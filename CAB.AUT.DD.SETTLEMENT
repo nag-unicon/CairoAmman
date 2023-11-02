@@ -1,0 +1,184 @@
+*-----------------------------------------------------------------------------
+* <Rating>-110</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AUT.DD.SETTLEMENT
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.AUT.DD.SETTLEMENT
+*---------------------------------------------------------------
+*Description       :
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0067
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_System
+    $INSERT I_GTS.COMMON
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.TELLER
+    $INSERT I_F.FUNDS.TRANSFER
+    $INCLUDE CAB.BP I_F.MC.DD.REGISTER
+    $INCLUDE CAB.BP I_F.DD.CHQ.TYPE
+
+    GOSUB INIT.FILES
+    GOSUB OPEN.FILES
+    GOSUB PROCESS
+
+    RETURN
+
+***********
+INIT.FILES:
+***********
+
+    FN.ACC = "F.ACCOUNT"
+    F.ACC = ""
+    FN.FT = "F.FUNDS.TRANSFER"
+    F.FT = ""
+    FN.FTHIS = "F.FUNDS.TRANSFER$HIS"
+    F.FTHIS = ""
+    FN.TT = "F.TELLER"
+    F.TT = ""
+    FN.TTHIS = "F.TELLER$HIS"
+    F.TTHIS = ""
+    FN.MCDD = "F.MC.DD.REGISTER"
+    F.MCDD = ""
+    FN.DD.CHQ = "F.DD.CHQ.TYPE"
+    F.DD.CHQ = ""
+
+    RETURN
+
+***********
+OPEN.FILES:
+***********
+
+    CALL OPF(FN.ACC,F.ACC)
+    CALL OPF(FN.FT,F.FT)
+    CALL OPF(FN.FTHIS,F.FTHIS)
+    CALL OPF(FN.TT,F.TT)
+    CALL OPF(FN.TTHIS,F.TTHIS)
+    CALL OPF(FN.MCDD,F.MCDD)
+    CALL OPF(FN.DD.CHQ,F.DD.CHQ)
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    DEBIT.ACCT.NO = 'CURRENT.DEB.ACCT'
+    CREDIT.CURRENCY = 'CURRENT.CREDIT.CURRENCY'
+    CREDIT.ACCT.NO = 'CURRENT.CRED.ACCT'
+    AMOUNT = 'CURRENT.AMOUNT'
+    TRAN.ID = 'CURRENT.STATUS.TRANSID'
+    PURCHASER = 'CURRENT.PURCHASER'
+    PAYEE.NAME = 'CURRENT.PAYEE.NAME'
+    MC.DD.ID = 'CURRENT.MC.DD.ID'
+
+    Y.DEBIT.ACCT.NO = System.getVariable(DEBIT.ACCT.NO)
+    Y.CREDIT.ACCT.NO = System.getVariable(CREDIT.ACCT.NO)
+    Y.CREDIT.CURRENCY = System.getVariable(CREDIT.CURRENCY)
+    Y.AMOUNT = System.getVariable(AMOUNT)
+    Y.TRAN.ID = System.getVariable(TRAN.ID)
+    Y.PURCHASER = System.getVariable(PURCHASER)
+    Y.PAYEE.NAM = System.getVariable(PAYEE.NAME)
+    Y.MC.DD.ID = System.getVariable(MC.DD.ID)
+
+    IF Y.MC.DD.ID THEN
+        CALL F.READ(FN.MCDD,Y.MC.DD.ID,R.MCDD,F.MCDD,MCD.ERR)
+        IF R.MCDD THEN
+            TRANSACTION.ID = R.MCDD<MC.DD.REG.STATUS.TRANSID>
+            IF TRANSACTION.ID[1,2] EQ "TT" THEN
+                GOSUB GET.TT.TYPE
+            END ELSE
+                GOSUB GET.FT.TYPE
+            END
+        END
+        R.NEW(FT.DEBIT.ACCT.NO) = DEBIT.ACCOUNT
+        R.NEW(FT.DEBIT.CURRENCY) = Y.CURRENCY
+        R.NEW(FT.DEBIT.AMOUNT) = Y.AMOUNT
+        R.NEW(FT.CREDIT.ACCT.NO) = CREDIT.ACCOUNT
+        R.NEW(FT.CREDIT.CURRENCY) = Y.CURRENCY
+        R.NEW(FT.LOCAL.REF)<1,L.CHEQUE.NUMBER.POS> = Y.MC.DD.ID
+        IF Y.PURCHASER NE "CURRENT.PURCHASER" THEN
+            R.NEW(FT.ORDERING.CUST) = Y.PURCHASER
+        END
+        IF Y.PAYEE.NAM NE "CURRENT.PAYEE.NAME" THEN
+            R.NEW(FT.PAYMENT.DETAILS) = Y.PAYEE.NAM
+        END
+        R.NEW(FT.PROFIT.CENTRE.DEPT) = "1"
+    END
+
+    RETURN
+
+************
+GET.TT.TYPE:
+************
+
+    GOSUB GET.LOCAL.REF
+    CALL F.READ(FN.TT,TRANSACTION.ID,R.TT,F.TT,TT.ERR)
+    IF R.TT THEN
+        DD.TYPE.ID = R.TT<TT.TE.LOCAL.REF><1,DD.TT.POS>
+    END ELSE
+        TRANSACTION.ID1 = TRANSACTION.ID:";1"
+        CALL F.READ(FN.TTHIS,TRANSACTION.ID1,R.TT,F.TTHIS,TT.ERR)
+        IF R.TT THEN
+            DD.TYPE.ID = R.TT<TT.TE.LOCAL.REF><1,DD.TT.POS>
+        END
+    END
+    GOSUB GET.DD.VALUES
+
+    RETURN
+
+************
+GET.FT.TYPE:
+************
+
+    GOSUB GET.LOCAL.REF
+    CALL F.READ(FN.FT,TRANSACTION.ID,R.FT,F.FT,FT.ERR)
+    IF R.FT THEN
+        DD.TYPE.ID = R.FT<FT.LOCAL.REF><1,DD.FT.POS>
+    END ELSE
+        TRANSACTION.ID1 = TRANSACTION.ID:";1"
+        CALL F.READ(FN.FTHIS,TRANSACTION.ID1,R.FT,F.FTHIS,FT.ERR)
+        IF R.FT THEN
+            DD.TYPE.ID = R.FT<FT.LOCAL.REF><1,DD.FT.POS>
+        END
+    END
+    GOSUB GET.DD.VALUES
+
+    RETURN
+
+**************
+GET.LOCAL.REF:
+**************
+
+    LOC.FIELD = "L.DD.TYPE":VM:"L.CHEQUE.NUMBER":FM:"L.DD.TYPE"
+    LOCAL.APPLICATION = 'FUNDS.TRANSFER':FM:'TELLER'
+    LOCAL.POS = ''
+    CALL MULTI.GET.LOC.REF(LOCAL.APPLICATION,LOC.FIELD,LOCAL.POS)
+    DD.FT.POS = LOCAL.POS<1,1>
+    DD.TT.POS = LOCAL.POS<2,1>
+    L.CHEQUE.NUMBER.POS = LOCAL.POS<1,2>
+
+    RETURN
+
+**************
+GET.DD.VALUES:
+**************
+
+    CALL F.READ(FN.DD.CHQ,DD.TYPE.ID,R.DD.CHQ,F.DD.CHQ,DD.CHQ.ERR)
+    IF R.DD.CHQ THEN
+        CREDIT.ACCOUNT  = R.DD.CHQ<DD.CHQ.NOSTRO.ACCOUNT>
+        DEBIT.ACCOUNT  = R.DD.CHQ<DD.CHQ.INTERNAL.ACCOUNT>
+        Y.CURRENCY = R.DD.CHQ<DD.CHQ.CURRENCY>
+    END
+
+    RETURN
+
+END

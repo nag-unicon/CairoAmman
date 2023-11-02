@@ -1,0 +1,66 @@
+*-----------------------------------------------------------------------------
+*-----------------------------------------------------------------------------
+
+* NOFILE ROUTINE used to get the Virtual Card details in CAB.ARC.LIST.VIRTUAL
+* It returns the Virtual card details
+
+* -----------------------------------------------------------------------------
+* Nuha Tuhul      05/03/2020           recompile rouitne to read template EB.CAB.CARD.TYPE
+* -----------------------------------------------------------------------------
+    SUBROUTINE CAB.ARC.LIST.PREPAID.CARD(RET.DATA)
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_ENQUIRY.COMMON
+    $INSERT I_EB.EXTERNAL.COMMON
+    $INCLUDE CAB.BP I_F.CAB.CARD.TYPE
+
+    GOSUB INITIALISE
+    GOSUB PROCESS
+    RETURN
+
+INITIALISE:
+
+    RET.DATA = ""
+    EXT.CUST.ID = EB.EXTERNAL$CUSTOMER
+    customerId = EXT.CUST.ID
+
+    R.CAB.CARD.TYPE = '' ; CAB.CARD.ERR = ''
+    CALL CACHE.READ("F.EB.CAB.CARD.TYPE","PREPAID",R.CAB.CARD.TYPE,CAB.CARD.ERR)
+    RETURN
+
+PROCESS:
+
+    CALL CallMobilWS.getCardList(customerId, errorCode , noOfRecords, recordArr )
+
+
+    IF recordArr NE '' THEN
+*CONVERT VM TO '|' IN recordArr
+*        CHANGE '||' TO FM IN recordArr
+        GOSUB SORT.VIRTUAL.CARD
+**        RET.DATA = recordArr
+    END ELSE
+        RET.DATA = errorCode<2>
+    END
+    RETURN
+
+SORT.VIRTUAL.CARD:
+
+    LOOP
+        REMOVE YR.LIST.ID FROM recordArr SETTING POS
+    WHILE YR.LIST.ID:POS
+
+        YR.CARD.ID = FIELD(YR.LIST.ID,'|',1)
+        YR.CARD.STATUS = FIELD(YR.LIST.ID,'|',4)
+        YR.CARD.PROGRAM = FIELD(YR.LIST.ID,'|',3)
+*        IF YR.CARD.ID[1,6] MATCHES '544378':@VM:'559938' THEN
+        LOCATE YR.CARD.ID[1,6] IN R.CAB.CARD.TYPE<EB.CAB75.CARD.TYPE,1> SETTING POS THEN
+            IF YR.CARD.STATUS NE "Cancelled" THEN
+                IF INDEX(YR.CARD.PROGRAM,"Prepaid",1) AND NOT(INDEX(YR.CARD.PROGRAM,"Virtual",1)) THEN
+                    RET.DATA<-1> = YR.LIST.ID
+                END
+            END
+        END
+    REPEAT
+
+END

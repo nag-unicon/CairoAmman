@@ -1,0 +1,123 @@
+* Version 1.0
+
+    SUBROUTINE CAB.ATM.SS.CUS.INQ.NOFILE(PAR.ID.LIST)
+
+***********************************************************************
+* Start date 19/02/2013 by ksrini@temenos.com
+* ---------------------------------------------------------------------
+* This is a Nofile routine for the enquiry CAB.ATM.CUS.INQ attached to
+* the STANDARD.SELECTION record NOFILE.CAB.ATM.CUS.INQ
+* This routine
+* - gets the customer details for the account
+*
+* It is designed for the ATM Interface (project CAB)
+*
+*                  ---- MODIFICATIONS ---------
+*
+***********************************************************************
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_ENQUIRY.COMMON
+
+    $INSERT I_F.CUSTOMER
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.ALTERNATE.ACCOUNT
+
+    PAR.ID.LIST   = ''        ;* Array for enquiry
+
+* Read enquiry parameters
+
+    LOC.D.RANGE.AND.VALUE = D.RANGE.AND.VALUE
+    CONVERT SM TO ' ' IN LOC.D.RANGE.AND.VALUE
+    LOC.D.RANGE.AND.VALUE = TRIM(LOC.D.RANGE.AND.VALUE,' ','R')
+
+    LOC.ACC.NO = ''
+    LOCATE 'ACC.NO' IN D.FIELDS<1> SETTING LOC.ACC.NO.POS ELSE LOC.ACC.NO.POS = ''
+    IF LOC.ACC.NO.POS THEN LOC.ACC.NO = LOC.D.RANGE.AND.VALUE<LOC.ACC.NO.POS>
+    IF NOT(LOC.ACC.NO) THEN RETURN
+
+* Init
+
+    FN.ACCOUNT = 'F.ACCOUNT'
+    F.ACCOUNT  = ''
+    CALL OPF(FN.ACCOUNT, F.ACCOUNT)
+
+    FN.ALT.ACCOUNT = 'F.ALTERNATE.ACCOUNT'
+    F.ALT.ACCOUNT  = ''
+    CALL OPF(FN.ALT.ACCOUNT, F.ALT.ACCOUNT)
+
+    FN.CUSTOMER = 'F.CUSTOMER'
+    F.CUSTOMER  = ''
+    CALL OPF(FN.CUSTOMER,F.CUSTOMER)
+
+    CALL GET.LOC.REF("CUSTOMER","PLACE.BIRTH.GB",LOC.POS)
+
+* Process
+
+    ACC.ERR = ''
+    R.ACCOUNT = ''
+    CALL F.READ(FN.ACCOUNT, LOC.ACC.NO, R.ACCOUNT,F.ACCOUNT, ACC.ERR)
+    IF NOT(R.ACCOUNT) THEN
+        ALT.ACC.ERR = ''
+        R.ALT.ACCOUNT = ''
+        CALL F.READ(FN.ALT.ACCOUNT, LOC.ACC.NO, R.ALT.ACCOUNT,F.ALT.ACCOUNT, ALT.ACC.ERR)
+        IF R.ALT.ACCOUNT THEN
+            ALT.ACCT.NO = R.ALT.ACCOUNT<AAC.GLOBUS.ACCT.NUMBER>
+            CALL F.READ(FN.ACCOUNT, ALT.ACCT.NO, R.ACCOUNT,F.ACCOUNT, ACC.ERR)
+            IF R.ACCOUNT THEN
+                CUST.ID = R.ACCOUNT<AC.CUSTOMER>
+                CUS.ERR = ''
+                R.CUSTOMER = ''
+                CALL F.READ(FN.CUSTOMER, CUST.ID, R.CUSTOMER,F.CUSTOMER, CUS.ERR)
+                IF R.CUSTOMER THEN
+                    REC.ADDR1 = R.CUSTOMER<EB.CUS.STREET,1>
+                    REC.ADDR2 = R.CUSTOMER<EB.CUS.ADDRESS,1,1>
+                    REC.CITY = R.CUSTOMER<EB.CUS.TOWN.COUNTRY,1>
+                    REC.ZIP = R.CUSTOMER<EB.CUS.POST.CODE,1>
+                    REC.PHONE = R.CUSTOMER<EB.CUS.SMS.1,1>
+                    IF NOT(REC.PHONE) THEN
+                        REC.PHONE = R.CUSTOMER<EB.CUS.OFF.PHONE,1>
+                    END
+                    ID.TYPE = R.CUSTOMER<EB.CUS.LEGAL.DOC.NAME,1>
+                    ID.ISSUER = R.CUSTOMER<EB.CUS.LEGAL.ISS.AUTH,1>
+                    ID.NUM = R.CUSTOMER<EB.CUS.LEGAL.ID,1>
+                    ID.ISS.DT = R.CUSTOMER<EB.CUS.LEGAL.ISS.DATE,1>
+                    ID.EXP.DT = R.CUSTOMER<EB.CUS.LEGAL.EXP.DATE,1>
+                    CUS.DOB = R.CUSTOMER<EB.CUS.DATE.OF.BIRTH>
+                    OCCUPATION = R.CUSTOMER<EB.CUS.OCCUPATION,1>
+                    ID.COUNTRY = R.CUSTOMER<EB.CUS.LEGAL.ISS.AUTH,1>
+                    PLACE.OF.BIRTH = R.CUSTOMER<EB.CUS.LOCAL.REF,LOC.POS>
+                    IF ID.EXP.DT THEN
+                        ID.REMARK = 'Y'
+                    END ELSE
+                        ID.REMARK = 'N'
+                    END
+                    NATIONALITY = R.CUSTOMER<EB.CUS.NATIONALITY>
+!!                    CUS.NAME.1 = R.CUSTOMER<EB.CUS.GIVEN.NAMES>
+!! CUS.NAME.2 = R.CUSTOMER<EB.CUS.FAMILY.NAME>
+!!
+
+                    LEN.1  = LEN(R.CUSTOMER<EB.CUS.SHORT.NAME>)
+                    LEN.2  = LEN(R.CUSTOMER<EB.CUS.GIVEN.NAMES>)
+
+                    X      =  R.CUSTOMER<EB.CUS.SHORT.NAME,1>
+                    CUS.NAME.1 = R.CUSTOMER<EB.CUS.GIVEN.NAMES>
+                    CUS.NAME.2 = X[LEN.2+1,LEN.1]
+
+                    PAR.ID.LIST = REC.ADDR1[40]'40" "L' : REC.ADDR2[40]'40" "L' : REC.CITY[20]'20" "L' : REC.ZIP[9]'9" "L' : REC.PHONE[15]'15" "L' : ID.TYPE[20]'20" "L' : ID.ISSUER[30]'30" "L'
+                    PAR.ID.LIST := ID.NUM[30]'30" "L' : ID.REMARK'1" "L' : ID.ISS.DT[10]'10" "L' : ID.EXP.DT[10]'10" "L' : CUS.DOB[10]'10" "L' : OCCUPATION[35]'35" "L' : CUS.NAME.1[50]'50" "L' : CUS.NAME.2[35]'35" "L'
+                    PAR.ID.LIST := PLACE.OF.BIRTH[44]'44" "L' : NATIONALITY'44" "L'
+                END
+            END
+        END
+
+    END
+
+    IF PAR.ID.LIST NE '' THEN
+        PAR.ID.LIST = "DETAILS:1:1=":PAR.ID.LIST:",RESP.OK"
+    END
+
+    RETURN
+
+END

@@ -1,0 +1,76 @@
+    SUBROUTINE CAB.AMEND.FT.NARAT
+    $INCLUDE I_COMMON
+    $INCLUDE I_EQUATE
+    $INCLUDE I_F.STMT.ENTRY
+    $INCLUDE I_F.FUNDS.TRANSFER
+
+    GOSUB INIT
+    GOSUB PROCESS
+    RETURN
+*****
+INIT:
+*****
+
+    F.STMT.ENTRY = ''
+    FN.STMT.ENTRY = 'F.STMT.ENTRY'
+    CALL OPF(FN.STMT.ENTRY,F.STMT.ENTRY)
+
+    F.STMT.ENTRY.DETAIL = ''
+    FN.STMT.ENTRY.DETAIL = 'F.STMT.ENTRY'
+    CALL OPF(FN.STMT.ENTRY.DETAIL,F.STMT.ENTRY.DETAIL)
+
+    F.FT = ''
+    FN.FT = 'F.FUNDS.TRANSFER$HIS'
+    CALL OPF(FN.FT,F.FT)
+
+    FILE.PATH = '&SAVEDLISTS&'
+    FILE.IN = ''
+    CALL OPF(FILE.PATH,FILE.IN)
+    OUT.FILE = 'OUT_FT.txt'
+    OPENSEQ FILE.PATH,OUT.FILE TO OUT.NAME ELSE
+        CREATE OUT.NAME ELSE
+            STOP
+        END
+    END
+
+    RETURN
+********
+PROCESS:
+********
+    CALL F.READ(FILE.PATH,'FT.txt',FILE.RECS,FILE.IN,FILE.RRR)
+    NO.OF.RECS = DCOUNT(FILE.RECS,FM)
+    FOR I = 1 TO NO.OF.RECS
+        FT.ID = FIELD(FILE.RECS<I>,',',1)
+        ACCT.ID =  FIELD(FILE.RECS<I>,',',2)
+        CALL F.READ.HISTORY(FN.FT,FT.ID,FT.REC,F.FT,FT.ERR)
+        IF FT.REC THEN
+            NO.OF.STMT = DCOUNT(FT.REC<FT.STMT.NOS>,VM)
+            GOSUB GET.STAT.IDS
+        END
+    NEXT
+
+    RETURN
+**************
+GET.STAT.IDS:
+**************
+    FOR J = 1 TO NO.OF.STMT
+        Y.STMT.ID = FT.REC<FT.STMT.NOS><1,J>
+        IF LEN(Y.STMT.ID) EQ '18' THEN
+            Y.ADD.STMT = FT.REC<FT.STMT.NOS><1,J+1>
+            Y.NO.OF.EXT.STAT = FIELD(Y.ADD.STMT,'-',2)
+            FOR K =1 TO Y.NO.OF.EXT.STAT
+                N.STMT.ID = Y.STMT.ID:'000':K
+                CALL F.READ(FN.STMT.ENTRY,N.STMT.ID,STMT.REC,F.STMT.ENTRY,STMT.ERR)
+                IF STMT.REC THEN
+                    OUT.REC = N.STMT.ID : ',' : FT.ID : ',' : ACCT.ID
+                    WRITESEQ OUT.REC APPEND TO OUT.NAME ELSE
+                    END
+                END
+            NEXT
+        END
+
+    NEXT
+
+    RETURN
+
+END

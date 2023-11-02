@@ -1,0 +1,84 @@
+    SUBROUTINE CAB.ARC.DAILY.LIMIT.UPD.FIELDS
+*<doc>
+* Template for field definitions routine YOURAPPLICATION.FIELDS
+*
+* @author tcoleman@temenos.com
+* @stereotype fields template
+* @uses Table
+* @public Table Creation
+* @package infra.eb
+* </doc>
+*-----------------------------------------------------------------------------
+* Modification History :
+*
+* 19/10/07 - EN_10003543
+*            New Template changes
+*
+* 14/11/07 - BG_100015736
+*            Exclude routines that are not released
+*-----------------------------------------------------------------------------
+*** <region name= Header>
+*** <desc>Inserts and control logic</desc>
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_DataTypes
+    $INSERT I_F.CUSTOMER
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Definition of ID>
+*** <desc> </desc>
+*    ID.F = 'CUSTOMER.ID'
+*   ID.N = '17'
+*  ID.T = 'CUS'
+*  ID.CHECKFILE = 'CUSTOMER':FM:EB.CUS.SHORT.NAME:FM:'L.A'
+*    neighbour = ''
+
+    ID.N = "25.1" ; ID.T = 'A' ;
+
+*-----------------------------------------------------------------------------
+    CALL Table.defineId("ID", T24_String)         ;* Define Table id
+*-----------------------------------------------------------------------------
+*** </region>
+
+*-----------------------------------------------------------------------------
+
+*-----------------------------------------------------------------------------
+
+    fieldName = 'CAB.CUS.AC.LIM.AMT'
+    fieldType = 'AMT'
+    fieldLength = '18'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour) ;* Add a new field
+
+
+    fieldName = 'CAB.INS.AC.LIM.AMT'
+    fieldType = 'AMT'
+    fieldLength = '18'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour) ;* Add a new field
+
+
+    fieldName = 'CAB.JOR.AC.LIM.AMT'
+    fieldType = 'AMT'
+    fieldLength = '18'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour) ;* Add a new field
+
+
+    fieldName = 'CAB.ABROAD.LIM.AMT'
+    fieldType = 'AMT'
+    fieldLength = '18'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour) ;* Add a new field
+
+
+*-----------------------------------------------------------------------------
+    CALL Table.setAuditPosition         ;* Poputale audit information
+*-----------------------------------------------------------------------------
+    RETURN
+*-----------------------------------------------------------------------------
+END

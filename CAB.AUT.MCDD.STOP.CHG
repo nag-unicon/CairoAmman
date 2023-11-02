@@ -1,0 +1,60 @@
+*-----------------------------------------------------------------------------
+* <Rating>-30</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AUT.MCDD.STOP.CHG
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.AUT.MCDD.STOP.CHG
+*---------------------------------------------------------------
+*Description       :
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0067
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_System
+    $INSERT I_GTS.COMMON
+    $INSERT I_F.FT.COMMISSION.TYPE
+    $INSERT I_F.FUNDS.TRANSFER
+
+    GOSUB INIT.FILES
+    GOSUB OPEN.FILES
+    GOSUB PROCESS
+
+    RETURN
+
+***********
+INIT.FILES:
+***********
+
+    FN.COM.TYPE = "F.FT.COMMISSION.TYPE"
+    F.COM.TYPE = ""
+
+    RETURN
+
+***********
+OPEN.FILES:
+***********
+
+    CALL OPF(FN.COM.TYPE,F.COM.TYPE)
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    CALL F.READ(FN.COM.TYPE,"CHQSPDR",R.COM.TYPE,F.COM.TYPE,COM.ERR)
+    IF R.COM.TYPE THEN
+        R.NEW(FT.CREDIT.AMOUNT) = R.COM.TYPE<FT4.FLAT.AMT>
+        R.NEW(FT.CREDIT.CURRENCY) = R.COM.TYPE<FT4.CURRENCY>
+        R.NEW(FT.CREDIT.ACCT.NO) = "PL":R.COM.TYPE<FT4.CATEGORY.ACCOUNT>
+    END
+
+END

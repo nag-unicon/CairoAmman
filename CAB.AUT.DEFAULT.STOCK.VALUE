@@ -1,0 +1,106 @@
+*-----------------------------------------------------------------------------
+* <Rating>-60</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AUT.DEFAULT.STOCK.VALUE
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.AUT.DEFAULT.STOCK.VALUE
+*---------------------------------------------------------------
+*Description       :
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0067
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_System
+    $INSERT I_GTS.COMMON
+    $INSERT I_F.STOCK.ENTRY
+    $INSERT I_F.STOCK.REGISTER
+
+    GOSUB INIT.FILES
+    GOSUB PROCESS
+
+    RETURN
+
+***********
+INIT.FILES:
+***********
+
+    FN.STO.REG = "F.STOCK.REGISTER"
+    F.STO.REG = ""
+    CALL OPF(FN.STO.REG,F.STO.REG)
+    LOCAL.APPLICATION = 'STOCK.ENTRY'
+    LOCAL.FIELD = 'L.TYPE':VM:'L.BR.REF':VM:'L.CURRENCY':VM:'L.REF'
+    LOCAL.POS = ''
+    CALL MULTI.GET.LOC.REF(LOCAL.APPLICATION,LOCAL.FIELD,LOCAL.POS)
+    GOSUB GET.POS.FIELDS
+
+    RETURN
+
+***************
+GET.POS.FIELDS:
+***************
+
+    L.TYPE.POS = LOCAL.POS<1,1>
+    L.BR.REF.POS = LOCAL.POS<1,2>
+    L.CURRENCY.POS = LOCAL.POS<1,3>
+    L.REF.POS = LOCAL.POS<1,4>
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    BR.ID = 'CURRENT.ID'
+    TYPE = 'CURRENT.TYPE'
+    COUNTERPARTY = 'CURRENT.COUNTERPARTY'
+    CURRENCY = 'CURRENT.CURRENCY'
+    NO.OF.DRAFT = 'CURRENT.NO.OF.DRAFT'
+    REFERENCE = 'CURRENT.REFERENCE'
+    Y.TYPE = System.getVariable(TYPE)
+    Y.COUNTERPARTY = System.getVariable(COUNTERPARTY)
+    Y.CURRENCY = System.getVariable(CURRENCY)
+    Y.NO.OF.DRAFT = System.getVariable(NO.OF.DRAFT)
+    Y.REFERENCE = System.getVariable(REFERENCE)
+    Y.BR.ID = System.getVariable(BR.ID)
+
+    R.NEW(STO.ENT.FROM.REGISTER) = Y.TYPE:".JO0090001"
+    R.NEW(STO.ENT.LOCAL.REF)<1,L.CURRENCY.POS> = Y.CURRENCY
+    R.NEW(STO.ENT.STOCK.ACCT.NO) = Y.COUNTERPARTY
+    R.NEW(STO.ENT.TO.REGISTER) = Y.TYPE:".JO009":FIELD(Y.REFERENCE,'.',1)
+    R.NEW(STO.ENT.LOCAL.REF)<1,L.BR.REF.POS> = Y.REFERENCE
+    R.NEW(STO.ENT.LOCAL.REF)<1,L.REF.POS> = Y.BR.ID
+    R.NEW(STO.ENT.IN.OUT.DATE) = TODAY
+    R.NEW(STO.ENT.STOCK.QUANTITY) = Y.NO.OF.DRAFT
+    R.NEW(STO.ENT.LOCAL.REF)<1,L.TYPE.POS> = Y.TYPE
+    IF Y.TYPE EQ "BCHQ" THEN
+        R.NEW(STO.ENT.STOCK.SERIES) = "MGR"
+        T(STO.ENT.STOCK.SERIES) = "NOINPUT"
+        CALL F.READ(FN.STO.REG,R.NEW(STO.ENT.FROM.REGISTER),R.STO.REG,F.STO.REG,REG.ERR)
+        IF R.STO.REG THEN
+            SERIES.ID = R.STO.REG<STO.REG.SERIES.ID>
+            STOCK.SERIES = "*":R.NEW(STO.ENT.STOCK.SERIES):"*"
+            STOCK.ACCT = R.NEW(STO.ENT.STOCK.ACCT.NO)
+            FIRST.THREE = STOCK.ACCT[1,3]
+            IF NOT(NUM(FIRST.THREE)) THEN
+                STOCK.SERIES := Y.CURRENCY
+            END
+            FINDSTR STOCK.SERIES IN R.STO.REG SETTING FLD.POS1,FLD.POS2 THEN
+                SERIES.NO = R.STO.REG<STO.REG.SERIES.NO,FLD.POS2,1>
+                Y.STOCK.START.NO = FIELD(SERIES.NO,"-",1)
+                R.NEW(STO.ENT.STOCK.START.NO) = Y.STOCK.START.NO
+            END
+        END
+    END
+
+    RETURN
+
+END
+

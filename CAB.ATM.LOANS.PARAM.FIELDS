@@ -1,0 +1,66 @@
+*-----------------------------------------------------------------------------
+* <Rating>-7</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.ATM.LOANS.PARAM.FIELDS
+*-----------------------------------------------------------------------------
+*<doc>
+* Template for field definitions routine CAB.ATM.LOANS.PARAM
+*
+* @author tcoleman@temenos.com
+* @stereotype fields template
+* @uses Table
+* @public Table Creation
+* @package infra.eb
+* </doc>
+*-----------------------------------------------------------------------------
+* Modification History :
+*
+* 19/10/07 - EN_10003543
+*            New Template changes
+*
+* 14/11/07 - BG_100015736
+*            Exclude routines that are not released
+*-----------------------------------------------------------------------------
+*** <region name= Header>
+*** <desc>Inserts and control logic</desc>
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT T24.BP I_DataTypes
+*** </region>
+
+*-----------------------------------------------------------------------------
+    CALL Table.defineId("ATM.LOAN.PARAM.ID",T24_String)     ;* Define Table id
+    ID.N = "17" ;  ID.T=''  ; ID.T<2> = "SYSTEM"
+*-----------------------------------------------------------------------------
+    neighbour=''
+    fieldName = 'XX.DESCRIPTION' ; fieldLength = '35' ; fieldType = 'A'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'OFS.USER' ; fieldLength = '35.1.C' ; fieldType = 'A' ;fileName='USER.SIGN.ON.NAME'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile(fileName)
+
+    fieldName = 'OFS.PASSWORD' ; fieldLength = '20.1' ; fieldType = 'PASSWD'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    CALL Table.addField("RESERVED.8",  T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.7",  T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.6",  T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.5",  T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.4",  T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.3",  T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.2",  T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.1",  T24_String, Field_NoInput,"")
+
+    fieldLength = "35"
+    fieldType = "A"
+    CALL Table.addFieldDefinition("XX.LOCAL.REF", fieldLength, fieldType, neighbour)
+    CALL Field.setDefault("")
+
+
+*-----------------------------------------------------------------------------
+    CALL Table.setAuditPosition         ;* Poputale audit information
+*-----------------------------------------------------------------------------
+    RETURN
+*-----------------------------------------------------------------------------
+END

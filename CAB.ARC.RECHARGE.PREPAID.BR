@@ -1,0 +1,51 @@
+    SUBROUTINE CAB.ARC.RECHARGE.PREPAID.BR
+**************************************************************************************
+* Nuha Tuhul        10/9/2020                  to retreive pool account & card holder
+*************************************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.FUNDS.TRANSFER
+    $INCLUDE T24.BP I_F.TELLER
+
+
+
+    YR.POS = ''
+    CALL MULTI.GET.LOC.REF("FUNDS.TRANSFER":@FM:"TELLER","AT.CARD.NO":@FM:"PAY.NARRATIVE":VM:"AC.CARD.HOLDER",YR.POS)
+    YR.CARD.NO.FT = YR.POS<1,1>
+    YR.CARD.NO.TT = YR.POS<2,1>
+    YR.AC.CARD.HOLDER.POS = YR.POS<2,2>
+
+    BEGIN CASE
+    CASE APPLICATION EQ "FUNDS.TRANSFER"
+        YR.CARD.NO = R.NEW(FT.LOCAL.REF)<1,YR.CARD.NO.FT>
+        YR.CARD.AMT = R.NEW(FT.CREDIT.AMOUNT)
+
+    CASE APPLICATION EQ "TELLER"
+
+        YR.CARD.NO = R.NEW(TT.TE.LOCAL.REF)<1,YR.CARD.NO.TT>
+
+        YR.CARD.AMT = R.NEW(TT.TE.AMOUNT.LOCAL.1)
+
+    END CASE
+
+    CALL CallMobilWS.rechargePrepaidCard(YR.CARD.NO, YR.CARD.AMT, cardHolder, PoolAccount, YR.ERR.CODE)
+
+    IF YR.ERR.CODE<1> THEN
+        E = YR.ERR.CODE<2>
+        CALL ERR
+        RETURN
+    END
+
+    YR.CARD.NO[LEN(YR.CARD.NO)-9,6] = 'XXXXXX'
+    IF APPLICATION EQ "FUNDS.TRANSFER" THEN
+        R.NEW(FT.LOCAL.REF)<1,YR.CARD.NO.FT> = YR.CARD.NO
+        R.NEW(FT.CREDIT.THEIR.REF)           = cardHolder
+        R.NEW(FT.DEBIT.THEIR.REF)            = cardHolder
+*        R.NEW(FT.DEBIT.THEIR.REF) = YR.CARD.NO
+    END ELSE
+*        R.NEW(TT.TE.NARRATIVE.1) = YR.CARD.NO
+        R.NEW(TT.TE.LOCAL.REF)<1,YR.AC.CARD.HOLDER.POS>    = cardHolder
+        R.NEW(TT.TE.LOCAL.REF)<1,YR.CARD.NO.TT> = YR.CARD.NO
+    END
+
+    RETURN

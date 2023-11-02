@@ -1,0 +1,99 @@
+*-----------------------------------------------------------------------------
+* <Rating>-12</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.ATTACH.LIMIT.PARAM.FIELDS
+*-----------------------------------------------------------------------------
+
+*** <region name= Header>
+*** <desc>Inserts and control logic</desc>
+    $INCLUDE I_COMMON
+    $INCLUDE I_EQUATE
+    $INCLUDE I_DataTypes
+*** </region>
+*-----------------------------------------------------------------------------
+    CALL Table.defineId("PARAM.ID", T24_String)   ;*Define Table id
+    ID.N = "9" ;  ID.T=''  ; ID.T<2> = "SYSTEM"
+*-----------------------------------------------------------------------------
+!! Ammar
+
+    field.type = ''
+    field.name = 'XX.CATEGORY'
+    field.type = 'A'
+    field.length = '4'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+    CALL Field.setCheckFile('CATEGORY')
+
+    field.type = ''
+    field.name = 'XX.CURRENCY'
+    field.type = 'A'
+    field.length = '4'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+    CALL Field.setCheckFile('CURRENCY')
+
+    field.type = ''
+    field.name = 'PROD.LMT'
+    field.type = 'A'
+    field.length = '3'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+    CALL Field.setCheckFile('LIMIT.REFERENCE')
+
+    field.type = ''
+    field.name = 'PART.LMT'
+    field.type = 'A'
+    field.length = '3'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+    CALL Field.setCheckFile('LIMIT.REFERENCE')
+
+    field.type = ''
+    field.name = 'CHLD.LMT'
+    field.type = 'A'
+    field.length = '3'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+    CALL Field.setCheckFile('LIMIT.REFERENCE')
+
+    field.type = ''
+    field.name = 'LMT.EXPIRY'
+    field.type = 'A'
+    field.length = '1'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+
+    field.type = ''
+    field.name = 'XX.PUPOSE'
+    field.type = 'A'
+    field.length = '2'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+    CALL Field.setCheckFile('EB.CAB.OPEN.PROFILE')
+
+    field.type = ''
+    field.name = 'COL.CODE'
+    field.type = 'A'
+    field.length = '3'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+    CALL Field.setCheckFile('COLLATERAL.CODE')
+
+    field.type = ''
+    field.name = 'OFS.LIMIT.VERSION'
+    field.type = 'A'
+    field.length = '35'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+    CALL Field.setCheckFile('VERSION')
+
+    field.type = ''
+    field.name = 'OFS.ACCT.VERSION'
+    field.type = 'A'
+    field.length = '35'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+    CALL Field.setCheckFile('VERSION')
+
+    field.type = ''
+    field.name = 'OFS.ID'
+    field.type = 'A'
+    field.length = '35'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+    CALL Field.setCheckFile('OFS.SOURCE')
+
+    CALL Table.addLocalReferenceField(XX.LOCAL.REF)
+    CALL Table.setAuditPosition
+    RETURN
+END

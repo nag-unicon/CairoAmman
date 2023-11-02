@@ -1,0 +1,124 @@
+    SUBROUTINE CAB.AMEND.STO.RECORD(IN.MSG,OUT.MSG)
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_GTS.COMMON
+    $INCLUDE CAB.BP I_CAB.LINC.BANK.PARAMETER.COMMON
+    $INCLUDE CAB.BP I_F.CAB.LINC.OFS.PARAM
+    $INCLUDE T24.BP I_F.STANDING.ORDER
+    $INCLUDE T24.BP I_F.ACCOUNT
+
+
+    GOSUB INITIALISE
+    GOSUB PROCESS
+
+    RETURN
+
+***********
+INITIALISE:
+***********
+
+    F.STO = ''
+    FN.STO = 'F.STANDING.ORDER'
+    CALL OPF(FN.STO,F.STO)
+
+    F.AC = ''
+    FN.AC = 'F.ACCOUNT'
+    CALL OPF(FN.AC,F.AC)
+
+    Y.REF.NO = '' ; Y.REF.NO = FIELD(FIELD(IN.MSG,"<ReqRefNo>",2),"</ReqRefNo>",1)
+    Y.REQ.DATE = '' ; Y.REQ.DATE = FIELD(FIELD(IN.MSG,"<ReqDate>",2),"</ReqDate>",1)
+    Y.REQ.TIME = '' ; Y.REQ.TIME = FIELD(FIELD(IN.MSG,"<ReqTime>",2),"</ReqTime>",1)
+    Y.IN.MSG.TYPE = '' ; Y.IN.MSG.TYPE = FIELD(FIELD(IN.MSG,"<ReqCode>",2),"</ReqCode>",1)
+    Y.CH.CODE = '' ; Y.CH.CODE = FIELD(FIELD(IN.MSG,"<ReqChCode>",2),"</ReqChCode>",1)
+    Y.STO.ID = '' ; Y.STO.ID = FIELD(FIELD(IN.MSG,"<StandingOrderId>",2),"</StandingOrderId>",1)
+    Y.CCY = '' ; Y.CCY = FIELD(FIELD(IN.MSG,"<Currency>",2),"</Currency>",1)
+    Y.AMT = '' ; Y.AMT = FIELD(FIELD(IN.MSG,"<Amount>",2),"</Amount>",1)
+    Y.DT.FQU = '' ; Y.DT.FQU = FIELD(FIELD(IN.MSG,"<StartDateFrequency>",2),"</StartDateFrequency>",1)
+    Y.END.DATE = '' ; Y.END.DATE = FIELD(FIELD(IN.MSG,"<EndDate>",2),"</EndDate>",1)
+    Y.DETAILS = '' ; Y.DETAILS = FIELD(FIELD(IN.MSG,"<PaymentDetails>",2),"</PaymentDetails>",1)
+    Y.BEN.ACC = '' ; Y.BEN.ACC = FIELD(FIELD(IN.MSG,"<Beneficiary>",2),"</Beneficiary>",1)
+    Y.TRF.TYPE = '' ; Y.TRF.TYPE = FIELD(FIELD(IN.MSG,"<TransferType>",2),"</TransferType>",1)
+    Y.TR.NICK = '' ; Y.TR.NICK = FIELD(FIELD(IN.MSG,"<NickName>",2),"</NickName>",1)
+    Y.TYPE = '' ; Y.TYPE = FIELD(FIELD(IN.MSG,"<Type>",2),"</Type>",1)
+
+    Y.IN.REQ.ERR = "" ; Y.ERR.CODE = "" ; Y.COMP.ID = "" ; FT.XML.TAG = "" ; OUT.MSG = ''
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    Y.DATE = '' ; Y.DATE = OCONV(DATE(),"D-")
+    CHANGE '-' TO '/' IN Y.DATE
+
+    TIME.STAMP = '' ; TIME.STAMP=TIMEDATE()
+    Y.TIME = TIME.STAMP[1,8]
+
+    IF Y.STO.ID = '' THEN
+        Y.IN.REQ.ERR = 'Standing Order Id Missing In Request'
+        Y.ERR.CODE = 1
+    END ELSE
+        R.STO = '' ; Y.RD.ERR = ''
+        CALL F.READ(FN.STO,Y.STO.ID,R.STO,F.STO,Y.RD.ERR)
+        IF R.STO = '' THEN
+            Y.IN.REQ.ERR = 'Standing Order Id In Request Missing In T24'
+            Y.ERR.CODE = 1
+        END ELSE
+            Y.COMP.ID = R.STO<STO.CO.CODE>
+        END
+    END
+
+    IF Y.ERR.CODE ELSE
+        Y.SONAME = '' ; Y.SONAME = R.CAB.LINC.OFS.PARAM<CAB.LINC.OFS.USERNAME>
+        Y.PASS = '' ; Y.PASS = R.CAB.LINC.OFS.PARAM<CAB.LINC.OFS.PASSWORD>
+        Y.OFS.MSG = ''
+        Y.OFS.MSG = VERSION.NAME:'/I/PROCESS,':Y.SONAME:'/':Y.PASS:'/':Y.COMP.ID:',':Y.STO.ID
+      *  IF Y.CCY NE '' THEN
+      *      IF Y.TYPE EQ 'BI' OR  Y.TYPE EQ  'FI'  THEN
+      *          CALL F.READ(FN.AC,Y.BEN.ACC,R.ACC.B,F.AC,Y.BEN.ERR)
+      *          Y.CCY.X = R.ACC.B<AC.CURRENCY>
+      *          Y.OFS.MSG := ',CURRENCY=':Y.CCY.X
+      *      END ELSE
+      *          Y.OFS.MSG := ',CURRENCY=':Y.CCY
+      *      END
+
+      *  END
+        IF Y.AMT NE '' THEN
+            Y.OFS.MSG := ',CURRENT.AMOUNT.BAL=':Y.AMT
+        END
+        IF Y.DT.FQU NE '' THEN
+            Y.OFS.MSG := ',CURRENT.FREQUENCY=':Y.DT.FQU
+            IF R.STO<STO.COMM.FREQUENCY,1> NE '' THEN
+                IF R.STO<STO.COMM.FREQUENCY,1> NE Y.DT.FQU THEN
+                    Y.OFS.MSG := ',COMM.FREQUENCY:1=':Y.DT.FQU
+                END
+            END
+        END
+        IF Y.END.DATE NE '' THEN
+            Y.OFS.MSG := ',CURRENT.END.DATE=':Y.END.DATE
+        END
+        IF Y.DETAILS NE '' THEN
+            Y.OFS.MSG := ',PAYMENT.DETAILS:1=':Y.DETAILS
+        END
+        IF Y.BEN.ACC NE '' THEN
+            Y.OFS.MSG := ',CPTY.ACCT.NO=':Y.BEN.ACC
+        END
+
+        IF Y.TRF.TYPE NE '' THEN
+            Y.OFS.MSG := ',PAY.METHOD=':Y.TRF.TYPE
+        END
+        IF Y.TR.NICK NE '' THEN
+            Y.OFS.MSG := ',STO.NICK.NAME=':Y.TR.NICK
+        END
+
+
+        OUT.MSG = Y.OFS.MSG
+    END
+
+    FT.XML.TAG = '<A2AMW><MsgHeader><ReqCode>':Y.IN.MSG.TYPE:'</ReqCode><ReqChCode>':Y.CH.CODE:'</ReqChCode><ReqRefNo>':Y.REF.NO:'</ReqRefNo><ReqDate>':Y.REQ.DATE:'</ReqDate><ReqTime>':Y.REQ.TIME:'</ReqTime><Result><RespDate>':Y.DATE:'</RespDate><RespTime>':Y.TIME:'</RespTime><RespRefNo/><ErrCode>':Y.ERR.CODE:'</ErrCode><ErrMsg>':Y.IN.REQ.ERR:'</ErrMsg></Result></MsgHeader><MsgBody><StandingOrderId>':Y.STO.ID:'</StandingOrderId><Success></Success></MsgBody></A2AMW>'
+
+    RETURN
+
+END

@@ -1,0 +1,119 @@
+*-----------------------------------------------------------------------------
+* <Rating>-42</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AUT.MC.VALUE
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.AUT.MC.VALUE
+*---------------------------------------------------------------
+*Description       :
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0067
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.TELLER
+    $INSERT I_F.FUNDS.TRANSFER
+    $INSERT I_F.STOCK.REGISTER
+    $INCLUDE CAB.BP I_F.DDMC.FILE.PARAMETER
+
+    IF MESSAGE EQ "AUT" THEN
+        RETURN
+    END
+    GOSUB INIT.FILES
+    GOSUB OPEN.FILES
+    GOSUB PROCESS
+
+    RETURN
+
+***********
+INIT.FILES:
+***********
+
+    FN.STO.REG = "F.STOCK.REGISTER"
+    F.STO.REG = ""
+    FN.DDMC = "F.DDMC.FILE.PARAMETER"
+    F.DDMC = ""
+
+    RETURN
+
+***********
+OPEN.FILES:
+***********
+
+    CALL OPF(FN.STO.REG,F.STO.REG)
+    CALL OPF(FN.DDMC,F.DDMC)
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    CALL CACHE.READ(FN.DDMC,'SYSTEM',R.DDMC,R.ERR)
+    IF R.DDMC THEN
+        Y.ACCT = R.DDMC<DDMC.MC.ACCOUNT.NO>
+    END
+    IF ID.NEW[1,2] EQ "TT" THEN
+*        R.NEW(TT.TE.ACCOUNT.1) = "JOD171110001":ID.COMPANY[LEN(ID.COMPANY)-3,LEN(ID.COMPANY)]
+        IF R.NEW(TT.TE.CURR.NO) EQ "" THEN
+            R.NEW(TT.TE.ACCOUNT.1) = Y.ACCT
+        END ELSE
+            RETURN
+        END
+    END ELSE
+*        R.NEW(FT.CREDIT.ACCT.NO) = "JOD171110001":ID.COMPANY[LEN(ID.COMPANY)-3,LEN(ID.COMPANY)]
+        IF R.NEW(FT.CURR.NO) EQ "" THEN
+            R.NEW(FT.CREDIT.ACCT.NO) = Y.ACCT
+        END ELSE
+            RETURN
+        END
+    END
+    CALL F.READ(FN.STO.REG,"BCHQ.":ID.COMPANY,R.STO.REG,F.STO.REG,REG.ERR)
+    IF R.STO.REG THEN
+        SERIES.ID = R.STO.REG<STO.REG.SERIES.ID>
+        FINDSTR "*":"MGR":"*" IN R.STO.REG SETTING FLD.POS1,FLD.POS2 THEN
+            SERIES.NO = R.STO.REG<STO.REG.SERIES.NO,FLD.POS2,1>
+            SERIES.BAL = R.STO.REG<STO.REG.SERIES.BAL,FLD.POS2>
+            Y.STOCK.START.NO = FIELD(SERIES.NO,'-',1)
+        END
+    END
+    GOSUB SUB.PROCESS
+
+    RETURN
+
+************
+SUB.PROCESS:
+************
+
+    LOCAL.APPLICATION = 'FUNDS.TRANSFER'
+    LOCAL.FIELD = 'L.CHEQUE.NUMBER'
+    LOCAL.POS = ''
+    CALL MULTI.GET.LOC.REF(LOCAL.APPLICATION,LOCAL.FIELD,LOCAL.POS)
+    L.CHEQUE.NUMBER.POS = LOCAL.POS<1,1>
+    IF SERIES.BAL EQ "0" THEN
+        IF ID.NEW[1,2] EQ "TT" THEN
+            AF = TT.TE.STOCK.REGISTER
+        END ELSE
+            AF = FT.LOCAL.REF
+            AV = L.CHEQUE.NUMBER.POS
+        END
+        ETEXT = "EB-STOCK.EMPTY"
+        CALL STORE.END.ERROR
+        RETURN
+    END
+    IF ID.NEW[1,2] EQ "TT" THEN
+        R.NEW(TT.TE.STOCK.NUMBER) = Y.STOCK.START.NO
+    END ELSE
+        R.NEW(FT.LOCAL.REF)<1,L.CHEQUE.NUMBER.POS> = Y.STOCK.START.NO
+    END
+
+    RETURN
+
+END

@@ -1,0 +1,65 @@
+*-----------------------------------------------------------------------------
+* <Rating>-5</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AI.EPAY.PARAMETER.FIELDS
+*-----------------------------------------------------------------------------
+*<doc>
+* Template for field definitions routine YOURAPPLICATION.FIELDS
+*
+* @author @temenos.com
+* @stereotype fields template
+* @uses Table
+* @public Table Creation
+* @package infra.eb
+* </doc>
+*-----------------------------------------------------------------------------
+* Modification History :
+*
+* 19/10/07 - EN_10003543
+*            New Template changes
+*
+* 14/11/07 - BG_100015736
+*            Exclude routines that are not released
+*-----------------------------------------------------------------------------
+* 09/03/2020  Nuha Tuhul               add new fields to paramater
+*-----------------------------------------------------------------------------
+*** <region name= Header>
+*** <desc>Inserts and control logic</desc>
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_DataTypes
+*** </region>
+*-----------------------------------------------------------------------------
+    CALL Table.defineId("CAB.AI.EPAY.PARAM.ID","":@FM:15:@FM:"":@VM:"SYSTEM")   ;* Define Table id
+*-----------------------------------------------------------------------------
+
+    CALL Table.addFieldDefinition("DESCRIPTION",35,"A","")
+
+    CALL Table.addFieldDefinition("USER.ID","35","A","")
+    CALL Table.addFieldDefinition("PASSWORD","35","A","")
+    CALL Table.addFieldDefinition("CHANNEL","35","A","")
+    CALL Table.addFieldDefinition("ACCOUNT","35","A","")
+    CALL Table.addFieldDefinition("ARC.CHANNEL","35","A","")
+    CALL Table.addFieldDefinition("TELLER.CHANNEL","35","A","")
+    CALL Table.addFieldDefinition("CASH.PAYMNT.METHD","35","A","")
+    CALL Table.addFieldDefinition("ACCT.PAYMNT.METHD","35","A","")
+
+*-----------------------------------------------------------------------------
+* Reserved Field Definition:
+*-----------------------------------------------------------------------------
+
+    CALL Table.addReservedField('RESERVED.6')
+    CALL Table.addReservedField('RESERVED.7')
+    CALL Table.addReservedField('RESERVED.8')
+    CALL Table.addReservedField('RESERVED.9')
+    CALL Table.addReservedField('RESERVED.10')
+
+*-----------------------------------------------------------------------------
+    CALL Table.setAuditPosition         ;* Poputale audit information
+*-----------------------------------------------------------------------------
+
+    RETURN
+
+*-----------------------------------------------------------------------------
+
+END

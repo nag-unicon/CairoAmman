@@ -1,0 +1,89 @@
+    SUBROUTINE CAB.ATS.VER.ENQUIRY(SAMPLE.ID,SAMPLE.RESPONSE,RESPONSE.TYPE,STYLE.SHEET)
+*-----------------------------------------------------------------------------
+*Modification Details:
+*=====================
+* Date        : 16-10-2019
+* Modified by : Nuha Tuhul
+* Description : FOR ATS VERSIONS
+*-----------------------------------------------------------------------------
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.CURRENCY
+    $INCLUDE T24.BP I_GTS.COMMON
+    $INCLUDE BP     I_F.ATS.VERSIONS
+    $INCLUDE JBC.h
+
+
+    GOSUB INIT.PROCESS
+    GOSUB PROCESS
+    RETURN
+
+INIT.PROCESS:
+
+    STYLE.SHEET = '/transforms/host/hostdetail.xsl'
+    RESPONSE.TYPE = 'XML.ENQUIRY'
+
+    RETURN
+
+PROCESS:
+
+    FN.ATS.VERSION = 'F.EB.ATS.VERSIONS'
+    F.ATS.VERSION = ''
+    CALL OPF(FN.ATS.VERSION,F.ATS.VERSION)
+
+    FN.CURRENCY = 'F.CURRENCY'
+    F.CURRENCY = ''
+    CALL OPF(FN.CURRENCY,F.CURRENCY)
+
+    KEY.ID        = FIELD(SAMPLE.ID ,'@',1)
+    VERSION.ID    = FIELD(SAMPLE.ID ,'@',2)
+    CURR.ID       = FIELD(SAMPLE.ID ,'@',3)
+
+    GOSUB BILLER.PROCESS
+
+    RETURN
+
+
+BILLER.PROCESS:
+
+    YR.TYPE = '112'
+
+
+    DATA.OUT  =''
+    CODE.LIST  =''
+    NAME.LIST  = '' ; R.REC ='' ; R.FCY.REC = '';R.CURR.REC = ''
+
+    CALL CACHE.READ(FN.ATS.VERSION,KEY.ID,R.REC,PARAM.ERR)
+    CALL CACHE.READ(FN.CURRENCY,CURR.ID,R.CURR.REC,CURR.ERR)
+
+    YR.VERSIONS = R.REC<EB.ATS.VERSION>
+    CODE.LIST   = "<ATSFlag>N</ATSFlag>"          ;* Initaiate version not exist on param
+
+    IF R.REC  THEN
+        IF VERSION.ID   MATCHES YR.VERSIONS  THEN
+            CODE.LIST = "<ATSFlag>L@":R.CURR.REC<EB.CUR.NO.OF.DECIMALS>:"@</ATSFlag>"     ;* version exist in LOCAL
+        END  ELSE
+            FCY.KEY.ID = KEY.ID:"FCY"
+            CALL CACHE.READ(FN.ATS.VERSION,FCY.KEY.ID,R.FCY.REC,PARAM.FCY.ERR)
+            YR.FCY.VERSIONS  = R.FCY.REC<EB.ATS.VERSION>
+            IF VERSION.ID   MATCHES YR.FCY.VERSIONS  THEN
+                IF  R.FCY.REC  THEN
+                    CODE.LIST     = "<ATSFlag>F@":R.CURR.REC<EB.CUR.NO.OF.DECIMALS>:"@</ATSFlag>"   ;* version exist in foriegn
+                END
+            END
+        END
+    END
+
+    CONVERT FM TO '|' IN CODE.LIST
+
+
+    DATA.OUT = CODE.LIST
+
+    XML.RECS = '<window><panes><pane><dataSection><enqResponse>'
+    XML.RECS :='<r><c><cap>':DATA.OUT:'</cap></c></r>'
+    XML.RECS :='</enqResponse></dataSection></pane></panes></window>'
+    SAMPLE.RESPONSE = XML.RECS
+    WRITELIST SAMPLE.RESPONSE TO "E1_128_2"
+
+    RETURN

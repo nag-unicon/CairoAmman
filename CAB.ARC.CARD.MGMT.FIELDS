@@ -1,0 +1,214 @@
+*-----------------------------------------------------------------------------
+* <Rating>-3</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.ARC.CARD.MGMT.FIELDS
+*<doc>
+* Template for field definitions routine YOURAPPLICATION.FIELDS
+*
+* @author tcoleman@temenos.com
+* @stereotype fields template
+* @uses Table
+* @public Table Creation
+* @package infra.eb
+* </doc>
+*-----------------------------------------------------------------------------
+* Modification History :
+*
+* 19/10/07 - EN_10003543
+*            New Template changes
+*
+* 14/11/07 - BG_100015736
+*            Exclude routines that are not released
+*-----------------------------------------------------------------------------
+*** <region name= Header>
+*** <desc>Inserts and control logic</desc>
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_DataTypes
+*** </region>
+
+    MAT F = "" ; MAT N = "" ; MAT T = ""
+    MAT CHECKFILE = "" ; MAT CONCATFILE = ""
+    ID.CHECKFILE = "" ; ID.CONCATFILE = ""
+
+    ID.F = "CAB.ARC.VAL" ; ID.N = "16.1" ; ID.T = "A"
+
+*-----------------------------------------------------------------------------
+*    CALL Table.defineId("ID", IdType)   ;* Define Table id
+*-----------------------------------------------------------------------------
+
+    fieldName = "CARD.PROGRAM"
+    fieldLength = "1"
+    fieldType = ''
+    fieldtype<2> = 'P_D_V'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+
+    fieldName = "EXTERNAL.USER.ID"
+    fieldLength = "10"
+    fieldtype = 'SSS'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+    CALL Field.setCheckFile("EB.EXTERNAL.USER")
+
+    fieldName = "CUSTOMER.NO"
+    fieldLength = "10"
+    fieldtype = 'CUS'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+    CALL Field.setCheckFile("CUSTOMER")
+
+    fieldName = "CUSTOMER.NAME"
+    fieldLength = "35"
+    fieldtype = 'SWI'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour) 
+
+    fieldName = "ACCOUNT.NO"
+    fieldLength = "16"
+    fieldtype = '.ALLACCVAL'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+    CALL Field.setCheckFile("ACCOUNT")
+
+
+    fieldName = "CARD.NO"
+    fieldLength = "19"
+    fieldtype = 'A'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+
+    fieldName = "CARD.STATUS"
+    fieldtype = 'CARD.STATUS'
+    neighbour = ''
+
+    CALL Table.addFieldWithEbLookup(fieldName, fieldtype , neighbour)
+
+    fieldName = "OPPOSE.CARD"
+    fieldtype = 'OPPOSE.CARD'
+    neighbour = ''
+
+    CALL Table.addFieldWithEbLookup(fieldName, fieldtype , neighbour)
+
+    fieldName = "RELOAD.CARD"
+    fieldLength = "64"
+    fieldtype = 'AMT'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+
+    fieldName = "MOBILE.NO"
+    fieldLength = "20"
+    fieldtype = 'A'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+
+
+    fieldName = "PURPOSE"
+    fieldLength = "64"
+    fieldtype = 'A'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+    fieldName = "STATUS.REASON"
+    fieldtype = 'STATUS.REASON'
+    neighbour = ''
+
+    CALL Table.addFieldWithEbLookup(fieldName, fieldtype , neighbour)
+
+**    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+
+    fieldName = "CVV2.CODE"
+    fieldLength = "6"
+    fieldtype = 'A'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+
+    fieldName = "EXPIRY.DATE"
+    fieldLength = "12"
+    fieldtype = ''
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+
+
+    fieldName = "XX.OVERRIDE"
+    fieldLength = "65"
+    fieldtype = 'A'
+    fieldtype<3> = 'NOINPUT'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+
+    fieldName = "RESERVED.7"
+    fieldLength = "65"
+    fieldtype = 'A'
+    fieldtype<3> = 'NOINPUT'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+
+    fieldName = "RESERVED.6"
+    fieldLength = "65"
+    fieldtype = 'A'
+    fieldtype<3> = 'NOINPUT'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+
+    fieldName = "RESERVED.5"
+    fieldLength = "65"
+    fieldtype = 'A'
+    fieldtype<3> = 'NOINPUT'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+
+    fieldName = "RESERVED.4"
+    fieldLength = "65"
+    fieldtype = 'A'
+    fieldtype<3> = 'NOINPUT'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+
+    fieldName = "RESERVED.3"
+    fieldLength = "65"
+    fieldtype = 'A'
+    fieldtype<3> = 'NOINPUT'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+
+    fieldName = "RESERVED.2"
+    fieldLength = "65"
+    fieldtype = 'A'
+    fieldtype<3> = 'NOINPUT'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+
+    fieldName = "RESERVED.1"
+    fieldLength = "65"
+    fieldtype = 'A'
+    fieldtype<3> = 'NOINPUT'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+
+
+*-----------------------------------------------------------------------------
+    CALL Table.setAuditPosition         ;* Poputale audit information
+*-----------------------------------------------------------------------------
+    RETURN
+*-----------------------------------------------------------------------------
+
+END

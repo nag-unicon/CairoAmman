@@ -1,0 +1,421 @@
+* Version 1.0
+
+*********************************************************************
+* Start on 21/12/2011 By A.Gryaznov, Temenos
+*
+* Developed for ATM Interface.
+* Program for sending a Customer&Account message to MQ.
+* Get accounts for this rtn from the CI field ACCOUNT.
+* Get customer for this rtn from the primery (first) account.
+*
+* Input parameters are:
+* - Customer ID
+* - Customer Record
+* - Customer Action
+* - Customer Action Parameter
+* - Account ID
+* - Account Record
+* - Account Action
+* - Account Action Parameter
+* - Action Parameter
+* Output parameters are:
+* - Error Message
+*
+*                       ---- MODIFICATIONS ---------
+*********************************************************************
+
+    SUBROUTINE CAB.ATM.SEND.CUAC(PAR.CUST.ID, PAR.CUST.RECORD, PAR.CUST.ACTION, PAR.CUST.ACTION.PARAM, PAR.ACCT.ID, PAR.ACCT.RECORD, PAR.ACCT.ACTION, PAR.ACCT.ACTION.PARAM, PAR.ERROR)
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.CARD.ISSUE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.CUSTOMER
+    $INSERT I_F.CURRENCY
+    $INSERT I_F.CAB.ATM.PARAMETER
+
+    PAR.ERROR = ''
+
+    GOSUB INIT
+    IF PAR.ERROR THEN RETURN
+
+    GOSUB CREATE.MSG
+    IF PAR.ERROR THEN RETURN
+
+    GOSUB SEND.MSG
+    IF PAR.ERROR THEN RETURN
+
+    RETURN
+
+*********************************************************************
+
+INIT:
+
+    LOC.DEL = CHARX(10)
+
+    LOC.HEADER = '<?xml version="1.0" encoding="us-ascii"?>'
+
+    APP.NAMES = 'CUSTOMER'
+    FIELD.NAMES  = 'IRIS.PER.NO':VM:'PLACE.BIRTH.GB':VM:'EN.LEGAL.TYPE':VM:'CBJ.NUMBER':VM:'DEC.CAPITAL':VM:'IND.NAT.ID':VM:'CORP.NAT.ID'
+    CALL MULTI.GET.LOC.REF(APP.NAMES,FIELD.NAMES,LOC.POS.ARR)
+
+    LOC.FN.ACCOUNT = 'F.ACCOUNT'
+    LOC.F.ACCOUNT  = ''
+    CALL OPF(LOC.FN.ACCOUNT, LOC.F.ACCOUNT)
+
+    LOC.FN.CUSTOMER = 'F.CUSTOMER'
+    LOC.F.CUSTOMER  = ''
+    CALL OPF(LOC.FN.CUSTOMER, LOC.F.CUSTOMER)
+
+    LOC.R.ACCOUNT = ''
+    IF PAR.ACCT.ID AND PAR.ACCT.RECORD THEN
+        LOC.ACCT.ID   = PAR.ACCT.ID
+        LOC.R.ACCOUNT = PAR.ACCT.RECORD
+    END ELSE
+        LOC.ACCT.ID   = PAR.ACCT.ACTION.PARAM<1>
+        IF LOC.ACCT.ID THEN
+            CALL F.READ(LOC.FN.ACCOUNT, LOC.ACCT.ID, LOC.R.ACCOUNT, LOC.F.ACCOUNT, PAR.ERROR)
+        END
+    END
+    IF PAR.ERROR THEN RETURN
+
+    LOC.R.CUSTOMER = ''
+    IF PAR.CUST.ID AND PAR.CUST.RECORD THEN
+        LOC.CUST.ID    = PAR.CUST.ID
+        LOC.R.CUSTOMER = PAR.CUST.RECORD
+    END ELSE
+        LOC.CUST.ID    = PAR.CUST.ACTION.PARAM<1>
+        CALL F.READ(LOC.FN.CUSTOMER, LOC.CUST.ID, LOC.R.CUSTOMER, LOC.F.CUSTOMER, PAR.ERROR)
+    END
+    IF PAR.ERROR THEN RETURN
+
+* Parameters
+
+    OPEN "F.CAB.ATM.PARAMETER" TO F.CAB.ATM.PARAMETER ELSE
+        PAR.ERROR = "Can not open a file F.CAB.ATM.PARAMETER"
+        RETURN
+    END
+
+*Type
+    LOC.DEVICE.TYPE = ''
+    READ R.CAB.ATM.PARAMETER FROM F.CAB.ATM.PARAMETER, 'DEVICE.TYPE' ELSE
+        PAR.ERROR = "Can not read a record DEVICE.TYPE from CAB.ATM.PARAMETER"
+        CLOSE F.CAB.ATM.PARAMETER
+        RETURN
+    END
+    LOC.DEVICE.TYPE = R.CAB.ATM.PARAMETER<CAP.VALUE,1>
+
+*Dets
+    LOC.DEVICE.DETS = 'ATM.MNGM/TMP'
+*LOC.DEVICE.DETS = ''
+*LOC.PARAM.ID = 'DEVICE.DETS.' : LOC.DEVICE.TYPE
+*READ R.CAB.ATM.PARAMETER FROM F.CAB.ATM.PARAMETER, LOC.PARAM.ID ELSE
+*   PAR.ERROR = "Can not read a record ":LOC.PARAM.ID:" from CAB.ATM.PARAMETER"
+*   CLOSE F.CAB.ATM.PARAMETER
+*   RETURN
+*END
+*LOC.DEVICE.DETS = R.CAB.ATM.PARAMETER<CAP.VALUE,1>:R.CAB.ATM.PARAMETER<CAP.VALUE,2>
+
+    CLOSE F.CAB.ATM.PARAMETER
+
+    RETURN
+
+*********************************************************************
+
+CREATE.MSG:
+*Save the msg in variable LOC.MSG
+
+    LOC.MSG  = ''
+
+    IF LOC.DEVICE.TYPE NE 'FILE' THEN
+        LOC.MSG := LOC.HEADER
+        LOC.MSG := LOC.DEL
+        LOC.MSG := '<CustomerBatch>'
+        LOC.MSG := LOC.DEL
+    END
+    LOC.MSG := '<Customer'
+    LOC.MSG := ' Action="':PAR.CUST.ACTION[1,1]:'"'
+    LOC.MSG := '>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<CID>':LOC.CUST.ID[24]:'</CID>'
+    LOC.MSG := LOC.DEL
+    IF PAR.CUST.ACTION EQ "A" THEN
+        LOC.MSG := '<Branch>':LOC.R.CUSTOMER<EB.CUS.COMPANY.BOOK>[4]:'</Branch>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG := '<CreationDate>':LOC.R.CUSTOMER<EB.CUS.CUSTOMER.SINCE>[8]:'</CreationDate>'
+        LOC.MSG := LOC.DEL
+    END
+
+    BEGIN CASE
+    CASE LOC.R.CUSTOMER<EB.CUS.POSTING.RESTRICT>
+        LOC.CU.STATUS = 2
+    CASE NOT(LOC.R.CUSTOMER<EB.CUS.POSTING.RESTRICT>)
+        LOC.CU.STATUS = IF LOC.R.CUSTOMER<EB.CUS.CUSTOMER.STATUS> EQ '???' THEN 3 ELSE 1
+    END CASE
+
+    LOC.MSG := '<Status>':LOC.CU.STATUS:'</Status>'
+    LOC.MSG := LOC.DEL
+
+**Send CustomerType/S
+    LOC.MSG := '<CustomerType>I</CustomerType>'
+    LOC.MSG := LOC.DEL
+**Send CustomerType/E
+
+    BEGIN CASE
+    CASE LOC.R.CUSTOMER<EB.CUS.CUSTOMER.STATUS> EQ '???1'
+        LOC.CU.CATEG = 1
+    CASE LOC.R.CUSTOMER<EB.CUS.CUSTOMER.STATUS> EQ '???2'
+        LOC.CU.CATEG = 2
+    CASE OTHERWISE
+        LOC.CU.CATEG = 0
+    END CASE
+
+    LOC.MSG := '<VipCategory>':LOC.CU.CATEG:'</VipCategory>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<IRIS>':LOC.R.CUSTOMER<EB.CUS.LOCAL.REF,LOC.POS.ARR<1,1>>:'</IRIS>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<Applicant'
+    LOC.MSG := ' Type="A"'
+    LOC.MSG := '>'
+    LOC.MSG := LOC.DEL
+
+    BEGIN CASE
+    CASE LOC.R.CUSTOMER<EB.CUS.TITLE> EQ "MR"
+        LOC.TITLE = 1
+    CASE LOC.R.CUSTOMER<EB.CUS.TITLE> EQ "MISS"
+        LOC.TITLE = 2
+    CASE LOC.R.CUSTOMER<EB.CUS.TITLE> EQ "MRS"
+        LOC.TITLE = 3
+    CASE LOC.R.CUSTOMER<EB.CUS.TITLE> EQ "DR"
+        LOC.TITLE = 4
+    CASE OTHERWISE
+        LOC.TITLE = 9
+    END CASE
+
+    LOC.NAME.M = LOC.R.CUSTOMER<EB.CUS.NAME.1,1> :" ": LOC.R.CUSTOMER<EB.CUS.NAME.2,1>
+    LOC.NAME.M = TRIM(LOC.NAME.M," ","R");    LOC.E = DCOUNT(LOC.NAME.M," ")
+    LOC.NAME.M = IF LOC.E GT 2 THEN LOC.NAME.M[" ",2,LOC.E-2] ELSE ''
+    YR.FIRST.NAME = LOC.R.CUSTOMER<EB.CUS.NAME.1,1>
+    YR.FIRST.NAME = FIELD(YR.FIRST.NAME," ",1)
+    LOC.GENDER = ""
+    BEGIN CASE
+    CASE LOC.R.CUSTOMER<EB.CUS.GENDER> EQ "Male"
+        LOC.GENDER = "M"
+    CASE LOC.R.CUSTOMER<EB.CUS.GENDER> EQ "Female"
+        LOC.GENDER = "F"
+    END CASE
+
+    LOC.DOB = IF LOC.R.CUSTOMER<EB.CUS.DATE.OF.BIRTH> THEN LOC.R.CUSTOMER<EB.CUS.DATE.OF.BIRTH> ELSE LOC.R.CUSTOMER<EB.CUS.BIRTH.INCORP.DATE>
+
+    LOC.MAR.STAT = ""
+    BEGIN CASE
+    CASE LOC.R.CUSTOMER<EB.CUS.MARITAL.STATUS> EQ "Single"
+        LOC.MAR.STAT = 1
+    CASE LOC.R.CUSTOMER<EB.CUS.MARITAL.STATUS> EQ "Married"
+        LOC.MAR.STAT = 2
+    CASE LOC.R.CUSTOMER<EB.CUS.MARITAL.STATUS> EQ "Divorced"
+        LOC.MAR.STAT = 3
+    CASE LOC.R.CUSTOMER<EB.CUS.MARITAL.STATUS> EQ "Widow"
+        LOC.MAR.STAT = 4
+    END CASE
+
+    LOC.MSG := '<Title>':LOC.TITLE:'</Title>'
+    LOC.MSG := LOC.DEL
+**    LOC.MSG := '<FirstName>':LOC.R.CUSTOMER<EB.CUS.GIVEN.NAMES>[1,40]:'</FirstName>'
+    LOC.MSG := '<FirstName>':YR.FIRST.NAME:'</FirstName>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<MiddleName>':LOC.NAME.M[1,40]:'</MiddleName>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<LastName>':LOC.R.CUSTOMER<EB.CUS.FAMILY.NAME>[1,40]:'</LastName>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<BirthDate>':LOC.DOB[8]:'</BirthDate>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<BirthLocation>':LOC.R.CUSTOMER<EB.CUS.LOCAL.REF,LOC.POS.ARR<1,2>>[1,40]:'</BirthLocation>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<Identity'
+
+    LOC.IDN.TYPE = ""
+    LOC.IDN.VAL  = ""
+    IF LOC.R.CUSTOMER<EB.CUS.LOCAL.REF,LOC.POS.ARR<1,6>> THEN
+        LOC.IDN.TYPE = 7
+        LOC.IDN.VAL  = LOC.R.CUSTOMER<EB.CUS.LOCAL.REF,LOC.POS.ARR<1,6>>
+    END ELSE
+        IF LOC.R.CUSTOMER<EB.CUS.LOCAL.REF,LOC.POS.ARR<1,7>> THEN
+            LOC.IDN.TYPE = 7
+            LOC.IDN.VAL  = LOC.R.CUSTOMER<EB.CUS.LOCAL.REF,LOC.POS.ARR<1,7>>
+        END ELSE
+            LOC.IDN.VAL  = LOC.R.CUSTOMER<EB.CUS.LEGAL.ID,1>
+            BEGIN CASE
+            CASE LOC.R.CUSTOMER<EB.CUS.LEGAL.DOC.NAME,1> EQ "Social Security No"
+                LOC.IDN.TYPE = 1
+            CASE LOC.R.CUSTOMER<EB.CUS.LEGAL.DOC.NAME,1> EQ "Passport"
+                LOC.IDN.TYPE = 2
+            CASE LOC.R.CUSTOMER<EB.CUS.LEGAL.DOC.NAME,1> EQ "Driving License"
+                LOC.IDN.TYPE = 3
+            CASE LOC.R.CUSTOMER<EB.CUS.LEGAL.DOC.NAME,1> EQ "Incorport certification"
+                LOC.IDN.TYPE = 4
+            CASE LOC.R.CUSTOMER<EB.CUS.LEGAL.DOC.NAME,1> EQ "Card Id"
+                LOC.IDN.TYPE = 5
+            END CASE
+        END
+    END
+    LOC.MSG := ' Type="':LOC.IDN.TYPE: '"'
+    LOC.MSG := '>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<Value>':LOC.IDN.VAL[20]:'</Value>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '</Identity>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<Gender>':LOC.GENDER:'</Gender>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<MaritalStatus>':LOC.MAR.STAT:'</MaritalStatus>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<CountryCode>':LOC.R.CUSTOMER<EB.CUS.NATIONALITY>[1,10]:'</CountryCode>'
+    LOC.MSG := LOC.DEL
+**    LOC.MSG := '<EmployerName>':LOC.R.CUSTOMER<EB.CUS.EMPLOYERS.NAME,1>[1,60]:'</EmployerName>'
+**    LOC.MSG := LOC.DEL
+    LOC.MSG := '<EmployerName></EmployerName>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<EmployerTitle>':LOC.R.CUSTOMER<EB.CUS.JOB.TITLE,1>[1,10]:'</EmployerTitle>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<EmployeeGrossSalary>':FMT(LOC.R.CUSTOMER<EB.CUS.SALARY,1>,"R3")[15]:'</EmployeeGrossSalary>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '</Applicant>'
+    LOC.MSG := LOC.DEL
+    IF LOC.R.CUSTOMER<EB.CUS.BIRTH.INCORP.DATE> THEN
+        LOC.MSG := '<Corporate>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG := '<Name>':LOC.R.CUSTOMER<EB.CUS.NAME.1,1>[1,25]:'</Name>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG := '<DBA>':LOC.R.CUSTOMER<EB.CUS.SHORT.NAME,1>[1,20]:'</DBA>'
+        LOC.MSG := LOC.DEL
+
+        LOC.LEG.TYPE = "00"
+        BEGIN CASE
+        CASE LOC.R.CUSTOMER<EB.CUS.LOCAL.REF,LOC.POS.ARR<1,3>> EQ "Public???"
+            LOC.LEG.TYPE = "01"
+        CASE LOC.R.CUSTOMER<EB.CUS.LOCAL.REF,LOC.POS.ARR<1,3>> EQ "Private???"
+            LOC.LEG.TYPE = "02"
+        END CASE
+
+        LOC.MSG := '<Type>':LOC.LEG.TYPE:'</Type>'
+        LOC.MSG := LOC.DEL
+
+        LOCATE "Incorport certification" IN LOC.R.CUSTOMER<EB.CUS.LEGAL.DOC.NAME,1> SETTING LOC.POS ELSE LOC.POS = ''
+        IF LOC.POS THEN
+            LOC.LEGAL.ID = LOC.R.CUSTOMER<EB.CUS.LEGAL.ID,LOC.POS>
+        END
+
+        LOC.MSG := '<LicenceNumber>':LOC.LEGAL.ID[10]:'</LicenceNumber>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG := '<RegisterNumber>':LOC.R.CUSTOMER<EB.CUS.LOCAL.REF,LOC.POS.ARR<1,4>>[10]:'</RegisterNumber>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG := '<Capital>':FMT(LOC.R.CUSTOMER<EB.CUS.LOCAL.REF,LOC.POS.ARR<1,5>>,"R3")[15]:'</Capital>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG := '</Corporate>'
+        LOC.MSG := LOC.DEL
+    END
+    LOC.MSG := '<Address'
+    LOC.MSG := ' Action="':PAR.CUST.ACTION[1,1]:'"'
+    LOC.MSG := ' Type="01"'
+    LOC.MSG := '>'
+    LOC.MSG := LOC.DEL
+
+**    LOC.ADR1 = TRIM(LOC.R.CUSTOMER<EB.CUS.STREET,1>:' ':LOC.R.CUSTOMER<EB.CUS.TOWN.COUNTRY,1>," ","R")
+    LOC.ADR1 = TRIM(LOC.R.CUSTOMER<EB.CUS.TOWN.COUNTRY,1>," ","R")
+    LOC.ADR2 = TRIM(LOC.R.CUSTOMER<EB.CUS.POST.CODE,1>:' ':LOC.R.CUSTOMER<EB.CUS.COUNTRY,1>," ","R")
+
+**    LOC.MSG := '<Address1>':LOC.ADR1[1,80]:'</Address1>'
+    LOC.MSG := '<Address1>':LOC.ADR1[1,40]:'</Address1>'
+    LOC.MSG := LOC.DEL
+**    LOC.MSG := '<Address2>':LOC.ADR2[1,80]:'</Address2>'
+    LOC.MSG := '<Address2>':LOC.ADR2[1,40]:'</Address2>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<Street>':LOC.R.CUSTOMER<EB.CUS.STREET,1>[1,40]:'</Street>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<ZIPCode>':LOC.R.CUSTOMER<EB.CUS.POST.CODE,1>[5]:'</ZIPCode>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<City>':LOC.R.CUSTOMER<EB.CUS.TOWN.COUNTRY,1>[1,10]:'</City>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<Phone1>':LOC.R.CUSTOMER<EB.CUS.PHONE.1,1>[20]:'</Phone1>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '<Fax>':LOC.R.CUSTOMER<EB.CUS.FAX.1,1>[20]:'</Fax>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG := '</Address>'
+    LOC.MSG := LOC.DEL
+
+    LOC.AC.LIST   = ""
+    LOC.R.AC      = ""
+    IF PAR.ACCT.ID AND PAR.ACCT.RECORD THEN
+        LOC.AC.LIST   = PAR.ACCT.ID
+        LOC.R.AC      = PAR.ACCT.RECORD
+    END ELSE
+        LOC.AC.LIST   = PAR.ACCT.ACTION.PARAM
+    END
+
+    LOOP
+        REMOVE LOC.AC.ID FROM LOC.AC.LIST SETTING LOC.L.MARK
+    WHILE LOC.AC.ID : LOC.L.MARK
+        IF NOT(PAR.ACCT.RECORD) THEN
+            CALL F.READ(LOC.FN.ACCOUNT, LOC.AC.ID, LOC.R.AC, LOC.F.ACCOUNT, PAR.ERROR)
+        END
+        LOC.MSG := '<Account'
+        LOC.MSG := ' Action="':PAR.ACCT.ACTION:'"'
+        LOC.MSG := '>'
+        LOC.MSG := LOC.DEL
+**        LOC.MSG := '<AccountNumber>':LOC.AC.ID[24]:'</AccountNumber>'
+        YR.ALT.ACCT = LOC.R.AC<AC.ALT.ACCT.ID,1>
+        IF YR.ALT.ACCT EQ '' THEN
+            YR.ALT.ACCT = FMT(LOC.AC.ID,"R%13")
+        END
+        LOC.MSG := '<AccountNumber>':YR.ALT.ACCT[24]:'</AccountNumber>'
+        LOC.MSG := LOC.DEL
+        IF PAR.ACCT.ACTION EQ "A" THEN
+            LOC.MSG := '<Branch>':LOC.R.AC<AC.CO.CODE>[4]:'</Branch>'
+            LOC.MSG := LOC.DEL
+            LOC.MSG := '<CreationDate>':LOC.R.AC<AC.OPENING.DATE>[8]:'</CreationDate>'
+            LOC.MSG := LOC.DEL
+            LOC.MSG := '<EffectiveDate>':LOC.R.AC<AC.OPENING.DATE>[8]:'</EffectiveDate>'
+            LOC.MSG := LOC.DEL
+        END
+
+        BEGIN CASE
+        CASE NOT(LOC.R.AC<AC.POSTING.RESTRICT>) AND LOC.R.AC<AC.INACTIV.MARKER> NE "Y"
+            LOC.AC.STATUS = 1
+        CASE OTHERWISE
+            LOC.AC.STATUS = 2
+        END CASE
+
+        LOC.MSG := '<Status>':LOC.AC.STATUS:'</Status>'
+        LOC.MSG := LOC.DEL
+
+        CALL DBR("CURRENCY":FM:EB.CUR.NUMERIC.CCY.CODE,LOC.R.AC<AC.CURRENCY>,LOC.CCY.CODE)
+
+        IF PAR.ACCT.ACTION EQ "A" THEN
+            LOC.MSG := '<Currency>':LOC.CCY.CODE[3]:'</Currency>'
+            LOC.MSG := LOC.DEL
+            LOC.MSG := '<Type>':LOC.R.AC<AC.CATEGORY>[1,3]:'</Type>'
+            LOC.MSG := LOC.DEL
+        END
+        LOC.MSG := '</Account>'
+        LOC.MSG := LOC.DEL
+    REPEAT
+    LOC.MSG := '</Customer>'
+    IF LOC.DEVICE.TYPE NE 'FILE' THEN
+        LOC.MSG := LOC.DEL
+        LOC.MSG := '</CustomerBatch>'
+    END
+
+    RETURN
+
+*********************************************************************
+
+SEND.MSG:
+
+    CALL CAB.ATM.SEND.MSG(LOC.MSG, LOC.DEVICE.TYPE, LOC.DEVICE.DETS, PAR.ERROR)
+
+    RETURN
+
+*********************************************************************
+
+END

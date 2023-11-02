@@ -1,0 +1,45 @@
+    SUBROUTINE CAB.AUTH.ESIG.REACTIVE
+
+*-----------------------------------------------------------------------------
+*Modification Details:
+*=====================
+* Modified by        Date              Description
+* Nuha Tuhul        18-3-2019       Send the Messge to E SIG MQ
+*-----------------------------------------------------------------------------
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.ACCT.INACTIVE.RESET
+    $INCLUDE T24.BP I_F.DATES
+
+    FN.ACCT.INACTIVE.RESET = 'F.ACCT.INACTIVE.RESET'
+    F.ACCT.INACTIVE.RESET = ''
+    CALL OPF(FN.ACCT.INACTIVE.RESET,F.ACCT.INACTIVE.RESET)
+
+
+    GOSUB SEND.MQ
+
+
+    RETURN
+
+
+*************
+SEND.MQ:
+*************
+
+    CMD.ERR = '';NO.OF.R='' ;YR.XML.OUT =''
+    Y.TIME  = TIMEDATE()
+    Y.TIME  = Y.TIME[1,8]
+
+        YR.XML.OUT = ''
+        YR.XML.OUT:= "<?xml version='1.0' encoding='utf-8'?><Root><PsSystem>PS-SIG</PsSystem>"
+        YR.XML.OUT:= "<RequestDate>":TODAY:"</RequestDate>"
+        YR.XML.OUT:= "<RequestTime>":Y.TIME:"</RequestTime><RequestCode>AccountStatus</RequestCode>"
+        YR.XML.OUT:= "<AccountNumber>":ID.NEW:"</AccountNumber><StatusofAccount>1</StatusofAccount>"
+        YR.XML.OUT:= "</Root>"
+
+        MSG.ERR = ''
+        CALL CAB.SEND.EXT.MSG(YR.XML.OUT,"SIG",MSG.ERR)
+
+    RETURN
+
+END

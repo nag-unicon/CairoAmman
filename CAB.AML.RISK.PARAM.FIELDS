@@ -1,0 +1,56 @@
+*-----------------------------------------------------------------------------
+* <Rating>-12</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AML.RISK.PARAM.FIELDS
+*-----------------------------------------------------------------------------
+* 4/3/2020  Nuha Tuhul              add industry
+*17/12/2021 Nuha Tuhul               ADD PURPOSE
+*-----------------------------------------------------------------------------
+*** <region name= Header>
+*** <desc>Inserts and control logic</desc>
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_DataTypes
+*** </region>
+*-----------------------------------------------------------------------------
+    CALL Table.defineId("ID", T24_String)         ;*Define Table id
+    ID.N = "20" ; ID.T = 'A' ; ID.T<2> = ''
+*-----------------------------------------------------------------------------
+
+    CALL Table.addFieldDefinition("XX.CUSTOMER.STATUS","4","A","")
+    CALL Field.setCheckFile("CUSTOMER.STATUS")
+    CALL Table.addFieldDefinition("STATUS.LEVEL","3","A","")
+    CALL Table.addFieldDefinition("STAT.WHT","4","A","")
+    CALL Table.addFieldDefinition("XX.SECTOR" ,"4","A","")
+    CALL Field.setCheckFile("SECTOR")
+    CALL Table.addFieldDefinition("SECTOR.LEVEL" ,"3","A","")
+    CALL Table.addFieldDefinition("SECT.WHT","4","A","")
+    CALL Table.addFieldDefinition("XX.NATIONALITY","9","A","")
+    CALL Field.setCheckFile("COUNTRY")
+    CALL Table.addFieldDefinition("NATION.LEVEL" ,"3","A","")
+    CALL Table.addFieldDefinition("NAT.WHT","4","A","")
+    CALL Table.addFieldDefinition("XX.RESIDENCE","9","A","")
+    CALL Field.setCheckFile("COUNTRY")
+    CALL Table.addFieldDefinition("RESIDENCE.LEVEL" ,"3","A","")
+    CALL Table.addFieldDefinition("RES.WHT","4","A","")
+    CALL Table.addFieldDefinition("RESI.FLAG","4","A","")
+    CALL Table.addFieldDefinition("RESI.WHT","4","A","")
+    CALL Table.addFieldDefinition("XX.INDUSTRY","10","A","")
+    CALL Field.setCheckFile("INDUSTRY")
+    CALL Table.addFieldDefinition("INDUSTRY.LEVEL","3","A","")
+    CALL Table.addFieldDefinition("IND.WHT","4","A","")
+
+    CALL Table.addFieldDefinition("XX.PURPOSE.PROFILE","10","A","")
+    CALL Field.setCheckFile("EB.CAB.OPEN.PROFILE")
+    CALL Table.addFieldDefinition("PURPOSE.LEVEL","3","A","")
+    CALL Table.addFieldDefinition("PURPOS.WHT","4","A","")
+    CALL Table.addFieldDefinition("XX.EMAIL.LEVEL1","35","A","")
+    CALL Table.addFieldDefinition("XX.EMAIL.LEVEL2","35","A","")
+
+    CALL Table.addField("RESERVED.3",T24_String,Field_NoInput,"")
+    CALL Table.addField("RESERVED.2",T24_String,Field_NoInput,"")
+    CALL Table.addField("RESERVED.1",T24_String,Field_NoInput,"")
+
+    CALL Table.setAuditPosition
+    RETURN
+END

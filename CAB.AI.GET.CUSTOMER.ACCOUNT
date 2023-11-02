@@ -1,0 +1,40 @@
+    SUBROUTINE CAB.AI.GET.CUSTOMER.ACCOUNT(ENQ.DATA)
+    $INSERT I_EQUATE
+    $INSERT I_COMMON
+    $INSERT I_ENQUIRY.COMMON
+    $INSERT I_F.STMT.ENTRY
+    $INSERT I_F.CUSTOMER.ACCOUNT
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.CUSTOMER.ACCOUNT
+    $INSERT I_EB.EXTERNAL.COMMON
+    GOSUB INITIALISE
+    GOSUB PROCESS
+    RETURN
+
+*-------------------------------------------------------------------------
+INITIALISE:
+*-------------------------------------------------------------------------
+*Open Required files and initialise the variables
+
+    FN.CUSTOMER.ACCOUNT = 'F.CUSTOMER.ACCOUNT'
+    FV.CUSTOMER.ACCOUNT = ''
+    CALL OPF(FN.CUSTOMER.ACCOUNT,FV.CUSTOMER.ACCOUNT)
+
+    RETURN
+*-------------------------------------------------------------------------
+PROCESS:
+*-------------------------------------------------------------------------
+    CUSTOMER.NUMBER = EB.EXTERNAL$CUSTOMER
+    CALL F.READ(FN.CUSTOMER.ACCOUNT,CUSTOMER.NUMBER,R.CUSTOMER.ACCOUNT,FV.CUSTOMER.ACCOUNT,ERR.ACC)
+
+    IF (R.CUSTOMER.ACCOUNT) THEN
+        CONVERT FM TO " " IN R.CUSTOMER.ACCOUNT
+
+        ENQ.DATA<2> = "@ID"
+        ENQ.DATA<3> = "EQ"
+        ENQ.DATA<4> = R.CUSTOMER.ACCOUNT 
+    END
+
+    RETURN
+
+END

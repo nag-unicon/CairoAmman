@@ -1,0 +1,43 @@
+    SUBROUTINE CAB.ANNUAL.COMM.FIELDS
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT       ;* Other Inserts required for Checkfiles, etc.
+    $INSERT I_F.CUSTOMER
+    $INSERT I_DataTypes
+
+    GOSUB INITIALISE
+
+    GOSUB DEFINE.FIELDS
+
+    RETURN
+*
+*-----------------------------------------------------------------------------
+DEFINE.FIELDS:
+
+    ID.F = "CAB.COM.ID" ; ID.N = "2" ; ID.T = ""
+
+
+    Z=0
+*
+    Z+=1 ; F(Z) = "DESCRIPTION" ; N(Z) = "35.1" ; T(Z) = "A"
+
+    V = Z + 9
+
+    RETURN
+*
+*-----------------------------------------------------------------------------
+INITIALISE:
+
+    MAT F = "" ; MAT N = "" ; MAT T = "" ; ID.T = ""
+    MAT CHECKFILE = "" ; MAT CONCATFILE = ""
+    ID.CHECKFILE = "" ; ID.CONCATFILE = ""
+*
+* Define often used checkfile variables
+*
+*
+    RETURN
+*
+*-----------------------------------------------------------------------------
+*
+END

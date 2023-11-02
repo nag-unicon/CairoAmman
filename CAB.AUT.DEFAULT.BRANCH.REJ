@@ -1,0 +1,28 @@
+*-----------------------------------------------------------------------------
+* <Rating>0</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AUT.DEFAULT.BRANCH.REJ
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.AUT.DEFAULT.BRANCH.REJ
+*---------------------------------------------------------------
+*Description       :
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0067
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_System
+    $INSERT I_GTS.COMMON
+    $INSERT I_F.BRANCH.STOCK.REQ
+
+    R.NEW(BR.STO.STATUS) = "REJECTED"
+
+    RETURN
+END

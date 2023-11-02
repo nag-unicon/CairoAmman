@@ -1,0 +1,39 @@
+    SUBROUTINE CAB.ARC.CREATE.VIRTUAL.CARD
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_EB.EXTERNAL.COMMON
+    $INCLUDE CAB.BP I_F.CAB.ARC.CARD.MGMT
+
+
+    GOSUB INITIALISE
+    GOSUB PROCESS
+    RETURN
+
+INITIALISE:
+
+    EXT.CUST.ID = EB.EXTERNAL$CUSTOMER
+
+    RETURN
+
+PROCESS:
+
+    CALL CallMobilWS.virtualCardIntegration(EXT.CUST.ID,errorCode,outArr)
+    IF outArr NE '' THEN
+        CONVERT VM TO '|' IN outArr
+        CONVERT FM TO '|' IN outArr
+        RET.DATA = outArr
+
+    END ELSE
+        E = errorCode<2>
+        RET.DATA = errorCode<2>
+        CALL ERR
+        RETURN
+    END
+
+    R.NEW(CAB.ARC.CUSTOMER.NO) = EXT.CUST.ID
+    R.NEW(CAB.ARC.CARD.NO) = FIELD(RET.DATA,'|',1)
+    R.NEW(CAB.ARC.CVV2.CODE) = FIELD(RET.DATA,'|',2,1)
+    R.NEW(CAB.ARC.EXPIRY.DATE) = FIELD(RET.DATA,'|',3,1)
+
+
+    RETURN

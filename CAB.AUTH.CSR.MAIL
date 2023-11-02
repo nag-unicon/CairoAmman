@@ -1,0 +1,82 @@
+    SUBROUTINE CAB.AUTH.CSR.MAIL
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.CUSTOMER
+    $INCLUDE T24.BP I_F.USER
+    $INCLUDE T24.BP I_F.TELLER
+
+    SEND.NOTIFICATION = ''
+
+    APPL = "TELLER"
+
+    FIELD.NAMES="CSR.INP.USER":@VM:"EFORM.WORKSTEP":@VM:"CSR.ALERT.TRG"
+
+    LOC.POS = ""
+
+    CALL MULTI.GET.LOC.REF(APPL,FIELD.NAMES,LOC.POS)
+
+    USE.POS = LOC.POS<1,1>
+
+    EF.WORKSTEP.POS = LOC.POS<1,2>
+
+    CSR.ALERT.POS = LOC.POS<1,3>
+
+    INPUT.USER = R.NEW(TT.TE.LOCAL.REF)<1,USE.POS>
+
+    EFORM.WORKSTEP.VALUE = R.NEW(TT.TE.LOCAL.REF)<1,EF.WORKSTEP.POS>
+
+    CSR.ALERT.VALUE = R.NEW(TT.TE.LOCAL.REF)<1,CSR.ALERT.POS>
+
+    FN.USER = 'F.USER'
+    CALL CACHE.READ(FN.USER,INPUT.USER,USER.DETS,USER.ERR)
+
+    CALL GET.LOC.REF("USER","EMAIL.ID",EMAIL.POS)
+
+    INPUT.USER.EMAIL = USER.DETS<EB.USE.LOCAL.REF,EMAIL.POS>
+
+    INPUT.USER.NAME = USER.DETS<EB.USE.USER.NAME>
+
+    TXN.TYPE = ""
+
+    IF INPUT.USER.EMAIL THEN
+        IF EFORM.WORKSTEP.VALUE THEN
+            IF CSR.ALERT.VALUE NE "Y" THEN
+                SEND.NOTIFICATION = 1
+            END
+        END
+    END
+
+****Email notification ******
+
+    IF SEND.NOTIFICATION THEN
+
+        CALL ALLOCATE.UNIQUE.TIME(PAR.ID)
+        PAR.ID= FIELD(PAR.ID,'.',1)
+        PAR.ID= 'CU':FIELD(PAR.ID,'.',1)
+        PAR.FROM = 'Alert.Cab@cab.jo'
+
+        PAR.SUBJECT = "Alert : Eform Generated ":ID.NEW
+        PAR.BODY     = "Dear ":INPUT.USER.NAME:","
+        PAR.TO = INPUT.USER.EMAIL
+
+        PAR.BODY<-1> = "This is to inform you that eform has been generated for transaction ":ID.NEW:" and next steps can commence."
+        PAR.BODY<-1> = "Thank you."
+        PAR.BODY<-1> = '' ; PAR.BODY<-1> = ''
+        PAR.BODY<-1> = "***This is system generated message. Please do not reply***"
+        LOC.CR = '&lt;br/&gt;'
+        CHANGE FM TO LOC.CR IN PAR.BODY
+
+        ebApiId          = 'DE.EMAIL.CLIENT'
+        errorResponse    = ''
+        calljError       = ''
+        deliveryPackage  = '<?xml version="1.0" encoding="UTF-8"?>'
+        deliveryPackage := '<T24MailPackage xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><Email id="':PAR.ID:'">'
+        deliveryPackage := '<Address><From>':PAR.FROM:'</From><To>':PAR.TO:'</To></Address>'
+        deliveryPackage := '<Message type="Null"><Subject>':PAR.SUBJECT:'</Subject><Body>':PAR.BODY:'</Body></Message>'
+        deliveryPackage := '</Email></T24MailPackage>'
+
+        CALL EB.CALL.JAVA.API(ebApiId,deliveryPackage,errorResponse,calljError)
+        R.NEW(TT.TE.LOCAL.REF)<1,CSR.ALERT.POS> = "Y"
+    END
+    RETURN
+END

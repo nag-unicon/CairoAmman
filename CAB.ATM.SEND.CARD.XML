@@ -1,0 +1,540 @@
+* Version 1.1
+
+*********************************************************************
+* Start on 21/12/2011 By A.Gryaznov, Temenos
+*
+* Developed for ATM Interface.
+* Program for sending a Card message to MQ.
+*
+* Input parameters are:
+* - Card.Issue ID
+* - Card.Issue Record
+* - Card Action
+* - Action Parameter
+* Output parameters are:
+* - Error Message
+*
+*                       ---- MODIFICATIONS ---------
+* 12-06-2019    Nuha Tuhul    add Sattlite ID FOR LINC PROJECT
+*********************************************************************
+
+    SUBROUTINE CAB.ATM.SEND.CARD.XML(PAR.CARD.ID, PAR.CARD.RECORD, PAR.CARD.ACTION, PAR.ACTION.PARAM, PAR.ERROR,LOC.MSG.XML)
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.CARD.ISSUE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.CUSTOMER
+    $INSERT I_F.CURRENCY
+    $INSERT I_F.CAB.ATM.PARAMETER
+
+    PAR.ERROR = ''
+
+    GOSUB INIT
+    IF PAR.ERROR THEN RETURN
+
+    GOSUB CREATE.MSG
+    IF PAR.ERROR THEN RETURN
+
+    GOSUB SEND.MSG
+    IF PAR.ERROR THEN RETURN
+
+    RETURN
+
+*********************************************************************
+
+INIT:
+
+    LOC.DEL = CHARX(10)
+
+    LOC.HEADER = '<?xml version="1.0" encoding="us-ascii"?>'
+
+    APP.NAMES = 'CARD.ISSUE'
+    FIELD.NAMES  = 'CARD.SEQ.NO':VM:'OLD.CARD.NO':VM:'CASH.WDL':VM:'BAL.ENQ':VM:'MINI.STMT'
+    FIELD.NAMES := VM:'CHQ.BOOK':VM:'FULL.STMT':VM:'E.TOPUP':VM:'BILL.PAY':VM:'CASH.DEP'
+    FIELD.NAMES := VM:'TRF':VM:'WES.UNI':VM:'LOAN':VM:'PROG.ID':VM:'L.CUST.ID':VM:'CI.NAME':VM:"SATTALITE.ID"
+    CALL MULTI.GET.LOC.REF(APP.NAMES,FIELD.NAMES,LOC.POS.ARR)
+
+    YR.JOINT.CUST.POS = LOC.POS.ARR<1,15>
+    YR.CI.NAME.POS = LOC.POS.ARR<1,16>
+    YR.SAT.ID.POS  = LOC.POS.ARR<1,17>
+    YR.JOINT.CUST = R.NEW(CARD.IS.LOCAL.REF)<1,YR.JOINT.CUST.POS>
+    YR.CI.NAME    =R.NEW(CARD.IS.LOCAL.REF)<1,YR.CI.NAME.POS>
+
+    LOC.FN.ACCOUNT = 'F.ACCOUNT'
+    LOC.F.ACCOUNT  = ''
+    CALL OPF(LOC.FN.ACCOUNT, LOC.F.ACCOUNT)
+
+    LOC.FN.CUSTOMER = 'F.CUSTOMER'
+    LOC.F.CUSTOMER  = ''
+    CALL OPF(LOC.FN.CUSTOMER, LOC.F.CUSTOMER)
+
+    PAR.ERROR = ''
+    LOC.R.ACCOUNT = ''
+    CALL F.READ(LOC.FN.ACCOUNT, PAR.CARD.RECORD<CARD.IS.ACCOUNT,1>, LOC.R.ACCOUNT, LOC.F.ACCOUNT, PAR.ERROR)
+    IF PAR.ERROR THEN RETURN
+
+    PAR.ERROR = ''
+    LOC.R.CUSTOMER = ''
+    YR.CUSTOMER = LOC.R.ACCOUNT<AC.CUSTOMER>
+    YR.CUSTOMER.CARD = YR.CUSTOMER
+
+
+    IF YR.JOINT.CUST NE '' THEN
+        CALL F.READ(LOC.FN.CUSTOMER, YR.JOINT.CUST, LOC.R.CUSTOMER, LOC.F.CUSTOMER, PAR.ERROR)
+    END ELSE
+        CALL F.READ(LOC.FN.CUSTOMER, YR.CUSTOMER, LOC.R.CUSTOMER, LOC.F.CUSTOMER, PAR.ERROR)
+    END
+
+    YR.SECTOR = LOC.R.CUSTOMER<EB.CUS.SECTOR>
+* Parameters
+
+    OPEN "F.CAB.ATM.PARAMETER" TO F.CAB.ATM.PARAMETER ELSE
+        PAR.ERROR = "Can not open a file F.CAB.ATM.PARAMETER"
+        RETURN
+    END
+
+*Type
+    LOC.DEVICE.TYPE = ''
+    READ R.CAB.ATM.PARAMETER FROM F.CAB.ATM.PARAMETER, 'DEVICE.TYPE' ELSE
+        PAR.ERROR = "Can not read a record DEVICE.TYPE from CAB.ATM.PARAMETER"
+        CLOSE F.CAB.ATM.PARAMETER
+        RETURN
+    END
+    LOC.DEVICE.TYPE = R.CAB.ATM.PARAMETER<CAP.VALUE,1>
+
+*Dets
+    LOC.DEVICE.DETS = 'ATM.MNGM/TMP'
+*LOC.DEVICE.DETS = ''
+*LOC.PARAM.ID = 'DEVICE.DETS.' : LOC.DEVICE.TYPE
+*READ R.CAB.ATM.PARAMETER FROM F.CAB.ATM.PARAMETER, LOC.PARAM.ID ELSE
+*   PAR.ERROR = "Can not read a record ":LOC.PARAM.ID:" from CAB.ATM.PARAMETER"
+*   CLOSE F.CAB.ATM.PARAMETER
+*   RETURN
+*END
+*LOC.DEVICE.DETS = R.CAB.ATM.PARAMETER<CAP.VALUE,1>:R.CAB.ATM.PARAMETER<CAP.VALUE,2>
+
+    CLOSE F.CAB.ATM.PARAMETER
+
+    RETURN
+
+*********************************************************************
+
+CREATE.MSG:
+*Save the msg in variable LOC.MSG
+
+    LOC.MSG  = ''
+    LOC.MSG.XML = ''
+    IF LOC.DEVICE.TYPE NE 'FILE' THEN
+        LOC.MSG := LOC.HEADER
+        LOC.MSG := LOC.DEL
+        LOC.MSG := '<CardBatch>'
+        LOC.MSG := LOC.DEL
+    END
+    LOC.MSG := '<CardRecord'
+    LOC.MSG := ' Action="':PAR.CARD.ACTION[1,20]:'"'
+    LOC.MSG := '>'
+    LOC.MSG := LOC.DEL
+*
+    LOC.MSG.XML = LOC.HEADER:LOC.DEL:'<Teller Application="CardIssuance">':LOC.DEL:'<CardIISS>':LOC.DEL:LOC.MSG
+**    LOC.MSG.XML := '<CardReqId>':FIELD(PAR.CARD.ID,'.',2)[24]:'</CardReqId>'
+    CALL ALLOCATE.UNIQUE.TIME(YR.UNIQUE.NO)
+    CONVERT "." TO "" IN YR.UNIQUE.NO
+    YR.UNIQUE.NO = FMT(YR.UNIQUE.NO,"R%24")
+    LOC.MSG.XML := '<CardReqId>':YR.UNIQUE.NO:'</CardReqId>'
+    LOC.MSG.XML := LOC.DEL
+    REQ.DATE.TIME = OCONV(DATE(),"DY"):FMT(OCONV(DATE(),"DM"),"R%2"):FMT(OCONV(DATE(),"DD"),"R%2")
+    TIME.STAMP=TIMEDATE()
+    REQ.DATE.TIME = REQ.DATE.TIME:TIME.STAMP[1,2]:TIME.STAMP[4,2]:TIME.STAMP[7,2]
+    LOC.MSG.XML := '<ReqDatetime>':REQ.DATE.TIME:'</ReqDatetime>'
+    LOC.MSG.XML := LOC.DEL
+*
+    IF PAR.CARD.ACTION EQ "NewCard" OR PAR.CARD.ACTION EQ "D" THEN
+        LOC.MSG := '<CID>':YR.CUSTOMER.CARD[24]:'</CID>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<CusReqId>':YR.CUSTOMER.CARD[24]:'</CusReqId>'
+        LOC.MSG.XML : = LOC.DEL
+    END
+    LOC.MSG.XML := '<CustomerId>':YR.CUSTOMER.CARD[24]:'</CustomerId>'
+    LOC.MSG.XML := LOC.DEL
+    LOC.MSG := '<CardNumber>':FIELD(PAR.CARD.ID,'.',2)[19]:'</CardNumber>'
+    LOC.MSG := LOC.DEL
+    LOC.MSG.XML : = '<CardNumber>':FIELD(PAR.CARD.ID,'.',2)[19]:'</CardNumber>'
+    LOC.MSG.XML := LOC.DEL
+    IF PAR.CARD.ACTION EQ "NewCard" OR PAR.CARD.ACTION EQ "D" OR PAR.CARD.ACTION EQ "ReplaceCard" THEN
+        LOC.MSG := '<CardSeqNumber>':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,1>>[3]:'</CardSeqNumber>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<CardSeqNumber>':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,1>>[3]:'</CardSeqNumber>'
+        LOC.MSG.XML := LOC.DEL
+    END
+    IF PAR.CARD.ACTION EQ "NewCard" OR PAR.CARD.ACTION EQ "D" THEN
+        LOC.MSG := '<CardType>1</CardType>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<CardType>1</CardType>'
+        LOC.MSG.XML := LOC.DEL
+
+    END
+
+    BEGIN CASE
+    CASE PAR.CARD.RECORD<CARD.IS.CARD.STATUS> EQ 90
+        LOC.STATUS = 2
+    CASE PAR.CARD.RECORD<CARD.IS.CARD.STATUS> EQ 89
+        LOC.STATUS = 3
+    CASE PAR.CARD.RECORD<CARD.IS.CARD.STATUS> EQ 91
+        LOC.STATUS = 6
+    CASE OTHERWISE
+        LOC.STATUS = 5
+    END CASE
+
+    IF PAR.CARD.ACTION EQ "NewCard" OR PAR.CARD.ACTION EQ "D" OR PAR.CARD.ACTION EQ "ReplaceCard" OR PAR.CARD.ACTION EQ "ChangeStatus" THEN
+        LOC.MSG := '<Status>':LOC.STATUS:'</Status>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<Status>':LOC.STATUS:'</Status>'
+        LOC.MSG.XML := LOC.DEL
+    END
+
+    BEGIN CASE
+    CASE LOC.R.CUSTOMER<EB.CUS.TITLE> EQ "MR"
+        LOC.TITLE = 1
+    CASE LOC.R.CUSTOMER<EB.CUS.TITLE> EQ "MISS"
+        LOC.TITLE = 2
+    CASE LOC.R.CUSTOMER<EB.CUS.TITLE> EQ "MRS"
+        LOC.TITLE = 3
+    CASE LOC.R.CUSTOMER<EB.CUS.TITLE> EQ "DR"
+        LOC.TITLE = 4
+    CASE OTHERWISE
+        LOC.TITLE = 9
+    END CASE
+
+    LOC.NAME.F = LOC.R.CUSTOMER<EB.CUS.NAME.1,1> :" ": LOC.R.CUSTOMER<EB.CUS.NAME.2,1>
+    LOC.NAME.F = TRIM(LOC.NAME.F," ","R");
+    LOC.E = DCOUNT(LOC.NAME.F," ")
+    LOC.NAME.M = IF LOC.E GT 2 THEN LOC.NAME.F[" ",2,LOC.E-2] ELSE '' ;* Middle name
+    LOC.NAME.F = UPCASE(LOC.NAME.F)     ;* Full name
+**
+
+    YR.FIRST.NAME = TRIM(LOC.R.CUSTOMER<EB.CUS.NAME.1,1>,' ',"L")
+    YR.FIRST.NAME = FIELD(YR.FIRST.NAME," ",1)
+**
+
+    IF (YR.CI.NAME EQ "PRIMARY" AND YR.SECTOR LT 1999 ) OR YR.JOINT.CUST THEN
+        YR.EMBOSS.NAME = TRIM(LOC.R.CUSTOMER<EB.CUS.GIVEN.NAMES>," ","B"):" ":TRIM(LOC.R.CUSTOMER<EB.CUS.FAMILY.NAME>,' ',"B")
+    END ELSE
+        YR.EMBOSS.NAME = TRIM(R.NEW(CARD.IS.NAME),' ',"B")
+    END
+
+    YR.EMBOSS.NAME = UPCASE(YR.EMBOSS.NAME)
+
+    LOC.GENDER = ""
+    BEGIN CASE
+    CASE LOC.R.CUSTOMER<EB.CUS.GENDER> EQ "Male"
+        LOC.GENDER = "M"
+    CASE LOC.R.CUSTOMER<EB.CUS.GENDER> EQ "Female"
+        LOC.GENDER = "F"
+    END CASE
+
+    CALL DBR("CURRENCY":FM:EB.CUR.NUMERIC.CCY.CODE,PAR.CARD.RECORD<CARD.IS.CURRENCY>,LOC.CCY.CODE)
+
+    IF PAR.CARD.ACTION EQ "NewCard" OR PAR.CARD.ACTION EQ "D" THEN
+        LOC.MSG := '<CardExpiry>':PAR.CARD.RECORD<CARD.IS.EXPIRY.DATE>[3,4]:'</CardExpiry>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML : = '<ExpiryDate>':PAR.CARD.RECORD<CARD.IS.EXPIRY.DATE>[3,4]:'</ExpiryDate>'
+        LOC.MSG.XML : = LOC.DEL
+        LOC.MSG := '<BeginDate>':PAR.CARD.RECORD<CARD.IS.ISSUE.DATE>[3,4]:'</BeginDate>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<StartDate>':PAR.CARD.RECORD<CARD.IS.ISSUE.DATE>[3,4]:'</StartDate>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<EncodedName>':LOC.NAME.F[1,40]:'</EncodedName>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<EncodedName>':LOC.NAME.F[1,40]:'</EncodedName>'
+        LOC.MSG.XML := LOC.DEL
+**        LOC.MSG := '<EmbossedName>':UPCASE(PAR.CARD.RECORD<CARD.IS.NAME,1>[1,25]):'</EmbossedName>'
+        LOC.MSG := '<EmbossedName>':YR.EMBOSS.NAME[1,25]:'</EmbossedName>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<EmbossedName>':YR.EMBOSS.NAME[1,25]:'</EmbossedName>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG.XML := '<NameOnCard>':YR.EMBOSS.NAME[1,25]:'</NameOnCard>'
+        LOC.MSG.XML := LOC.DEL
+**        LOC.MSG := '<PinName>':UPCASE(PAR.CARD.RECORD<CARD.IS.NAME>[1,25]):'</PinName>'
+        LOC.MSG := '<PinName>':YR.EMBOSS.NAME[1,25]:'</PinName>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<PinName>':YR.EMBOSS.NAME[1,25]:'</PinName>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<Language>1</Language>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<Language>1</Language>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<Version>0</Version>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<Version>0</Version>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<CardCurrency>':LOC.CCY.CODE[3]:'</CardCurrency>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<CardCurrency>':LOC.CCY.CODE[3]:'</CardCurrency>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<CardExponent>0</CardExponent>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<CardExponent>0</CardExponent>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<ServiceCode>121</ServiceCode>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<ServiceCode>121</ServiceCode>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<CardRes>0</CardRes>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<CardRes>0</CardRes>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<Title>':LOC.TITLE:'</Title>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<Title>':LOC.TITLE:'</Title>'
+        LOC.MSG.XML := LOC.DEL
+**        LOC.MSG := '<FirstName>':LOC.R.CUSTOMER<EB.CUS.GIVEN.NAMES>[1,40]:'</FirstName>'
+        LOC.MSG := '<FirstName>':YR.FIRST.NAME:'</FirstName>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<FirstName>':YR.FIRST.NAME:'</FirstName>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<MiddleName>':LOC.NAME.M[1,40]:'</MiddleName>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<MiddleName>':LOC.NAME.M[1,40]:'</MiddleName>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<LastName>':LOC.R.CUSTOMER<EB.CUS.FAMILY.NAME>[1,40]:'</LastName>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<LastName>':LOC.R.CUSTOMER<EB.CUS.FAMILY.NAME>[1,40]:'</LastName>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<Gender>':LOC.GENDER:'</Gender>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<Gender>':LOC.GENDER:'</Gender>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<CardProgramId>':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,14>>'2"0"R':'</CardProgramId>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<CardProgramId>':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,14>>'2"0"R':'</CardProgramId>'
+        LOC.MSG.XML := LOC.DEL
+
+        LOC.MSG := '<SatelliteID>':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,YR.SAT.ID.POS>:'</SatelliteID>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<SatelliteID>':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,YR.SAT.ID.POS>:'</SatelliteID>'
+        LOC.MSG.XML := LOC.DEL
+
+        LOC.C.BEG = PAR.CARD.RECORD<CARD.IS.ISSUE.DATE>
+        LOC.C.BEG = LOC.C.BEG[7,2]:LOC.C.BEG[5,2]:LOC.C.BEG[3,2]
+
+        LOC.MSG := '<CardLimit Type="Cash">'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<CardLimit Type="Cash">'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<CycleBegin>':LOC.C.BEG:'</CycleBegin>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<CycleBegin>':LOC.C.BEG:'</CycleBegin>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<CycleLength>1</CycleLength>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<CycleLength>1</CycleLength>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<CycleLimit>800</CycleLimit>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<CycleLimit>800</CycleLimit>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<CycleFrequency>999</CycleFrequency>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<CycleFrequency>999</CycleFrequency>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<OfflineLimit>1</OfflineLimit>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<OfflineLimit>1</OfflineLimit>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<NetworkLimit>800</NetworkLimit>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<NetworkLimit>800</NetworkLimit>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '</CardLimit>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '</CardLimit>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<CardLimit Type="Sale">'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<CardLimit Type="Sale">'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<CycleBegin>':LOC.C.BEG:'</CycleBegin>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<CycleBegin>':LOC.C.BEG:'</CycleBegin>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<CycleLength>1</CycleLength>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<CycleLength>1</CycleLength>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<CycleLimit>1000</CycleLimit>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<CycleLimit>1000</CycleLimit>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<CycleFrequency>999</CycleFrequency>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<CycleFrequency>999</CycleFrequency>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<OfflineLimit>1</OfflineLimit>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<OfflineLimit>1</OfflineLimit>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<NetworkLimit>800</NetworkLimit>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '<NetworkLimit>800</NetworkLimit>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '</CardLimit>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG.XML := '</CardLimit>'
+        LOC.MSG.XML := LOC.DEL
+**        LOC.MSG := '<Branch>':LOC.R.CUSTOMER<EB.CUS.CO.CODE>[4]:'</Branch>'
+**        LOC.MSG := '<Branch>':LOC.R.ACCOUNT<AC.CO.CODE>[4]:'</Branch>'
+        LOC.MSG := '<Branch>':ID.COMPANY[4]:'</Branch>'
+        LOC.MSG := LOC.DEL
+**        LOC.MSG.XML := '<Branch>':LOC.R.ACCOUNT<AC.CO.CODE>[4]:'</Branch>'
+        LOC.MSG.XML := '<Branch>':ID.COMPANY[4]:'</Branch>'
+        LOC.MSG.XML := LOC.DEL
+        LOC.MSG := '<CustomerID>':YR.CUSTOMER.CARD:'</CustomerID>'
+        LOC.MSG := LOC.DEL
+    END
+    IF PAR.CARD.ACTION EQ "ReplaceCard" THEN
+        LOC.MSG := '<OldCard>':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,2>>[19]:'</OldCard>'
+        LOC.MSG := LOC.DEL
+    END
+    IF PAR.CARD.ACTION EQ "ReplaceCard" OR PAR.CARD.ACTION EQ "RenewCard" THEN
+        LOC.MSG := '<NewExpiryDate>':PAR.CARD.RECORD<CARD.IS.EXPIRY.DATE>[1,6]:'</NewExpiryDate>'
+        LOC.MSG := LOC.DEL
+        LOC.MSG := '<NewStartDate>':PAR.CARD.RECORD<CARD.IS.ISSUE.DATE>[1,6]:'</NewStartDate>'
+        LOC.MSG := LOC.DEL
+    END
+    IF PAR.CARD.ACTION EQ "RenewCard" THEN
+        LOC.MSG := '<NewStatus>':LOC.STATUS:'</NewStatus>'
+        LOC.MSG := LOC.DEL
+    END
+
+    LOC.AC.LIST   = ""
+    LOC.AC.ACTION = ""
+    BEGIN CASE
+    CASE PAR.CARD.ACTION EQ "NewCard"
+        LOC.AC.ACTION = "Add"
+        LOC.AC.LIST = PAR.CARD.RECORD<CARD.IS.ACCOUNT>
+    CASE PAR.CARD.ACTION EQ "D"
+        LOC.AC.ACTION = "Add"
+        LOC.AC.LIST = PAR.CARD.RECORD<CARD.IS.ACCOUNT>
+    CASE PAR.CARD.ACTION EQ "AddAccount"
+        LOC.AC.ACTION = "Add"
+        LOC.AC.LIST = PAR.ACTION.PARAM
+    CASE PAR.CARD.ACTION EQ "RemoveAccount"
+        LOC.AC.ACTION = "Remove"
+        LOC.AC.LIST = PAR.ACTION.PARAM
+    END CASE
+    YR.INDEX = '1'
+    IF PAR.CARD.ACTION EQ "NewCard" OR PAR.CARD.ACTION EQ "D" OR PAR.CARD.ACTION EQ "AddAccount" OR PAR.CARD.ACTION EQ "RemoveAccount" THEN
+        LOOP
+            REMOVE LOC.AC.ID FROM LOC.AC.LIST SETTING LOC.L.MARK
+        WHILE LOC.AC.ID : LOC.L.MARK
+            LOC.MSG := '<Account'
+            LOC.MSG.XML := '<Account'
+            LOC.MSG := ' Index="':YR.INDEX:'"'
+            LOC.MSG.XML := ' Index="':YR.INDEX:'"'
+            LOC.MSG := ' Action="':LOC.AC.ACTION:'"'
+            LOC.MSG.XML := ' Action="':LOC.AC.ACTION:'"'
+            IF PAR.CARD.ACTION NE "RemoveAccount" THEN
+                LOC.MSG := ' Cash="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,3>>:'"'
+                LOC.MSG.XML :=  ' Cash="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,3>>:'"'
+                LOC.MSG := ' BalanceInq="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,4>>:'"'
+                LOC.MSG.XML := ' BalanceInq="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,4>>:'"'
+                LOC.MSG := ' ShortStatement="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,5>>:'"'
+                LOC.MSG.XML := ' ShortStatement="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,5>>:'"'
+                LOC.MSG := ' CheckBook="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,6>>:'"'
+                LOC.MSG.XML := ' CheckBook="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,6>>:'"'
+                LOC.MSG := ' FullStatement="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,7>>:'"'
+                LOC.MSG.XML := ' FullStatement="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,7>>:'"'
+                LOC.MSG := ' eTopUp="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,8>>:'"'
+                LOC.MSG.XML := ' eTopUp="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,8>>:'"'
+                LOC.MSG := ' BillPayment="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,9>>:'"'
+                LOC.MSG.XML := ' BillPayment="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,9>>:'"'
+                LOC.MSG := ' Deposit="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,10>>:'"'
+                LOC.MSG.XML := ' Deposit="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,10>>:'"'
+                LOC.MSG := ' Transfer="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,11>>:'"'
+                LOC.MSG.XML := ' Transfer="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,11>>:'"'
+                LOC.MSG := ' WU="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,12>>:'"'
+                LOC.MSG.XML := ' WU="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,12>>:'"'
+                LOC.MSG := ' Loan="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,13>>:'"'
+                LOC.MSG.XML := ' Loan="':PAR.CARD.RECORD<CARD.IS.LOCAL.REF,LOC.POS.ARR<1,13>>:'"'
+            END
+            LOC.MSG := '>'
+            LOC.MSG := LOC.DEL
+            LOC.MSG.XML := '>'
+            LOC.MSG.XML := LOC.DEL
+**            LOC.MSG := '<AccountId>':LOC.AC.ID[24]:'</AccountId>'
+            GOSUB READ.ACCOUNT
+            LOC.MSG := '<AccountId>':YR.ALT.ACCT[24]:'</AccountId>'
+            LOC.MSG.XML := '<AccountId>':YR.ALT.ACCT[24]:'</AccountId>'
+            LOC.MSG := LOC.DEL
+            LOC.MSG.XML := LOC.DEL
+            LOC.MSG.XML := '<AccountNumber>':YR.ALT.ACCT[24]:'</AccountNumber>'
+            LOC.MSG.XML := LOC.DEL
+            LOC.MSG.XML := '<Branch>':R.ACCT<AC.CO.CODE>[4]:'</Branch>'
+            LOC.MSG.XML := LOC.DEL
+            LOC.MSG.XML := '<CreationDate>':R.ACCT<AC.OPENING.DATE>[8]:'</CreationDate>'
+            LOC.MSG.XML := LOC.DEL
+            LOC.MSG.XML := '<EffectiveDate>':R.ACCT<AC.OPENING.DATE>[8]:'</EffectiveDate>'
+            LOC.MSG.XML := LOC.DEL
+            BEGIN CASE
+            CASE NOT(R.ACCT<AC.POSTING.RESTRICT>) AND R.ACCT<AC.INACTIV.MARKER> NE "Y"
+                LOC.AC.STATUS = 1
+            CASE OTHERWISE
+                LOC.AC.STATUS = 2
+            END CASE
+            LOC.MSG.XML := '<Status>':LOC.AC.STATUS:'</Status>'
+            LOC.MSG.XML := LOC.DEL
+            CALL DBR('ACCOUNT':FM:AC.CURRENCY:FM:'':FM:'CURRENCY':FM:EB.CUR.NUMERIC.CCY.CODE,LOC.AC.ID,LOC.CCY.CODE)
+            LOC.MSG.XML := '<Currency>':LOC.CCY.CODE[3]:'</Currency>'
+            LOC.MSG.XML := LOC.DEL
+            LOC.MSG.XML := '<Type>':R.ACCT<AC.CATEGORY>[1,3]:'</Type>'
+            LOC.MSG.XML := LOC.DEL
+            LOC.MSG.XML := '</Account>'
+            LOC.MSG.XML := LOC.DEL
+            LOC.MSG := '<AccountSystem>1</AccountSystem>'
+            LOC.MSG := LOC.DEL
+            LOC.MSG := '<AccountDesc>1</AccountDesc>'
+            LOC.MSG := LOC.DEL
+            LOC.MSG := '<IsoTA>1</IsoTA>'
+            LOC.MSG := LOC.DEL
+
+            LOC.MSG := '<AccountCurrency>':LOC.CCY.CODE[3]:'</AccountCurrency>'
+            LOC.MSG := LOC.DEL
+            LOC.MSG := '</Account>'
+            LOC.MSG := LOC.DEL
+            YR.INDEX +=1
+        REPEAT
+    END
+    LOC.MSG := '</CardRecord>'
+**    LOC.MSG.XML := '</CardRecord>'
+    IF LOC.DEVICE.TYPE NE 'FILE' THEN
+        LOC.MSG := LOC.DEL
+        LOC.MSG := '</CardBatch>'
+    END
+
+    RETURN
+
+*********************************************************************
+
+SEND.MSG:
+
+**    CALL CAB.ATM.SEND.MSG(LOC.MSG, LOC.DEVICE.TYPE, LOC.DEVICE.DETS, PAR.ERROR)
+
+    RETURN
+
+READ.ACCOUNT:
+
+    FN.ACCOUNT = 'F.ACCOUNT'
+    F.ACCOUNT = ''
+    CALL OPF(FN.ACCOUNT,F.ACCOUNT)
+    R.ACCT = ''
+    ACCT.ERR = ''
+    CALL F.READ(FN.ACCOUNT,LOC.AC.ID,R.ACCT,F.ACCOUNT,ACCT.ERR)
+    YR.ALT.ACCT = R.ACCT<AC.ALT.ACCT.ID,1>
+    IF YR.ALT.ACCT EQ '' THEN
+        YR.ALT.ACCT = FMT(LOC.AC.ID,"R%13")
+    END
+    RETURN
+*********************************************************************
+
+END

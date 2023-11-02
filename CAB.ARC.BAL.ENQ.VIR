@@ -1,0 +1,52 @@
+*-----------------------------------------------------------------------------
+*-----------------------------------------------------------------------------
+
+* NOFILE ROUTINE used to get the Balance enquiry details in CAB.ARC.BAL.ENQ.VIR
+* It returns the Balance enquiry details belongs to the given Virtual card
+
+* -----------------------------------------------------------------------------
+
+    SUBROUTINE CAB.ARC.BAL.ENQ.VIR(RET.DATA)
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_ENQUIRY.COMMON
+    $INSERT I_EB.EXTERNAL.COMMON
+
+
+
+    LOCATE "CARD.NO" IN ENQ.SELECTION<2,1> SETTING POS THEN
+        CARD.NO = ENQ.SELECTION<4,POS>
+        cardNumber = CARD.NO
+    END ELSE
+        RETURN
+    END
+    RET.DATA = ""
+
+
+    GOSUB INITIALISE
+    GOSUB PROCESS
+    DEBUG
+    RETURN
+
+INITIALISE:
+
+    EXT.CUST.ID = EB.EXTERNAL$CUSTOMER
+
+    RETURN
+
+PROCESS:
+
+CALL CallMobilWS.getPrepaidBalance(cardNumber, errorCode, acctAvailAmt)
+
+    IF acctAvailAmt NE '' THEN
+        RET.DATA = acctAvailAmt
+    END ELSE
+        RET.DATA = errorCode<2>
+    END
+
+
+    RETURN
+
+END
+

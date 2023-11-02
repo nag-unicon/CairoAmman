@@ -1,0 +1,79 @@
+* Version 1.1
+
+*********************************************************************
+* Start on 18/04/2012 By A.Gryaznov, Temenos
+*
+* Developed for ATM Interface.
+* Program for sending a message
+*
+* Input parameters are:
+* - Message to send
+* - Device type (FILE or MQ)
+* - Device details (Path or Queue)
+* Output parameters are:
+* - Error
+*
+*                       ---- MODIFICATIONS ---------
+*********************************************************************
+
+    SUBROUTINE CAB.ATM.SEND.MSG(PAR.MESSAGE, PAR.DEVICE.TYPE, PAR.DEVICE.DETS, PAR.ERROR)
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+
+    PAR.ERROR = ''
+
+    S2M.MESSAGE = PAR.MESSAGE
+    BEGIN CASE
+
+    CASE PAR.DEVICE.TYPE EQ 'FILE'
+
+        LOC.OUT.DIR = PAR.DEVICE.DETS
+        OPEN LOC.OUT.DIR TO F.OUT.FILE ELSE
+            PAR.ERROR = "Can not open file ":LOC.OUT.DIR
+            RETURN
+        END
+
+        LOC.TIME = TIMEDATE()
+        LOC.TIME = LOC.TIME[1,8]
+        CONVERT ":" TO "" IN LOC.TIME
+
+        LOC.TYPE = PAR.MESSAGE[">",1,1]
+        LOC.TYPE = LOC.TYPE[" ",1,1]
+        LOC.TYPE = LOC.TYPE["<",2,1]
+*LOC.ID = ID.NEW
+        BEGIN CASE
+        CASE LOC.TYPE EQ "CustomerBatch" OR LOC.TYPE EQ "Customer"
+            LOC.TYPE = "AcCuBatch"
+            LOC.ID = PAR.MESSAGE["</CID>",1,1]
+            LOC.ID = LOC.ID["<CID>",2,1]
+        CASE LOC.TYPE EQ "CardBatch" OR LOC.TYPE EQ "CardRecord"
+            LOC.TYPE = "CardBatch"
+            LOC.ID = PAR.MESSAGE["</CardNumber>",1,1]
+            LOC.ID = LOC.ID["<CardNumber>",2,1]
+        END CASE
+        CONVERT '.' TO '' IN LOC.ID
+
+*Save msg to file
+        FILE.NAME = 'MSG':'.':TODAY:'.':LOC.TYPE:'.':LOC.ID:'.':LOC.TIME:'.':OPERATOR
+        WRITE PAR.MESSAGE TO F.OUT.FILE,FILE.NAME
+
+        CLOSE F.OUT.FILE
+**Changes to send the message to MQ/S
+**        CALL CAB.SEND.CARD.S2M(S2M.MESSAGE)
+**Changes/E
+    CASE PAR.DEVICE.TYPE EQ 'MQ'
+
+        PAR.ERROR = "WRONG TYPE"
+        RETURN
+
+    CASE OTHERWISE
+
+        PAR.ERROR = "WRONG TYPE"
+        RETURN
+
+    END CASE
+
+    RETURN
+
+END

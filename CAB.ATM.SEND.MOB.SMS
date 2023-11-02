@@ -1,0 +1,30 @@
+    SUBROUTINE CAB.ATM.SEND.MOB.SMS
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.CUSTOMER
+
+
+    CUSTOMER.MOB = R.NEW(EB.CUS.SMS.1)<1,1> ; YR.DOB = R.NEW(EB.CUS.DATE.OF.BIRTH) ; YR.USER = '0':ID.NEW
+    YR.DOB = YR.DOB[7,2]:YR.DOB[5,2]:YR.DOB[1,4]
+    YR.BODY.EN = 'Dear Valued Customer, An email account for all Bank correspondances has been created for you. Email URL: https://estatements.cab.email Username:':YR.USER:'. Password:':YR.DOB:'. *We advice you to change your password at first login'
+    YR.BODY.AR = 'عميلنا العزيز, تم انشاء بريد الكتروني خاص بك للمراسلات المصرفية, للدخول اضغط على الرابط التالي:  https://estatements.cab.email اسم المستخدم:':YR.USER:' كلمة المرور:':YR.DOB:'  *يرجى تغيير كلمة السر عند اول محاولة دخول.'
+    IF R.NEW(EB.CUS.LANGUAGE) EQ '1' THEN
+        YR.BODY = YR.BODY.EN
+    END ELSE
+        YR.BODY = YR.BODY.AR
+    END
+    YR.MSG = '<?xml version="1.0" encoding="UTF-8"?><sms id="D20161031014966972000.2"><sender>0791111111</sender><receiver>':CUSTOMER.MOB:'</receiver><message>':YR.BODY:'</message></sms>'
+
+    MSG.TYPE<1> = "SMS" ; MSG.TYPE<2> = "NO" ; MSG.ERR = ''
+
+    CALL CAB.SEND.EXT.MSG(YR.MSG,MSG.TYPE,MSG.ERR)
+
+    IF MSG.ERR THEN
+        E = 'AI-PAYPAL.CONFIGURATION'
+        CALL ERR
+        RETURN
+    END
+
+
+
+    RETURN

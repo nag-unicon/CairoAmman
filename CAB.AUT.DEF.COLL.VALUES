@@ -1,0 +1,129 @@
+*-----------------------------------------------------------------------------
+* <Rating>-39</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AUT.DEF.COLL.VALUES
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.AUT.DEF.COLL.VALUES
+*---------------------------------------------------------------
+*Description       : Autnew content routine to pass values to the COLLATERAL.FIELDS versions.
+*Linked With       : VERSION>COLLATERAL.FIELDS
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2012-01-0004
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INCLUDE T24.BP I_F.LIMIT
+    $INSERT I_System
+    $INCLUDE CAB.BP I_F.COLLATERAL.FIELDS
+    $INCLUDE T24.BP I_F.COLLATERAL.RIGHT
+    $INCLUDE T24.BP I_ENQUIRY.COMMON
+
+    FN.LIMIT = 'F.LIMIT'
+    F.LIMIT = ''
+    CALL OPF(FN.LIMIT,F.LIMIT)
+
+    FN.COLLATERAL.RIGHT = 'F.COLLATERAL.RIGHT'
+    F.COLLATERAL.RIGHT = ''
+    CALL OPF(FN.COLLATERAL.RIGHT,F.COLLATERAL.RIGHT)
+    R.COL.RIGH = ''
+
+    NOMINAL.VALUE = 'CURRENT.NOMINAL.VALUE'
+    EXECUTION.VALUE = 'CURRENT.EXECUTION.VALUE'
+    GEN.LEDGER.VALUE = 'CURRENT.GEN.LEDGER.VALUE'
+    THIRD.PARTY.VALUE = 'CURRENT.THIRD.PARTY.VALUE'
+
+    Y.NOMINAL.VALUE = System.getVariable(NOMINAL.VALUE)
+    Y.EXECUTION.VALUE = System.getVariable(EXECUTION.VALUE)
+    Y.GEN.LEDGER.VALUE = System.getVariable(GEN.LEDGER.VALUE)
+    Y.THIRD.PARTY.VALUE = System.getVariable(THIRD.PARTY.VALUE)
+
+
+    CUST.ID = FIELD(ID.NEW,'.',1)
+
+    GLB.LIM.VAL1 = CUST.ID:".0010000"
+    GLB.LIM.VAL2 = CUST.ID:".0020000"
+
+    SEL.CMD = "SELECT ":FN.LIMIT:" WITH @ID LIKE ":CUST.ID :"..."
+    CALL EB.READLIST(SEL.CMD,LIMIT.LIST,'',NREC,RETURN.CODE)
+
+    GLB.REV.LIM = ''
+    GLB.NONREV.LIM = ''
+    REV.LIM.AMT = ''
+    REV.O.DATA = ''
+    REV.AVAIL.AMT = ''
+    NONREV.LIM.AMT = ''
+    NONREV.O.DATA = ''
+    NONREV.AVAIL.AMT = ''
+
+    FINDSTR GLB.LIM.VAL1 IN LIMIT.LIST SETTING POS1 THEN
+        GLB.REV.LIM = LIMIT.LIST<POS1>
+        FINDSTR GLB.LIM.VAL2 IN LIMIT.LIST SETTING POS2 THEN
+            GLB.NONREV.LIM = LIMIT.LIST<POS2>
+            O.DATA = GLB.REV.LIM
+*         CALL CAB.LIAB.SUMM.CAL(GLB.REV.LIM,REV.LIM.AMT,REV.O.DATA,REV.AVAIL.AMT)
+            CALL E.LIM.ENQ.REC.BUILD
+            REV.LIM.AMT = R.RECORD<5> * 1000
+            REV.O.DATA = R.RECORD<6> * 1000
+            REV.AVAIL.AMT = R.RECORD<7> * 1000
+
+            O.DATA = GLB.NONREV.LIM
+            CALL E.LIM.ENQ.REC.BUILD
+*         CALL CAB.LIAB.SUMM.CAL(GLB.NONREV.LIM,NONREV.LIM.AMT,NONREV.O.DATA,NONREV.AVAIL.AMT)
+
+            NONREV.LIM.AMT = R.RECORD<5> * 1000
+            NONREV.O.DATA = R.RECORD<6> * 1000
+            NONREV.AVAIL.AMT = R.RECORD<7> * 1000
+
+        END
+    END
+
+    TOT.EXECUS.VAL =  Y.EXECUTION.VALUE - Y.THIRD.PARTY.VALUE
+    BEGIN CASE
+    CASE REV.LIM.AMT GT REV.O.DATA
+*        TOT.EXECUS.VAL =  Y.EXECUTION.VALUE - Y.THIRD.PARTY.VALUE
+        REV.GLOB.LIM.VAL  = REV.LIM.AMT + NONREV.O.DATA
+        TOT.CAL = (TOT.EXECUS.VAL/REV.GLOB.LIM.VAL)
+        R.NEW(COLL.FLD.COVERAGE.RATIO) = DROUND(TOT.CAL, 3)
+    CASE REV.O.DATA GT REV.LIM.AMT
+        IF REV.LIM.AMT GT REV.O.DATA THEN
+            LAR.LIM.AMT = REV.LIM.AMT
+        END ELSE
+            LAR.LIM.AMT = REV.O.DATA
+        END
+        REV.GLOB.LIM.VAL = LAR.LIM.AMT + NONREV.O.DATA
+        TOT.CAL = (TOT.EXECUS.VAL/REV.GLOB.LIM.VAL)
+        R.NEW(COLL.FLD.COVERAGE.RATIO) =  DROUND(TOT.CAL, 3)
+    CASE 1
+
+        COLL.RIG.ID = FIELD(ID.NEW,'.',1,2)
+        CALL F.READ(FN.COLLATERAL.RIGHT,COLL.RIG.ID,R.COL.RIGH,F.COLLATERAL.RIGHT,COL.ERR)
+        PROD.LIMI.ID = R.COL.RIGH<COLL.RIGHT.LIMIT.REFERENCE>
+        IF PROD.LIMI.ID NE '' THEN
+*       CALL CAB.LIAB.SUMM.CAL(PROD.LIMI.ID,PROD.LIM.AMT,PROD.O.DATA,PROD.AVAIL.AMT)
+            O.DATA = PROD.LIMI.ID
+            CALL E.LIM.ENQ.REC.BUILD
+            PROD.O.DATA = R.RECORD<6> * 1000
+            TOT.CAL = (TOT.EXECUS.VAL/PROD.O.DATA)
+            R.NEW(COLL.FLD.COVERAGE.RATIO) = DROUND(TOT.CAL, 3)
+        END
+    END CASE
+
+
+
+*    IF Y.EXECUTION.VALUE EQ "" OR Y.EXECUTION.VALUE EQ "0" OR Y.EXECUTION.VALUE EQ "CURRENT.EXECUTION.VALUE" OR Y.GEN.LEDGER.VALUE EQ "" OR Y.GEN.LEDGER.VALUE EQ "0" OR Y.GEN.LEDGER.VALUE EQ "CURRENT.GEN.LEDGER.VALUE" THEN
+*        R.NEW(COLL.FLD.COVERAGE.RATIO) = "0"
+*    END ELSE
+*        COV.RATIO = (Y.EXECUTION.VALUE/Y.GEN.LEDGER.VALUE)
+*        R.NEW(COLL.FLD.COVERAGE.RATIO) = COV.RATIO
+*    END
+
+    RETURN
+
+END

@@ -1,0 +1,107 @@
+*-----------------------------------------------------------------------------
+* <Rating>61</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.ATM.LOANS.DETAILS.FIELDS
+*-------------------------------------------------------------------------------------------------------------------
+*<doc>
+* Template for field definitions routine CAB.ATM.LOANS.DETAILS
+*
+* @author
+* @stereotype fields template
+* @uses Table
+* @public Table Creation
+* @package infra.eb
+* </doc>
+*-------------------------------------------------------------------------------------------------------------------
+* Modification History :
+*
+* 22/07/09 - ODR-2010-XX-XXXX
+*            Field descriptions for the template CAB.SALARY.DETAILS
+*-------------------------------------------------------------------------------------------------------------------
+*** <region name= Header>
+*** <desc>Inserts and control logic</desc>
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_DataTypes
+*** </region>
+*-------------------------------------------------------------------------------------------------------------------
+*
+    CALL Table.defineId("TXN.REF.NO", T24_String) ;* Define Table id
+    ID.N = "32" ; ID.T = "A"
+*
+*-------------------------------------------------------------------------------------------------------------------
+*
+    neighbour = ''
+    fieldLength = '35'
+    fieldType = 'A'
+
+    fieldName = 'CUSTOMER.NO'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'LIMIT.TXN.ID'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'LIMIT.AMOUNT'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'LIMIT.CCY'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'LIM.TXN.STAT'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'LIM.T24.RESP'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'AAA.TXN.ID'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'AAA.TXN.STAT'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'AAA.INP.RESP'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'AAA.AUT.RESP'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'FT.TXN.ID'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'FT.TXN.STAT'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'FT.T24.RESP'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'ACCP.TXN.ID'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'ACCP.TXN.STAT'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'ACCP.T24.RESP'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'RESERVED.05'  ;  fieldType = T24_String ; args = Field_NoInput ;  GOSUB ADD.RESERVED.FIELDS
+    fieldName = 'RESERVED.04'  ;  fieldType = T24_String ; args = Field_NoInput ;  GOSUB ADD.RESERVED.FIELDS
+    fieldName = 'RESERVED.03'  ;  fieldType = T24_String ; args = Field_NoInput ;  GOSUB ADD.RESERVED.FIELDS
+    fieldName = 'RESERVED.02'  ;  fieldType = T24_String ; args = Field_NoInput ;  GOSUB ADD.RESERVED.FIELDS
+    fieldName = 'RESERVED.01'  ;  fieldType = T24_String ; args = Field_NoInput ;  GOSUB ADD.RESERVED.FIELDS
+
+*
+*    CALL Table.setAuditPosition         ;* Poputale audit information
+*
+    RETURN
+*
+*--------------------------------------------------------------------------------------------------------------------
+********************
+ADD.RESERVED.FIELDS:
+********************
+*
+    CALL Table.addField(fieldName, fieldType, args, neighbour)        ;* Add a new fields
+*
+    RETURN
+*
+*-------------------------------------------------------------------------------------------------------------------
+END

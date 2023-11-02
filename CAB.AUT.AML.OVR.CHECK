@@ -1,0 +1,92 @@
+    SUBROUTINE CAB.AUT.AML.OVR.CHECK
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.CUSTOMER
+    $INCLUDE T24.BP I_F.USER
+    $INCLUDE CAB.BP I_F.CAB.AML.RISK.PARAM
+    $INCLUDE BP     I_F.CAB.EMAIL.ALERT
+    $INCLUDE CAB.BP I_F.CAB.EXT.MQ.PARAM
+*-----------------------------------------------------------------------------
+* Nuha Tuhul      30-03-2021                  pick email-id  from template
+* Nuha Tuhul      30-03-2021                  send Msg to MQ
+*-----------------------------------------------------------------------------
+    IF V$FUNCTION NE 'A' THEN
+        RETURN
+    END
+
+    F.CAB.EMAIL = ''
+    FN.CAB.EMAIL = 'F.EB.CAB.EMAIL.ALERT'
+    CALL OPF(FN.CAB.EMAIL,F.CAB.EMAIL)
+    CALL F.READ(FN.CAB.EMAIL,'SYSTEM',R.CAB.ALERT.REC,F.CAB.EMAIL,CAB.EML.ERR)
+    YR.EMAIL.FROM = R.CAB.ALERT.REC<EB.CAB25.FROM.EMAIL>
+***
+    R.CAB.EXT.MQ.PARAM = ''
+    CALL CACHE.READ("F.CAB.EXT.MQ.PARAM","SYSTEM",R.CAB.EXT.MQ.PARAM,CAB.EXT.MQ.ERR)
+
+    LOCATE "T24.EMAIL" IN R.CAB.EXT.MQ.PARAM<CAB.EXT.MQ.TXN.TYPE,1> SETTING POS THEN
+        MQ.HOST.NAME = R.CAB.EXT.MQ.PARAM<CAB.EXT.MQ.MQ.HOST,POS>
+        MQ.PORT.NO = R.CAB.EXT.MQ.PARAM<CAB.EXT.MQ.MQ.PORT,POS>
+        MQ.MANAGER = R.CAB.EXT.MQ.PARAM<CAB.EXT.MQ.MQ.MANAGER,POS>
+        MQ.CHANNEL = R.CAB.EXT.MQ.PARAM<CAB.EXT.MQ.MQ.CHANNEL,POS>
+        MQ.USER = R.CAB.EXT.MQ.PARAM<CAB.EXT.MQ.MQ.USER,POS>
+        MQ.PASSWORD = R.CAB.EXT.MQ.PARAM<CAB.EXT.MQ.MQ.PASSWORD,POS>
+        MQ.INQUEUE = R.CAB.EXT.MQ.PARAM<CAB.EXT.MQ.MQ.INQUEUE,POS>
+        MQ.OUTQUEUE = R.CAB.EXT.MQ.PARAM<CAB.EXT.MQ.MQ.OUTQUEUE,POS>
+        MQ.ACTIVATION = R.CAB.EXT.MQ.PARAM<CAB.EXT.MQ.MQ.ACTIVATION,POS>
+        MQ.TIMEOUT = R.CAB.EXT.MQ.PARAM<CAB.EXT.MQ.MQ.TIMEOUT,POS>
+        MQ.CHARSET = R.CAB.EXT.MQ.PARAM<CAB.EXT.MQ.MQ.CHARSET,POS>
+    END
+
+**
+
+
+    OVERRIDE.USER = ''
+    LAST.OVERRIDE.USER = '' ; SEND.NOTIFICATION = ''
+    OVR.CNT = DCOUNT(R.NEW(EB.CUS.OVERRIDE),VM)
+    FOR I=1 TO OVR.CNT
+        CUS.OVERRIDE = R.NEW(EB.CUS.OVERRIDE)<1,I>
+        OVERRIDE.ID = FIELD(FIELD(CUS.OVERRIDE,SM,1),'}',1)
+        IF OVERRIDE.ID EQ 'AML.HIGH.RISK.1' THEN
+            OVERRIDE.USER = FIELD(CUS.OVERRIDE,SM,3)
+            OVERRIDE.CLASS = FIELD(CUS.OVERRIDE,SM,2)
+            IF OVERRIDE.CLASS MATCHES R.USER<EB.USE.OVERRIDE.CLASS>  AND OVERRIDE.USER EQ '' THEN
+                SEND.NOTIFICATION = 1
+            END
+        END
+    NEXT I
+    IF SEND.NOTIFICATION EQ 1 THEN
+        FN.CAB.AML.RISK.PARAM = 'F.CAB.AML.RISK.PARAM'
+        CALL CACHE.READ(FN.CAB.AML.RISK.PARAM,'SYSTEM',R.AML.RISK,AML.ERR)
+
+        CALL ALLOCATE.UNIQUE.TIME(PAR.ID)
+        PAR.ID= FIELD(PAR.ID,'.',1)
+        PAR.ID= 'CU':FIELD(PAR.ID,'.',1)
+        PAR.FROM = YR.EMAIL.FROM
+        PAR.TO = R.AML.RISK<AML.HR.EMAIL.LEVEL2>
+        CONVERT VM TO ';' IN PAR.TO
+
+        PAR.SUBJECT = "Alert : High Risk customer ":ID.NEW
+        PAR.BODY     = "Dear User,"
+        PAR.BODY<-1> = "This is to inform you that high risk customer ":ID.NEW:" has been authorized by KYC (Level1) and awaiting your further action."
+        PAR.BODY<-1> = "Thank you."
+        PAR.BODY<-1> = '' ; PAR.BODY<-1> = ''
+        PAR.BODY<-1> = "***This is system generated message. Please do not reply***"
+        LOC.CR = '&lt;br/&gt;'
+        CHANGE FM TO LOC.CR IN PAR.BODY
+
+        ebApiId          = 'DE.EMAIL.CLIENT'
+        errorResponse    = ''
+        calljError       = ''
+        deliveryPackage  = '<?xml version="1.0" encoding="UTF-8"?>'
+        deliveryPackage := '<T24MailPackage xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><Email id="':PAR.ID:'">'
+        deliveryPackage := '<Address><From>':PAR.FROM:'</From><To>':PAR.TO:'</To></Address>'
+        deliveryPackage := '<Message type="Null"><Subject>':PAR.SUBJECT:'</Subject><Body>':PAR.BODY:'</Body></Message>'
+        deliveryPackage := '</Email></T24MailPackage>'
+
+* CALL EB.CALL.JAVA.API(ebApiId,deliveryPackage,errorResponse,calljError)
+        OUT.MSG   = deliveryPackage
+        MSG.TYPE  = "T24.EMAIL":@FM:'Y'
+        CALL CAB.SEND.EXT.MSG(OUT.MSG,MSG.TYPE,err)
+    END
+    RETURN
+END

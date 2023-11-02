@@ -1,0 +1,81 @@
+*-----------------------------------------------------------------------------
+* <Rating>-50</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AUT.DEFAULT.CHQ.ISSUE
+******************************************************************************************************************
+*Company   Name    : CABK BANK
+*Developed By      : Abdul Rahman.J
+*Program   Name    : CAB.AUT.DEFAULT.CHQ.ISSUE
+*-----------------------------------------------------------------------------------------------------------------
+*Description       :Auto new content routine to update the values in CHEQUE.ISSUE application while opening
+*                   a record from enquiry.
+*Linked With       :
+*ODR Number        :ODR-2011-10-0063
+*-----------------------------------------------------------------------------------------------------------------
+*Modification Details:
+*=====================
+*
+*-----------------------------------------------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.CHEQUE.ISSUE
+    $INSERT I_F.CHEQUE.REGISTER
+    $INSERT I_F.CUSTOMER
+*----------------------------------------------------------------------------------------------------------------
+    GOSUB INIT
+    GOSUB PROCESS
+    RETURN
+*----------------------------------------------------------------------------------------------------------------
+INIT:
+*****
+    APPL.ARR = ''
+    APPL.ARR = 'CHEQUE.ISSUE':FM:'CUSTOMER'
+    FIELD.ARR = ''
+    FIELD.ARR = 'L.CHQ.TYPE':VM:'L.ACCT.NO':VM:'L.NO.OF.LEAVES':VM:'L.CHQ.START.NO':VM:'L.NOOFBOOKS':VM:
+    FIELD.ARR := 'L.CHQ.NO.END':VM:'L.CUST.ID':VM:'L.CHQ.BOK.TITLE':VM:'L.MOBILE.NO':FM:'L.CHQ.BOK.TITLE'
+
+    CALL MULTI.GET.LOC.REF(APPL.ARR,FIELD.ARR,FIELD.POS)
+    CHEQ.TYP.POS = FIELD.POS<1,1>
+    ACC.POS = FIELD.POS<1,2>
+    LEAVES.POS = FIELD.POS<1,3>
+    CHQ.STRT.POS = FIELD.POS<1,4>
+    CHQ.BOOK.POS = FIELD.POS<1,5>
+    CHQ.END.POS  = FIELD.POS<1,6>
+    CUS.ID.POS = FIELD.POS<1,7>
+    CHQ.BOK.POS = FIELD.POS<1,8>
+    CHQ.MOBIL.POS = FIELD.POS<1,9>
+
+    CUS.CHQ.BOK.POS =  FIELD.POS<2,1>
+
+    LAST.CHQ.NO = ''
+
+    FN.CHEQUE.REGISTER = 'F.CHEQUE.REGISTER'
+    F.CHEQUE.REGISTER = ''
+    R.CHEQ.REG = ''
+    CALL OPF(FN.CHEQUE.REGISTER,F.CHEQUE.REGISTER)
+
+    FN.CUSTOMER = 'F.CUSTOMER'
+    F.CUSTOMER = ''
+    R.CUS = ''
+    CALL OPF(FN.CUSTOMER,F.CUSTOMER)
+
+    RETURN
+*-----------------------------------------------------------------------------
+PROCESS:
+********
+
+    CHEQ.TYP = R.NEW(CHEQUE.IS.LOCAL.REF)<1,CHEQ.TYP.POS>
+    ACC.VAL = R.NEW(CHEQUE.IS.LOCAL.REF)<1,ACC.POS>
+    CHQ.STRT.VAL = R.NEW(CHEQUE.IS.LOCAL.REF)<1,CHQ.STRT.POS>
+    LEAVES.VAL = R.NEW(CHEQUE.IS.LOCAL.REF)<1,LEAVES.POS>
+    NO.OF.BOOK.VAL = R.NEW(CHEQUE.IS.LOCAL.REF)<1,CHQ.BOOK.POS>
+    CUST.ID.VAL  = R.NEW(CHEQUE.IS.LOCAL.REF)<1,CUS.ID.POS>
+
+    CALL F.READ(FN.CUSTOMER,CUST.ID.VAL,R.CUS,F.CUSTOMER,ERR.CUS)
+    R.NEW(CHEQUE.IS.LOCAL.REF)<1,CHQ.BOK.POS> = R.CUS<EB.CUS.LOCAL.REF><1,CUS.CHQ.BOK.POS>
+    R.NEW(CHEQUE.IS.LOCAL.REF)<1,CHQ.MOBIL.POS> = R.CUS<EB.CUS.SMS.1>
+
+    RETURN
+*------------------------------------------------------------------------------
+END

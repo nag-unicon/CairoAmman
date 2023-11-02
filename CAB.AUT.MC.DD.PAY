@@ -1,0 +1,161 @@
+*-----------------------------------------------------------------------------
+* <Rating>-36</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AUT.MC.DD.PAY
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.AUT.MC.DD.PAY
+*---------------------------------------------------------------
+*Description       :
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0067
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_System
+    $INSERT I_GTS.COMMON
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.TELLER
+    $INSERT I_F.FUNDS.TRANSFER
+
+    GOSUB INIT.FILES
+    GOSUB OPEN.FILES
+    GOSUB PROCESS
+
+    RETURN
+
+***********
+INIT.FILES:
+***********
+
+    FN.ACC = "F.ACCOUNT"
+    F.ACC = ""
+
+    RETURN
+
+***********
+OPEN.FILES:
+***********
+
+    CALL OPF(FN.ACC,F.ACC)
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    DEBIT.ACCT.NO = 'CURRENT.DEB.ACCT'
+    CREDIT.CURRENCY = 'CURRENT.CREDIT.CURRENCY'
+    CREDIT.ACCT.NO = 'CURRENT.CRED.ACCT'
+    AMOUNT = 'CURRENT.AMOUNT'
+    TRAN.ID = 'CURRENT.STATUS.TRANSID'
+    PURCHASER = 'CURRENT.PURCHASER'
+    PAYEE.NAME = 'CURRENT.PAYEE.NAME'
+    MC.DD.ID = 'CURRENT.MC.DD.ID'
+
+    Y.DEBIT.ACCT.NO = System.getVariable(DEBIT.ACCT.NO)
+    Y.CREDIT.ACCT.NO = System.getVariable(CREDIT.ACCT.NO)
+    Y.CREDIT.CURRENCY = System.getVariable(CREDIT.CURRENCY)
+    Y.AMOUNT = System.getVariable(AMOUNT)
+    Y.TRAN.ID = System.getVariable(TRAN.ID)
+    Y.PURCHASER = System.getVariable(PURCHASER)
+    Y.PAYEE.NAM = System.getVariable(PAYEE.NAME)
+    Y.MC.DD.ID = System.getVariable(MC.DD.ID)
+
+    IF ID.NEW[1,2] EQ "TT" THEN
+        R.NEW(TT.TE.ACCOUNT.1) = Y.CREDIT.ACCT.NO
+        R.NEW(TT.TE.CURRENCY.1) = Y.CREDIT.CURRENCY
+        CALL F.READ(FN.ACC,Y.DEBIT.ACCT.NO,R.ACC,F.ACC,ACC.ERR)
+        IF R.ACC THEN
+            R.NEW(TT.TE.CURRENCY.2) = R.ACC<AC.CURRENCY>
+        END
+        IF Y.CREDIT.CURRENCY EQ LCCY THEN
+            R.NEW(TT.TE.AMOUNT.LOCAL.1) = Y.AMOUNT
+        END ELSE
+            R.NEW(TT.TE.AMOUNT.FCY.1) = Y.AMOUNT
+        END
+        R.NEW(TT.TE.STOCK.NUMBER) = Y.MC.DD.ID
+        IF Y.PURCHASER NE "CURRENT.PURCHASER" THEN
+            R.NEW(TT.TE.NARRATIVE.2)<1,1> = Y.PURCHASER
+        END
+        IF Y.PAYEE.NAM NE "CURRENT.PAYEE.NAME" THEN
+            R.NEW(TT.TE.NARRATIVE.1) = Y.PAYEE.NAM
+        END
+    END ELSE
+        R.FT.REC = ''
+        IF Y.TRAN.ID[1,2] EQ 'FT' THEN
+            FN.FUNDS.TRANSFER.HIS = 'F.FUNDS.TRANSFER$HIS'
+            F.FUNDS.TRANSFER.HIS = ''
+            CALL OPF(FN.FUNDS.TRANSFER.HIS,F.FUNDS.TRANSFER.HIS)
+
+            FN.FUNDS.TRANSFER = 'F.FUNDS.TRANSFER'
+            F.FUNDS.TRANSFER = ''
+            CALL OPF(FN.FUNDS.TRANSFER,F.FUNDS.TRANSFER)
+
+            TRANS.REF = Y.TRAN.ID
+            CALL EB.READ.HISTORY.REC(F.FUNDS.TRANSFER.HIS,TRANS.REF,R.FT.REC,FTH.ERR)
+            IF R.FT.REC ELSE
+                TRANS.REF = Y.TRAN.ID
+                CALL F.READ(FN.FUNDS.TRANSFER,TRANS.REF,R.FT.REC,F.FUNDS.TRANSFER,FT.ERR)
+            END
+        END
+
+        LOCAL.APPLICATION = 'FUNDS.TRANSFER'
+        LOCAL.FIELD = 'L.CHEQUE.NUMBER':VM:'ORDER.CUST':VM:'BEN.CUST':VM:'VERSION.NAME':VM:'PAYMNT.DETAILS'
+        LOCAL.POS = ''
+        CALL MULTI.GET.LOC.REF(LOCAL.APPLICATION,LOCAL.FIELD,LOCAL.POS)
+        L.CHEQUE.NUMBER.POS = LOCAL.POS<1,1>
+        L.ORDER.CUST.POS = LOCAL.POS<1,2>
+        L.BEN.CUST.POS = LOCAL.POS<1,3>
+        L.VERSION.POS = LOCAL.POS<1,4>
+        L.PAY.DET.POS = LOCAL.POS<1,5>
+
+        R.NEW(FT.DEBIT.ACCT.NO) = Y.CREDIT.ACCT.NO
+*        IF PGM.VERSION EQ ",MC.DD.CAN.ACCT" THEN
+*            R.NEW(FT.CHARGES.ACCT.NO) = Y.CREDIT.ACCT.NO
+*        END
+        R.NEW(FT.DEBIT.CURRENCY) = Y.CREDIT.CURRENCY
+        R.NEW(FT.DEBIT.AMOUNT) = Y.AMOUNT
+*        R.NEW(FT.CREDIT.ACCT.NO) = Y.DEBIT.ACCT.NO
+*        CALL F.READ(FN.ACC,Y.DEBIT.ACCT.NO,R.ACC,F.ACC,ACC.ERR)
+*        IF R.ACC THEN
+*            R.NEW(FT.CREDIT.CURRENCY) = R.ACC<AC.CURRENCY>
+*        END
+        R.NEW(FT.LOCAL.REF)<1,L.CHEQUE.NUMBER.POS> = Y.MC.DD.ID
+        IF Y.PURCHASER NE "CURRENT.PURCHASER" THEN
+            R.NEW(FT.ORDERING.CUST) = Y.PURCHASER
+        END
+        IF Y.PAYEE.NAM NE "CURRENT.PAYEE.NAME" THEN
+            R.NEW(FT.PAYMENT.DETAILS) = Y.PAYEE.NAM
+        END
+        R.NEW(FT.PROFIT.CENTRE.DEPT) = "1"
+
+        IF R.FT.REC<FT.LOCAL.REF,L.VERSION.POS> EQ ",MC.ISS.ACCT" OR R.FT.REC<FT.LOCAL.REF,L.VERSION.POS> EQ ",MC.ISS.ACCT.2" THEN
+            R.NEW(FT.ORDERING.CUST) = R.FT.REC<FT.ORDERING.CUST>
+            R.NEW(FT.PAYMENT.DETAILS) = R.FT.REC<FT.PAYMENT.DETAILS>
+            R.NEW(FT.LOCAL.REF)<1,L.BEN.CUST.POS> = R.FT.REC<FT.LOCAL.REF,L.BEN.CUST.POS>
+            R.NEW(FT.LOCAL.REF)<1,L.ORDER.CUST.POS> = R.FT.REC<FT.LOCAL.REF,L.ORDER.CUST.POS>
+            R.NEW(FT.LOCAL.REF)<1,L.PAY.DET.POS> = R.FT.REC<FT.LOCAL.REF,L.PAY.DET.POS>
+        END
+        ORDR.CUST = R.NEW(FT.PAYMENT.DETAILS)
+        ORDR.CUST = TRIM(UTF8(ORDR.CUST)," ","A")
+        IF ISALPHA(ORDR.CUST) OR ISALNUM(ORDR.CUST) OR ORDR.CUST EQ '' ELSE
+            R.NEW(FT.ORDERING.CUST) = 'MANAGER CHEQUE'
+            R.NEW(FT.LOCAL.REF)<1,L.ORDER.CUST.POS> = Y.PURCHASER
+        END
+        BENEF.NAME = R.NEW(FT.PAYMENT.DETAILS)
+        BENEF.NAME = TRIM(UTF8(BENEF.NAME) ," ","A")
+        IF ISALPHA(BENEF.NAME) OR ISALNUM(BENEF.NAME) OR BENEF.NAME EQ '' ELSE
+            R.NEW(FT.PAYMENT.DETAILS) = 'MANAGER CHEQUE'
+            R.NEW(FT.LOCAL.REF)<1,L.BEN.CUST.POS> = Y.PAYEE.NAM
+        END
+    END
+    RETURN
+END

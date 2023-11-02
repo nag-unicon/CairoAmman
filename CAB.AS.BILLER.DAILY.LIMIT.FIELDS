@@ -1,0 +1,53 @@
+    SUBROUTINE CAB.AS.BILLER.DAILY.LIMIT.FIELDS
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_DataTypes
+    $INSERT I_F.CUSTOMER
+
+
+    ID.N = "25.1" ; ID.T = 'A' ;
+
+*-----------------------------------------------------------------------------
+    CALL Table.defineId("ID", T24_String)         ;* Define Table id
+*-----------------------------------------------------------------------------
+
+
+    fieldName = 'CAB.CUS.AC.LIM.AMT'
+    fieldType = 'AMT'
+    fieldLength = '18'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour) ;* Add a new field
+
+
+    fieldName = 'CAB.INS.AC.LIM.AMT'
+    fieldType = 'AMT'
+    fieldLength = '18'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour) ;* Add a new field
+
+
+    fieldName = 'CAB.JOR.AC.LIM.AMT'
+    fieldType = 'AMT'
+    fieldLength = '18'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour) ;* Add a new field
+
+
+    fieldName = 'CAB.ABROAD.LIM.AMT'
+    fieldType = 'AMT'
+    fieldLength = '18'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour) ;* Add a new field
+
+
+*-----------------------------------------------------------------------------
+    CALL Table.setAuditPosition         ;* Poputale audit information
+*-----------------------------------------------------------------------------
+    RETURN
+*-----------------------------------------------------------------------------
+END

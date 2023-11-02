@@ -1,0 +1,253 @@
+*-----------------------------------------------------------------------------
+* <Rating>-70</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AUT.DEFAULT.PAY.DET
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.AUT.DEFAULT.PAY.DET
+*---------------------------------------------------------------
+*Description       : Used to default charge code and waive charges
+*Linked With       : VERSION>TELLER,NON.CUST.CASH.PAYMENT
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0064
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_System
+    $INSERT I_GTS.COMMON
+    $INSERT I_F.TELLER
+    $INSERT I_F.FUNDS.TRANSFER
+
+    GOSUB OPEN.FILES
+    GOSUB PROCESS
+
+    RETURN
+
+*---------------------------------------------------------------
+OPEN.FILES:
+*----------
+
+    LOCAL.APPLICATION = 'TELLER':FM:'FUNDS.TRANSFER'
+    LOCAL.FIELD = 'PAY.NARRATIVE':VM:'BEN.NATIONAL.NO':VM:'PAY.BEN.NAME':VM:'SHAREHOLDER.NO':VM:'EMPLOYEE.NO':VM:'LEGAL.ID':VM:'EMAIL.ID':VM:'MOBILE.NO':VM:'PHONE.NO':VM:'OTH.DETAILS':VM:'PAY.DET.ID':FM:'PAY.NARRATIVE':VM:'BEN.NATIONAL.NO':VM:'PAY.BEN.NAME':VM:'SHAREHOLDER.NO':VM:'EMPLOYEE.NO':VM:'LEGAL.ID':VM:'EMAIL.ID':VM:'MOBILE.NO':VM:'PHONE.NO':VM:'OTH.DETAILS':VM:'PAY.DET.ID'
+    LOCAL.POS = ''
+    CALL MULTI.GET.LOC.REF(LOCAL.APPLICATION,LOCAL.FIELD,LOCAL.POS)
+    GOSUB GET.POS.FIELDS
+
+    RETURN
+
+***************
+GET.POS.FIELDS:
+***************
+
+    PAY.NARR.POS = LOCAL.POS<1,1>
+    BEN.NAT.POS = LOCAL.POS<1,2>
+    PAY.BEN.POS = LOCAL.POS<1,3>
+    SHARE.HOLD.POS = LOCAL.POS<1,4>
+    EMP.NO.POS = LOCAL.POS<1,5>
+    LEG.ID.POS = LOCAL.POS<1,6>
+    EMAIL.POS = LOCAL.POS<1,7>
+    MOB.POS = LOCAL.POS<1,8>
+    PH.POS = LOCAL.POS<1,9>
+    OTH.DET.POS = LOCAL.POS<1,10>
+    PAY.DET.POS = LOCAL.POS<1,11>
+
+    FT.PAY.NARR.POS = LOCAL.POS<2,1>
+    FT.BEN.NAT.POS = LOCAL.POS<2,2>
+    FT.PAY.BEN.POS = LOCAL.POS<2,3>
+    FT.SHARE.HOLD.POS = LOCAL.POS<2,4>
+    FT.EMP.NO.POS = LOCAL.POS<2,5>
+    FT.LEG.ID.POS = LOCAL.POS<2,6>
+    FT.EMAIL.POS = LOCAL.POS<2,7>
+    FT.MOB.POS = LOCAL.POS<2,8>
+    FT.PH.POS = LOCAL.POS<2,9>
+    FT.OTH.DET.POS = LOCAL.POS<2,10>
+    FT.PAY.DET.POS = LOCAL.POS<2,11>
+
+    RETURN
+*---------------------------------------------------------------
+PROCESS:
+*-------
+
+    CCY.ID = 'CURRENT.CURRENCY'
+    LOC.AMT = 'CURRENT.LOCAL.AMT'
+    CHRG.ID = 'CURRENT.CHARGE'
+    COMP.CHRG.ID = 'CURRENT.CHAR.ID'
+    NARR = 'CURRENT.NARRAT'
+    BEN.NAME = 'CURRENT.PAY.BEN.NAME'
+    NAT.NO = 'CURRENT.NATION.NO'
+    DEB.AC = 'CURRENT.DEB.ACCT'
+    SHARE = 'CURRENT.SHARE.NO'
+    EMPLOY.NO = 'CURRENT.EMPLOY.NO'
+    LEG.ID = 'CURRENT.LEGAL.ID'
+    EMAIL = 'CURRENT.EMAIL'
+    MOB = 'CURRENT.MOBILE'
+    PHONE = 'CURRENT.PHONE'
+    DET.ONE = 'CURRENT.DET1'
+    DET.TWO = 'CURRENT.DET2'
+    DET.THREE = 'CURRENT.DET3'
+    DET.FOUR = 'CURRENT.DET4'
+    DET.FIVE = 'CURRENT.DET5'
+    PAY.DET.ID = 'CURRENT.PAY.DET.ID'
+    BATCH = 'CURRENT.BATCH'
+    FIN.PAY.AMT = 'CURRENT.FIN.PAY.AMT'
+    COMMISSION.AMT = 'CURRENT.COMMAMT'
+    COMP.ACCOUNT.NO = 'CURRENT.COMP.ACCOUNT.NO'
+
+    Y.CCY.ID = System.getVariable(CCY.ID)
+    Y.LOC.AMT = System.getVariable(LOC.AMT)
+    Y.CHRG.ID = System.getVariable(CHRG.ID)
+    Y.COMP.CHRG.ID = System.getVariable(COMP.CHRG.ID)
+    Y.NARR = System.getVariable(NARR)
+    Y.BEN.NAME = System.getVariable(BEN.NAME)
+    Y.NAT.NO = System.getVariable(NAT.NO)
+    Y.DEB.AC = System.getVariable(DEB.AC)
+    Y.SHARE = System.getVariable(SHARE)
+    Y.EMPLOY.NO = System.getVariable(EMPLOY.NO)
+    Y.LEG.ID = System.getVariable(LEG.ID)
+    Y.EMAIL = System.getVariable(EMAIL)
+    Y.MOB = System.getVariable(MOB)
+    Y.PHONE = System.getVariable(PHONE)
+    Y.DET.ONE = System.getVariable(DET.ONE)
+    Y.DET.TWO = System.getVariable(DET.TWO)
+    Y.DET.THREE = System.getVariable(DET.THREE)
+    Y.DET.FOUR = System.getVariable(DET.FOUR)
+    Y.DET.FIVE = System.getVariable(DET.FIVE)
+    Y.PAY.DET.ID = System.getVariable(PAY.DET.ID)
+    Y.BATCH = System.getVariable(BATCH)
+    Y.FIN.PAY.AMT = System.getVariable(FIN.PAY.AMT)
+    Y.COMMISSION.AMT = System.getVariable(COMMISSION.AMT)
+    Y.COMP.ACCOUNT.NO = System.getVariable(COMP.ACCOUNT.NO)
+
+    IF APPLICATION EQ "FUNDS.TRANSFER" THEN
+        GOSUB GET.FT.VALUES
+    END ELSE
+        GOSUB GET.TT.VALUES
+    END
+
+    RETURN
+
+**************
+GET.FT.VALUES:
+**************
+
+    R.NEW(FT.DEBIT.CURRENCY) = Y.CCY.ID
+    R.NEW(FT.DEBIT.ACCT.NO) = Y.DEB.AC
+    R.NEW(FT.LOCAL.REF)<1,FT.PAY.NARR.POS> = Y.NARR
+    R.NEW(FT.LOCAL.REF)<1,FT.PAY.BEN.POS> = Y.BEN.NAME
+    IF PGM.VERSION EQ ",NON.CUST.CASH.PAYMENT" THEN
+        IF Y.CHRG.ID NE "" AND Y.CHRG.ID NE "CURRENT.CHARGE" THEN
+            R.NEW(FT.COMMISSION.CODE) = "CREDIT LESS CHARGES"
+            R.NEW(FT.COMMISSION.TYPE) = Y.CHRG.ID
+        END
+    END
+    IF PGM.VERSION EQ ",NON.CUST.CASH.PAYMENT.RETURN" THEN
+        R.NEW(FT.CREDIT.ACCT.NO) = Y.COMP.ACCOUNT.NO
+    END
+    IF Y.NAT.NO NE "CURRENT.NATION.NO" THEN
+        R.NEW(FT.LOCAL.REF)<1,FT.BEN.NAT.POS> = Y.NAT.NO
+    END
+    IF Y.SHARE NE "CURRENT.SHARE.NO" THEN
+        R.NEW(FT.LOCAL.REF)<1,FT.SHARE.HOLD.POS> = Y.SHARE
+    END
+    IF Y.EMPLOY.NO NE "CURRENT.EMPLOY.NO" THEN
+        R.NEW(FT.LOCAL.REF)<1,FT.EMP.NO.POS> = Y.EMPLOY.NO
+    END
+    R.NEW(FT.LOCAL.REF)<1,FT.LEG.ID.POS> = Y.LEG.ID
+    IF Y.EMAIL NE "CURRENT.EMAIL" THEN
+        R.NEW(FT.LOCAL.REF)<1,FT.EMAIL.POS> = Y.EMAIL
+    END
+    IF Y.MOB NE "CURRENT.MOBILE" THEN
+        R.NEW(FT.LOCAL.REF)<1,FT.MOB.POS> = Y.MOB
+    END
+    IF Y.PHONE NE "CURRENT.PHONE" THEN
+        R.NEW(FT.LOCAL.REF)<1,FT.PH.POS> = Y.PHONE
+    END
+    IF Y.DET.ONE NE "CURRENT.DET1" THEN
+        R.NEW(FT.LOCAL.REF)<1,FT.OTH.DET.POS,1> = Y.DET.ONE
+    END
+    IF Y.DET.TWO NE "CURRENT.DET2" THEN
+        R.NEW(FT.LOCAL.REF)<1,FT.OTH.DET.POS,2> = Y.DET.TWO
+    END
+    IF Y.DET.THREE NE "CURRENT.DET3" THEN
+        R.NEW(FT.LOCAL.REF)<1,FT.OTH.DET.POS,3> = Y.DET.THREE
+    END
+    IF Y.DET.FOUR NE "CURRENT.DET4" THEN
+        R.NEW(FT.LOCAL.REF)<1,FT.OTH.DET.POS,4> = Y.DET.FOUR
+    END
+    IF Y.DET.FIVE NE "CURRENT.DET5" THEN
+        R.NEW(FT.LOCAL.REF)<1,FT.OTH.DET.POS,5> = Y.DET.FIVE
+    END
+    R.NEW(FT.LOCAL.REF)<1,FT.PAY.DET.POS> = Y.PAY.DET.ID
+    R.NEW(FT.DEBIT.AMOUNT) = Y.LOC.AMT
+    R.NEW(FT.ORDERING.BANK) = "CAB"
+    R.NEW(FT.PROFIT.CENTRE.DEPT) = "1"
+
+    RETURN
+
+**************
+GET.TT.VALUES:
+**************
+
+    R.NEW(TT.TE.CURRENCY.1) = Y.CCY.ID
+    R.NEW(TT.TE.CURRENCY.2) = Y.CCY.ID
+    R.NEW(TT.TE.ACCOUNT.2) = Y.DEB.AC
+    R.NEW(TT.TE.LOCAL.REF)<1,PAY.NARR.POS> = Y.NARR
+    R.NEW(TT.TE.LOCAL.REF)<1,PAY.BEN.POS> = Y.BEN.NAME
+    IF Y.NAT.NO NE "CURRENT.NATION.NO" THEN
+        R.NEW(TT.TE.LOCAL.REF)<1,BEN.NAT.POS> = Y.NAT.NO
+    END
+    IF Y.SHARE NE "CURRENT.SHARE.NO" THEN
+        R.NEW(TT.TE.LOCAL.REF)<1,SHARE.HOLD.POS> = Y.SHARE
+    END
+    IF Y.EMPLOY.NO NE "CURRENT.EMPLOY.NO" THEN
+        R.NEW(TT.TE.LOCAL.REF)<1,EMP.NO.POS> = Y.EMPLOY.NO
+    END
+    R.NEW(TT.TE.LOCAL.REF)<1,LEG.ID.POS> = Y.LEG.ID
+    IF Y.EMAIL NE "CURRENT.EMAIL" THEN
+        R.NEW(TT.TE.LOCAL.REF)<1,EMAIL.POS> = Y.EMAIL
+    END
+    IF Y.MOB NE "CURRENT.MOBILE" THEN
+        R.NEW(TT.TE.LOCAL.REF)<1,MOB.POS> = Y.MOB
+    END
+    IF Y.PHONE NE "CURRENT.PHONE" THEN
+        R.NEW(TT.TE.LOCAL.REF)<1,PH.POS> = Y.PHONE
+    END
+    IF Y.DET.ONE NE "CURRENT.DET1" THEN
+        R.NEW(TT.TE.LOCAL.REF)<1,OTH.DET.POS,1> = Y.DET.ONE
+    END
+    IF Y.DET.TWO NE "CURRENT.DET2" THEN
+        R.NEW(TT.TE.LOCAL.REF)<1,OTH.DET.POS,2> = Y.DET.TWO
+    END
+    IF Y.DET.THREE NE "CURRENT.DET3" THEN
+        R.NEW(TT.TE.LOCAL.REF)<1,OTH.DET.POS,3> = Y.DET.THREE
+    END
+    IF Y.DET.FOUR NE "CURRENT.DET4" THEN
+        R.NEW(TT.TE.LOCAL.REF)<1,OTH.DET.POS,4> = Y.DET.FOUR
+    END
+    IF Y.DET.FIVE NE "CURRENT.DET5" THEN
+        R.NEW(TT.TE.LOCAL.REF)<1,OTH.DET.POS,5> = Y.DET.FIVE
+    END
+    R.NEW(TT.TE.LOCAL.REF)<1,PAY.DET.POS> = Y.PAY.DET.ID
+    IF Y.CHRG.ID EQ "" OR Y.CHRG.ID EQ "CURRENT.CHARGE" THEN
+        IF PGM.VERSION EQ ",NON.CUST.CASH.PAYMENT.FCY" THEN
+            R.NEW(TT.TE.AMOUNT.FCY.1) = Y.LOC.AMT
+        END ELSE
+            R.NEW(TT.TE.AMOUNT.LOCAL.1) = Y.LOC.AMT
+        END
+        R.NEW(TT.TE.WAIVE.CHARGES) = 'YES'
+    END ELSE
+        IF PGM.VERSION EQ ",NON.CUST.CASH.PAYMENT.FCY" THEN
+            R.NEW(TT.TE.AMOUNT.FCY.1) = Y.FIN.PAY.AMT
+        END ELSE
+            R.NEW(TT.TE.AMOUNT.LOCAL.1) = Y.FIN.PAY.AMT
+        END
+        R.NEW(TT.TE.WAIVE.CHARGES) = 'NO'
+    END
+
+    RETURN
+*---------------------------------------------------------------
+END

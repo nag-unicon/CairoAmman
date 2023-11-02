@@ -1,0 +1,201 @@
+* Version 1.0
+
+    SUBROUTINE CAB.ATM.SS.ACC.INQ.NOFILE(PAR.ID.LIST)
+
+***********************************************************************
+* Start date 24/01/2012 by agryaznov@temenos.com
+* ---------------------------------------------------------------------
+* This is a Nofile routine for the enquiry CAB.ATM.ACC.INQ attached to
+* the STANDARD.SELECTION record NOFILE.CAB.ATM.ACC.INQ
+* This routine
+* - gets the list of accounts related to the card
+* - returns the data for the enquiry (balances, ... ) devided by "*"
+*
+* It is designed for the ATM Interface (project CAB)
+*
+*                  ---- MODIFICATIONS ---------
+* 28/02/2012 - Return value has to be prefixed with 'BALANCE:1:1='
+*20/06/2019   Nuha Tuhul         add MASL for LINC                    *
+*13/10/2019   Nuha Tuhul         add MASB for basic acc cards         *
+***********************************************************************
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_ENQUIRY.COMMON
+
+    $INSERT I_F.CARD.ISSUE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.CURRENCY
+    $INSERT I_F.LIMIT
+
+    PAR.ID.LIST   = ''        ;* Array for enquiry
+
+* Read enquiry parameters
+
+    LOC.D.RANGE.AND.VALUE = D.RANGE.AND.VALUE
+    CONVERT SM TO ' ' IN LOC.D.RANGE.AND.VALUE
+    LOC.D.RANGE.AND.VALUE = TRIM(LOC.D.RANGE.AND.VALUE,' ','R')
+
+    LOC.CARD.NO = ''
+    LOCATE 'CARD.NO' IN D.FIELDS<1> SETTING LOC.CARD.NO.POS ELSE LOC.CARD.NO.POS = ''
+    IF LOC.CARD.NO.POS THEN LOC.CARD.NO = LOC.D.RANGE.AND.VALUE<LOC.CARD.NO.POS>
+    IF NOT(LOC.CARD.NO) THEN RETURN
+
+* Init
+
+    GOSUB INIT
+    IF LOC.ERR THEN RETURN
+
+* Process accounts
+
+    LOC.ACID.LIST = LOC.R.CARD.ISSUE<CARD.IS.ACCOUNT>
+    LOOP
+        REMOVE LOC.ACID FROM LOC.ACID.LIST SETTING LOC.L.MARK
+    WHILE LOC.ACID : LOC.L.MARK
+        LOC.ERR = ''
+        LOC.R.ACCOUNT = ''
+        CALL F.READ(LOC.FN.ACCOUNT, LOC.ACID, LOC.R.ACCOUNT, LOC.F.ACCOUNT, LOC.ERR)
+        YR.ALT.ACCT.ID = LOC.R.ACCOUNT<AC.ALT.ACCT.ID,1>
+        IF YR.ALT.ACCT.ID EQ '' THEN
+            YR.ALT.ACCT.ID = LOC.ACID
+        END
+        IF LOC.ERR THEN CONTINUE
+
+        GOSUB PROCESS.ID
+    REPEAT
+
+    PAR.ID.LIST = SORT(PAR.ID.LIST)
+
+    IF PAR.ID.LIST NE '' THEN
+        CHANGE FM TO '' IN PAR.ID.LIST
+        PAR.ID.LIST = "BALANCE:1:1=":PAR.ID.LIST:",RESP.OK"
+    END
+
+    RETURN
+
+*================================================================
+
+INIT:
+
+**    LOC.CARD.TYPE = "VISA"
+
+    LOC.F.CARD.ISSUE  = ""
+    LOC.FN.CARD.ISSUE = "FBNK.CARD.ISSUE"
+**    CALL OPF(LOC.FN.CARD.ISSUE, LOC.F.CARD.ISSUE)
+    OPEN LOC.FN.CARD.ISSUE TO LOC.F.CARD.ISSUE ELSE
+        CRT "ERROR IN OPEN"
+    END
+    LOC.CARD.TYPE = 'VISA'
+    LOC.ERR = ''
+    LOC.R.CARD.ISSUE = ''
+    CALL F.READ(LOC.FN.CARD.ISSUE, LOC.CARD.TYPE:".":LOC.CARD.NO, LOC.R.CARD.ISSUE, LOC.F.CARD.ISSUE, LOC.ERR)
+**    IF LOC.ERR THEN RETURN
+    IF LOC.R.CARD.ISSUE EQ '' THEN
+        LOC.CARD.TYPE = 'MAST'
+        LOC.ERR = ''
+        LOC.R.CARD.ISSUE = ''
+        CALL F.READ(LOC.FN.CARD.ISSUE, LOC.CARD.TYPE:".":LOC.CARD.NO, LOC.R.CARD.ISSUE, LOC.F.CARD.ISSUE, LOC.ERR)
+    END
+
+    IF LOC.CARD.NO[1,6] EQ '544378' THEN
+        LOC.CARD.TYPE = 'MASP'
+        LOC.ERR = ''
+        LOC.R.CARD.ISSUE = ''
+        CALL F.READ(LOC.FN.CARD.ISSUE, LOC.CARD.TYPE:".":LOC.CARD.NO, LOC.R.CARD.ISSUE, LOC.F.CARD.ISSUE, LOC.ERR)
+    END
+
+    IF LOC.CARD.NO[1,6] EQ '527277' THEN
+        LOC.CARD.TYPE = 'MASS'
+        LOC.ERR = ''
+        LOC.R.CARD.ISSUE = ''
+        CALL F.READ(LOC.FN.CARD.ISSUE, LOC.CARD.TYPE:".":LOC.CARD.NO, LOC.R.CARD.ISSUE, LOC.F.CARD.ISSUE, LOC.ERR)
+        IF LOC.R.CARD.ISSUE EQ ''  THEN
+            LOC.CARD.TYPE    = 'MASB'
+            LOC.ERR          = ''
+            LOC.R.CARD.ISSUE = ''
+            CALL F.READ(LOC.FN.CARD.ISSUE, LOC.CARD.TYPE:".":LOC.CARD.NO, LOC.R.CARD.ISSUE, LOC.F.CARD.ISSUE, LOC.ERR)
+        END
+    END
+
+    IF LOC.CARD.NO[1,6] EQ '536346' THEN
+        LOC.CARD.TYPE = 'MASL'
+        LOC.ERR = ''
+        LOC.R.CARD.ISSUE = ''
+        CALL F.READ(LOC.FN.CARD.ISSUE, LOC.CARD.TYPE:".":LOC.CARD.NO, LOC.R.CARD.ISSUE, LOC.F.CARD.ISSUE, LOC.ERR)
+    END
+
+    IF LOC.R.CARD.ISSUE EQ '' THEN RETURN
+
+    LOC.FN.ACCOUNT = 'FBNK.ACCOUNT'
+    LOC.F.ACCOUNT  = ''
+**    CALL OPF(LOC.FN.ACCOUNT, LOC.F.ACCOUNT)
+    OPEN LOC.FN.ACCOUNT TO LOC.F.ACCOUNT ELSE
+        CRT "ERROR IN OPEN"
+    END
+
+    FN.LIMIT = 'FBNK.LIMIT'
+    F.LIMIT = ''
+**    CALL OPF(FN.LIMIT,F.LIMIT)
+    OPEN FN.LIMIT TO F.LIMIT ELSE
+        CRT "ERROR IN OPEN"
+    END
+
+
+    RETURN
+
+*-------------------------------------------------------------
+
+PROCESS.ID:
+
+*Account currency
+    Y.CCY = LOC.R.ACCOUNT<AC.CURRENCY>
+    CALL DBR("CURRENCY":FM:EB.CUR.NUMERIC.CCY.CODE,Y.CCY,LOC.CCY.CODE)
+    IF NOT(LOC.CCY.CODE) THEN LOC.CCY.CODE = Y.CCY
+    CALL DBR("CURRENCY":FM:EB.CUR.NO.OF.DECIMALS,Y.CCY,LOC.CCY.DEC)
+
+*Available balance
+    Y.A.BAL = ''
+    Y.B.BAL    = LOC.R.ACCOUNT<AC.ONLINE.ACTUAL.BAL>
+    Y.WORK.BAL = LOC.R.ACCOUNT<AC.WORKING.BALANCE>
+    CALL CAB.ICBS.AVAIL.BALANCE(LOC.ACID,LOC.R.ACCOUNT,Y.WORK.BAL,Y.C.BAL)
+    Y.A.BAL = Y.C.BAL
+*    LIMIT.REF = LOC.R.ACCOUNT<AC.LIMIT.REF>
+*    LIMIT.REF = LOC.R.ACCOUNT<AC.CUSTOMER>:'.':FMT(FIELD(LIMIT.REF,'.',1),'R%7'):'.':FIELD(LIMIT.REF,'.',2)
+*    DIM R.LIMIT(500)
+*    UNUTILISED.LIMIT.AMT = 0
+*    MATREAD R.LIMIT FROM F.LIMIT,LIMIT.REF THEN
+*        UTILISED.AMT = 0
+*        CALL AT.CALC.AVAIL.LIMIT(MAT R.LIMIT,UTILISED.AMT)
+*        UTILISED.AMT = ABS(UTILISED.AMT)
+*        IF UTILISED.AMT GT R.LIMIT(LI.AVAIL.AMT) THEN
+*            UNUTILISED.LIMIT.AMT = 0
+*        END ELSE
+*            UNUTILISED.LIMIT.AMT = R.LIMIT(LI.AVAIL.AMT) - UTILISED.AMT
+*        END
+*        IF Y.C.BAL LT 0 THEN
+*            Y.A.BAL = Y.C.BAL + R.LIMIT(LI.AVAIL.AMT)
+*        END ELSE
+*            Y.A.BAL = Y.C.BAL + UNUTILISED.LIMIT.AMT
+*        END
+*    END ELSE
+*        Y.A.BAL = Y.C.BAL
+*    END
+    LOC.A.BAL = ABS(Y.A.BAL)
+    LOC.A.BAL = LOC.A.BAL['.',1,1] : FMT(LOC.A.BAL['.',2,1], LOC.CCY.DEC:'"0"L')
+    LOC.W.BAL = ABS(Y.WORK.BAL)
+    LOC.W.BAL = LOC.W.BAL['.',1,1] : FMT(LOC.W.BAL['.',2,1], LOC.CCY.DEC:'"0"L')
+
+*Available balance sign
+    Y.A.BAL.DC = IF Y.A.BAL GT 0 THEN "C" ELSE "D"
+    Y.W.BAL.DC = IF Y.WORK.BAL GT 0 THEN "C" ELSE "D"
+
+*Status
+    LOC.STAT = IF LOC.R.ACCOUNT<AC.INACTIV.MARKER> NE "Y" THEN "0" ELSE "1"
+    LOC.STAT = "0"
+    PAR.ID.LIST<-1> = YR.ALT.ACCT.ID[24]'24" "L' : LOC.CCY.CODE[3]'3" "L' : Y.A.BAL.DC[1]'1" "L' : LOC.A.BAL[12]'12"0"R' : Y.W.BAL.DC[1]'1" "L' : LOC.W.BAL[12]'12"0"R' : LOC.STAT[1]
+    RETURN
+
+
+*================================================================
+
+END

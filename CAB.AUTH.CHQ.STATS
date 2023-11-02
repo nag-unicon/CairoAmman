@@ -1,0 +1,37 @@
+*-----------------------------------------------------------------------------
+* <Rating>0</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AUTH.CHQ.STATS
+******************************************************************************************************************
+*Company   Name    : CAB
+*Developed By      : Abdul Rahman.J
+*Program   Name    : CAB.AUTH.PRINT.ADVICE
+*-----------------------------------------------------------------------------------------------------------------
+*Description       : Authorisation routine to print advice when Cheque status eq 90.
+*Linked With       :
+*ODR Number        : ODR-2011-10-0063
+*-----------------------------------------------------------------------------------------------------------------
+*Modification Details:
+*=====================
+*
+*-----------------------------------------------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.CHEQUE.ISSUE
+    $INSERT I_F.DEAL.SLIP.FORMAT
+    $INCLUDE CAB.BP I_F.CHEQUE.ISSUE.RESERVED
+*----------------------------------------------------------------------------------------------------------------
+
+    FN.CHEQUE.ISSUE.RESERVED = 'F.CHEQUE.ISSUE.RESERVED'
+    F.CHEQUE.ISSUE.RESERVED = ''
+    R.CHQ.RES = ''
+    CALL OPF(FN.CHEQUE.ISSUE.RESERVED,F.CHEQUE.ISSUE.RESERVED)
+    CALL F.READ(FN.CHEQUE.ISSUE.RESERVED,ID.NEW,R.CHQ.RES,F.CHEQUE.ISSUE.RESERVED,ERR.CHQ)
+
+    IF R.CHQ.RES NE '' THEN
+        R.CHQ.RES<PY.DET.CHEQUE.STATUS> = '89'
+        CALL F.WRITE(FN.CHEQUE.ISSUE.RESERVED,ID.NEW,R.CHQ.RES)
+    END
+    RETURN
+END

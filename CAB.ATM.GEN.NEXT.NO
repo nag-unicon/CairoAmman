@@ -1,0 +1,85 @@
+* Version 1.0
+
+*********************************************************************
+* Start on 19/12/2011 By A.Gryaznov, Temenos
+*
+* This routine generates next ID (just num) for the new record
+* and returns it in the PAR.RESULT argument.
+*
+* INPUT:
+* - PAR.LOCK.REC.ID  - ID of corresponding record in LOCKING
+* - PAR.RESULT       - Previous record ID (if empty => from F.LOCKING)
+* OUTPUT:
+* - PAR.RESULT       - Next record ID
+*
+*                       ---- MODIFICATIONS ---------
+*********************************************************************
+
+   SUBROUTINE CAB.ATM.GEN.NEXT.NO(PAR.LOCK.REC.ID, PAR.RESULT)
+
+$INSERT I_COMMON
+$INSERT I_EQUATE
+$INSERT I_F.LOCKING
+
+   GOSUB OPENF
+
+   LOC.ERR = ''
+   LOC.R.LOCKING = ''
+
+  *CALL F.READU(LOC.FN.LOCKING, PAR.LOCK.REC.ID, LOC.R.LOCKING, LOC.F.LOCKING, LOC.ERR, 'P')
+   LOC.LW.LOCKED   = 1
+   LOC.LW.ELSE     = ''
+   LOOP
+   WHILE LOC.LW.LOCKED
+      LOC.LW.LOCKED = ''
+      READU LOC.R.LOCKING FROM LOC.F.LOCKING, PAR.LOCK.REC.ID LOCKED LOC.LW.LOCKED = 1 THEN LOC.LW.LOCKED = '' ELSE LOC.LW.ELSE = 1
+   REPEAT
+   BEGIN CASE
+      CASE LOC.LW.ELSE
+         LOC.ERR = 'RECORD NOT FOUND'
+      CASE LOC.LW.LOCKED
+         LOC.ERR = 'Record locked'
+   END CASE
+
+   IF NOT(LOC.ERR) OR LOC.ERR EQ 'RECORD NOT FOUND' THEN
+      LOC.LOCK.DOC.NO = PAR.RESULT
+      IF NOT(LOC.LOCK.DOC.NO) THEN LOC.LOCK.DOC.NO = LOC.R.LOCKING<EB.LOK.CONTENT>
+      PAR.RESULT = ''
+
+      *Generate New ID value
+      LOC.DOC.NO = LOC.LOCK.DOC.NO + 1
+
+      LOC.R.LOCKING<EB.LOK.CONTENT> = LOC.DOC.NO
+     *CALL F.WRITE(LOC.FN.LOCKING, PAR.LOCK.REC.ID, LOC.R.LOCKING)
+      WRITE LOC.R.LOCKING TO LOC.F.LOCKING, PAR.LOCK.REC.ID ON ERROR
+         ETEXT = 'ERROR STATUS: ':STATUS()
+         TEXT = ETEXT
+         CALL REM
+      END
+
+      PAR.RESULT = LOC.DOC.NO
+   END ELSE
+      PAR.RESULT = ''
+      ETEXT = 'error "' : LOC.ERR : '"'
+      TEXT = ETEXT
+      CALL REM
+   END
+
+  *CALL F.RELEASE(LOC.FN.LOCKING, PAR.LOCK.REC.ID, LOC.F.LOCKING)
+   RELEASE LOC.F.LOCKING, PAR.LOCK.REC.ID
+
+   RETURN
+
+*********************************************************************
+
+OPENF:
+
+   LOC.FN.LOCKING = 'F.LOCKING'
+   LOC.F.LOCKING  = ''
+   CALL OPF(LOC.FN.LOCKING, LOC.F.LOCKING)
+
+   RETURN
+
+*********************************************************************
+
+END

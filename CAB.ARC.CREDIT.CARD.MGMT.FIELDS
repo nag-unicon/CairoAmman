@@ -1,0 +1,83 @@
+*-----------------------------------------------------------------------------
+* <Rating>-3</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.ARC.CREDIT.CARD.MGMT.FIELDS
+*<doc>
+* Template for field definitions routine YOURAPPLICATION.FIELDS
+*
+* @author tcoleman@temenos.com
+* @stereotype fields template
+* @uses Table
+* @public Table Creation
+* @package infra.eb
+* </doc>
+*-----------------------------------------------------------------------------
+* Modification History :
+*
+* 19/10/07 - EN_10003543
+*            New Template changes
+*
+* 14/11/07 - BG_100015736
+*            Exclude routines that are not released
+*-----------------------------------------------------------------------------
+*** <region name= Header>
+*** <desc>Inserts and control logic</desc>
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_DataTypes
+*** </region>
+
+    MAT F = "" ; MAT N = "" ; MAT T = ""
+    MAT CHECKFILE = "" ; MAT CONCATFILE = ""
+    ID.CHECKFILE = "" ; ID.CONCATFILE = ""
+
+    ID.F = "CAB.ARC.VAL" ; ID.N = "16.1" ; ID.T = "A"
+
+*-----------------------------------------------------------------------------
+*    CALL Table.defineId("ID", IdType)   ;* Define Table id
+*-----------------------------------------------------------------------------
+
+
+    fieldName = "CUSTOMER.NO"
+    fieldLength = "10"
+    fieldtype = 'CUS'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+    CALL Field.setCheckFile("CUSTOMER")
+
+    fieldName = "CARD.NO"
+    fieldLength = "16"
+    fieldtype = 'A'
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+
+    fieldName = "CARD.STATUS"
+    fieldLength = "12"
+    fieldtype = ""
+*    fieldtype<2> = "Activate_Deactivate"
+    fieldtype<2> = "Activate_Block"
+    neighbour = ''
+
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldtype , neighbour)
+
+    fieldName = 'RESERVED.05'  ;  fieldType = T24_String ; args = Field_NoInput ;  GOSUB ADD.RESERVED.FIELDS
+    fieldName = 'RESERVED.04'  ;  fieldType = T24_String ; args = Field_NoInput ;  GOSUB ADD.RESERVED.FIELDS
+    fieldName = 'RESERVED.03'  ;  fieldType = T24_String ; args = Field_NoInput ;  GOSUB ADD.RESERVED.FIELDS
+    fieldName = 'RESERVED.02'  ;  fieldType = T24_String ; args = Field_NoInput ;  GOSUB ADD.RESERVED.FIELDS
+    fieldName = 'RESERVED.01'  ;  fieldType = T24_String ; args = Field_NoInput ;  GOSUB ADD.RESERVED.FIELDS
+
+    CALL Table.setAuditPosition         ;* Poputale audit information
+    RETURN
+*------------------------------------------------------------------------------------------
+ADD.RESERVED.FIELDS:
+********************
+
+    CALL Table.addField(fieldName, fieldType, args, neighbour)        ;* Add a new fields
+
+    RETURN
+
+*-----------------------------------------------------------------------------
+
+END
