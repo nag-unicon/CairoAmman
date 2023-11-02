@@ -1,0 +1,82 @@
+*-----------------------------------------------------------------------------
+* <Rating>-30</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AA.PAYOFF.PROCESS.SERVICE.LOAD
+*----------------------------------------------------------------------------------------------------------------
+*
+* Description           : Load Routine for the Batch job CAB.AA.PAYOFF.PROCESS.SERVICE
+*
+* Developed By          : ITSS - Nabeel
+*
+* Development Reference : Automatic payoff for loan
+*
+* Attached To           : Attached To the Batch Job BNK/CAB.AA.PAYOFF.PROCESS.SERVICE
+*
+* Attached As           : .LOAD routine
+*-----------------------------------------------------------------------------------------------------------------
+* Input Parameter:
+* ---------------*
+* Argument#1 : N/A
+* Argument#2 : N/A
+* Argument#3 : N/A
+*
+*-----------------*
+* Output Parameter:
+* ----------------*
+* Argument#4 : N/A
+* Argument#5 : N/A
+* Argument#6 : N/A
+*-----------------------------------------------------------------------------------------------------------------
+*  M O D I F I C A T I O N S
+* ***************************
+*-----------------------------------------------------------------------------------------------------------------
+* Defect Reference       Modified By                    Date of Change        Change Details
+*-----------------------------------------------------------------------------------------------------------------
+*
+*-----------------------------------------------------------------------------------------------------------------
+* Include files
+*-----------------------------------------------------------------------------------------------------------------
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_BATCH.FILES
+    $INCLUDE CAB.BP I_CAB.AA.PAYOFF.PROCESS.SERVICE.COMMON
+
+    GOSUB INIT
+
+    RETURN
+
+*----------------------------------------------------------------------------------------------------------------------
+INIT:
+*****
+
+    FN.CAB.AUTO.PAYOFF.DETAILS = 'F.CAB.AUTO.PAYOFF.DETAILS'
+    F.CAB.AUTO.PAYOFF.DETAILS = ''
+    R.CAB.AUTO.PAYOFF.DETAILS = ''
+    CALL OPF(FN.CAB.AUTO.PAYOFF.DETAILS,F.CAB.AUTO.PAYOFF.DETAILS)
+
+    FN.CAB.PAYOFF ='F.CAB.PAYOFF'
+    F.CAB.PAYOFF =''
+    CALL OPF(FN.CAB.PAYOFF,F.CAB.PAYOFF)
+
+    FN.CAB.LOS.PAYOFF = 'F.CAB.LOS.PAYOFF.DETAIL'
+    F.CAB.LOS.PAYOFF  = ''
+    CALL OPF(FN.CAB.LOS.PAYOFF,F.CAB.LOS.PAYOFF)
+
+    FN.AC.LOCKED.EVENTS  = 'F.AC.LOCKED.EVENTS'
+    F.AC.LOCKED.EVENTS   = ''
+    CALL OPF(FN.AC.LOCKED.EVENTS,F.AC.LOCKED.EVENTS)
+
+    APPL.ARR = '' ; FIELDNAME.ARR = '' ; POS.ARR = ''
+    SET.AC.POS = '' ; SET.ACCT.POS = ''
+
+    APPL.ARR      = 'AA.PRD.DES.CHARGE':FM:'AA.PRD.DES.ACCOUNT'
+    FIELDNAME.ARR = 'PAYOFF.SETT.AC':VM:'L.BLUE.RING':FM:'SETTLE.ACCOUNT'
+    CALL MULTI.GET.LOC.REF(APPL.ARR,FIELDNAME.ARR,POS.ARR)
+    SET.ACCT.POS = POS.ARR<1,1>
+    Y.BR.POS     = POS.ARR<1,2>
+    SET.AC.POS   = POS.ARR<2,1>
+
+    RETURN
+*----------------------------------------------------------------------------------------------------------------------
+END

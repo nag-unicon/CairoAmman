@@ -1,0 +1,130 @@
+    SUBROUTINE CAB.AA.VAL.INSURANCE.DETAILS
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 19th Feb 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : API Validatation routine
+*
+* Attached to      : Activity Class : LENDING-NEW-ARRANGEMENT
+*                    Property Class : ACCOUNT
+*                    Action         : MAINTAIN
+*
+* Attached As      : Validation Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This routine is used to validate whether all the mandatory insurance fields values are entered properly.
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.AA.ACCOUNT
+    $INSERT I_AA.LOCAL.COMMON
+
+*** </region>
+*** <region name= Main Body>
+
+    IF c_aalocActivityStatus EQ "UNAUTH" THEN
+        GOSUB GET.LOCAL.REFERENCE.POS
+        GOSUB PROCESS
+    END
+
+    RETURN
+
+*** </region>
+*** <region name= Get the Local Reference Positions>
+
+GET.LOCAL.REFERENCE.POS:
+
+    APPLS   = 'AA.PRD.DES.ACCOUNT'
+    FLD.VALS = 'AA.LN.GUAR.COMP' :VM: 'LIFE.INS.TYPE' :VM: 'LIFT.INS.COMP' :VM: 'RL.ES.GUAR.COMP' :VM: 'SUPERVISOR.CODE' :VM: 'SCORE' :VM: 'LN.GUAR.RATIO' :VM: 'LIFF.INSTAL.AMT'
+    FLD.POS  = ''
+
+    CALL MULTI.GET.LOC.REF(APPLS,FLD.VALS,FLD.POS)
+
+    AA.LN.GUAR.COMP.POS = FLD.POS<1,1>
+    LIFE.INS.TYPE.POS   = FLD.POS<1,2>
+    LIFT.INS.COMP.POS   = FLD.POS<1,3>
+    RL.ES.GUAR.COMP.POS = FLD.POS<1,4>
+    SUPERVISOR.CODE.POS = FLD.POS<1,5>
+    SCORE.POS           = FLD.POS<1,6>
+    LN.GUAR.RATIO.POS   = FLD.POS<1,7>
+    LIFF.INSTAL.AMT.POS = FLD.POS<1,8>
+
+    RETURN
+
+PROCESS:
+
+    IF R.NEW(AA.AC.LOCAL.REF)<1,AA.LN.GUAR.COMP.POS> EQ '' THEN
+        AV = AA.LN.GUAR.COMP.POS
+        GOSUB RAISE.ERROR.MESSAGE
+    END
+
+    IF R.NEW(AA.AC.LOCAL.REF)<1,LIFE.INS.TYPE.POS> EQ '' THEN
+        AV = LIFE.INS.TYPE.POS
+        GOSUB RAISE.ERROR.MESSAGE
+    END
+
+    IF R.NEW(AA.AC.LOCAL.REF)<1,LIFT.INS.COMP.POS> EQ '' THEN
+        AV = LIFT.INS.COMP.POS
+        GOSUB RAISE.ERROR.MESSAGE
+    END
+
+    IF R.NEW(AA.AC.LOCAL.REF)<1,LIFT.INS.COMP.POS> EQ '' THEN
+        AV = LIFT.INS.COMP.POS
+        GOSUB RAISE.ERROR.MESSAGE
+    END
+
+    IF R.NEW(AA.AC.LOCAL.REF)<1,RL.ES.GUAR.COMP.POS> EQ '' THEN
+        AV = RL.ES.GUAR.COMP.POS
+        GOSUB RAISE.ERROR.MESSAGE
+    END
+
+*    IF R.NEW(AA.AC.LOCAL.REF)<1,SUPERVISOR.CODE.POS> EQ '' THEN
+*        AV = SUPERVISOR.CODE.POS
+*        GOSUB RAISE.ERROR.MESSAGE
+*    END
+
+*    IF R.NEW(AA.AC.LOCAL.REF)<1,SCORE.POS> EQ '' THEN
+*        AV = SCORE.POS
+*        GOSUB RAISE.ERROR.MESSAGE
+*    END
+
+    IF R.NEW(AA.AC.LOCAL.REF)<1,LN.GUAR.RATIO.POS> EQ '' THEN
+        AV = LN.GUAR.RATIO.POS
+        GOSUB RAISE.ERROR.MESSAGE
+    END
+
+    IF NOT(NUM(R.NEW(AA.AC.LOCAL.REF)<1,LIFF.INSTAL.AMT.POS>)) THEN
+        AV = LIFF.INSTAL.AMT.POS
+        AF = AA.AC.LOCAL.REF
+        ETEXT = "EB-INP.NOT.NUMERIC"
+        CALL STORE.END.ERROR
+    END
+
+    IF R.NEW(AA.AC.LOCAL.REF)<1,LIFF.INSTAL.AMT.POS> EQ '' THEN
+        AV = LIFF.INSTAL.AMT.POS
+        GOSUB RAISE.ERROR.MESSAGE
+    END
+
+    RETURN
+
+RAISE.ERROR.MESSAGE:
+
+    AF = AA.AC.LOCAL.REF
+    ETEXT = "EB-INPUT.MISSING"
+    CALL STORE.END.ERROR
+
+    RETURN
+END

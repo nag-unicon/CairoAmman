@@ -1,0 +1,157 @@
+    SUBROUTINE CAB.AA.V.CHRG.START.DATE
+*--------------------------------------------------------------------------------*
+* Date - 30/06/2014
+* Author - Gokul
+* Desc  - This validation routine will check whether START.DATE field is inputted
+*         if not displays the error message to the user
+* Attached Version -AA.ARR.PAYMENT.SCHEDULE,INSTPOST
+*
+* 13-09-2015 - Remove Renegotiate activity from the on activity tab
+*
+* 13-03-2016 - ADD this routine to post API.
+*
+*--------------------------------------------------------------------------------*
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.AA.PAYMENT.SCHEDULE
+    $INCLUDE T24.BP I_AA.ACTION.CONTEXT
+    $INCLUDE T24.BP I_AA.APP.COMMON
+    $INCLUDE T24.BP I_F.AA.ACCOUNT.DETAILS
+    $INCLUDE T24.BP I_AA.CONTRACT.DETAILS
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT.ACTIVITY
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT
+
+
+    GOSUB INIT
+
+    RETURN
+
+*****
+INIT:
+*****
+    CURR.DATE = AA$ACTIVITY.EFF.DATE
+
+
+    GOSUB SET.ACTIVITY.DETAILS
+
+    BEGIN CASE
+    CASE R.ACTIVITY.STATUS = "UNAUTH"
+        GOSUB PROCESS
+    CASE R.ACTIVITY.STATUS = "AUTH"
+        GOSUB PROCESS.AUTH
+    END CASE
+
+
+    RETURN
+
+*********************
+SET.ACTIVITY.DETAILS:
+*********************
+
+** This section initialises Arrangement Activity related information
+
+    R.ACTIVITY.STATUS = c_arrActivityStatus["-",1,1]
+*** ARR.ACTIVITY.ID = c_arrActivityId
+    R.ACTIVITY = c_arrActivityRec
+    ACTIVITY.ACTION = AA$CURR.ACTION
+    EFFECTIVE.DATE = AA$ACTIVITY.EFF.DATE
+    ARRANGEMENT.ID = AA$ARR.ID
+    ACTIVITY.ID = AA$CURR.ACTIVITY
+    PROPERTY.ID = AA$PROPERTY.ID
+    CURRENT.ACTIVITY = AA$ACTIVITY.ID<AA$ACT.ACTIVITY>
+
+    RETURN
+
+
+********
+PROCESS:
+********
+
+    GOSUB CHECK.FOR.DUE
+
+    IF R.NEW(AA.PS.START.DATE) EQ '' THEN
+        ETEXT = "AA-START.DAY.MISS"
+        CALL STORE.END.ERROR
+    END
+
+    IF R.NEW(AA.PS.END.DATE)<1,1> THEN
+        R.NEW(AA.PS.END.DATE)<1,1> = ''
+    END
+
+*** Include the Renegotiate Arrangement
+
+    LOCATE 'LENDING-RENEGOTIATE-ARRANGEMENT' IN  R.NEW(AA.PS.ON.ACTIVITY)<1,1> SETTING POS.INT THEN
+        DEL R.NEW(AA.PS.ON.ACTIVITY)<1,POS.INT>
+        DEL R.NEW(AA.PS.RECALCULATE)<1,POS.INT>
+    END
+
+
+    FINDSTR 'LENDING-PREPOSTPONE-INSTALMENT' IN R.NEW(AA.PS.ON.ACTIVITY) SETTING FM.POS1,VM.POS1 THEN
+    END ELSE
+**        INS 'LENDING-PREPOSTPONE-INSTALMENT' BEFORE R.NEW(AA.PS.ON.ACTIVITY)<1,1>
+**        INS 'PAYMENT' BEFORE R.NEW(AA.PS.RECALCULATE)<1,1>
+    END
+
+    RETURN
+
+**************
+CHECK.FOR.DUE:
+**************
+*** Top up is allowed when user not having any due
+
+    CALL AA.GET.ARRANGEMENT(ARRANGEMENT.ID, R.ARR,ERR.ARR)
+    BAL.AMOUNT='0'
+    ACC.ID = R.ARR<AA.ARR.LINKED.APPL.ID,1>
+    BASE.BALANCE='ETOTALDUE'
+    CALL CAB.AA.VIRTUAL.BAL(ACC.ID,BASE.BALANCE,BAL.AMOUNT)
+
+    IF BAL.AMOUNT LT '0' THEN
+        ETEXT='AA-RTN.SETT.OUTDUE'
+        CALL STORE.END.ERROR
+    END
+
+
+    RETURN
+
+*************
+PROCESS.AUTH:
+*************
+
+*    YREGION =''
+*    DIFF ='C'
+*    CALL CDD('',CURR.DATE,R.NEW(AA.PS.START.DATE)<1,1>,DIFF)
+*    YDAYS.ORIG = '+':DIFF:'C'
+*    YDATE = AA$ACCOUNT.DETAILS<AA.AD.MATURITY.DATE>
+*    CALL CDT(YREGION,YDATE,YDAYS.ORIG)
+* IF YDATE THEN
+    GOSUB POST.OFS
+* END
+
+    RETURN
+*********
+POST.OFS:
+*********
+
+    options = ''
+    options<1> = "AA.COB"
+    options<4> = "HLD"
+
+    ARR.ACTIVITY.ID =''
+    APP.NAME = "AA.ARRANGEMENT.ACTIVITY"
+    OFS.RECORD = ''
+    OFSVERSION = APP.NAME:","
+    NO.OF.AUTH = "0"
+    AA.RECORD<AA.ARR.ACT.EFFECTIVE.DATE> = EFFECTIVE.DATE
+    AA.RECORD<AA.ARR.ACT.ACTIVITY> = "LENDING-CHANGE-REPAYMENT.SCHEDULE"
+    AA.RECORD<AA.ARR.ACT.ARRANGEMENT> = ARRANGEMENT.ID
+***    OFS.PROP = "PROPERTY:1=COMMITMENT,FIELD.NAME:1:1=MATURITY.DATE:1,FIELD.VALUE:1.1=": YDATE :","
+
+    CALL OFS.BUILD.RECORD(APP.NAME, FUNCT, "PROCESS", OFSVERSION, "", NO.OF.AUTH, ARR.ACTIVITY.ID, AA.RECORD, OFS.RECORD)
+    OFS.RECORD = OFS.RECORD
+    OFS.SOURCE = 'AA.COB'
+
+    CALL OFS.POST.MESSAGE(OFS.RECORD,'',OFS.SOURCE,'')
+
+    RETURN
+END

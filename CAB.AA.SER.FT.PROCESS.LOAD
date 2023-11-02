@@ -1,0 +1,111 @@
+*-----------------------------------------------------------------------------
+* <Rating>-32</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AA.SER.FT.PROCESS.LOAD
+
+* Author - Gokul J
+* Date   - 12/06/2014
+* Desc  - The required files and variables required for FT Process are initialised
+
+* Incoming Arguments
+* ------------------
+
+* Outgoing Arguments
+* ------------------
+*
+
+*Modification History
+************************
+* Author          :
+* Reference       :
+* Description     :
+
+**********************************************************************************************************************************
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.FUNDS.TRANSFER
+    $INCLUDE T24.BP I_F.ACCOUNT
+    $INCLUDE T24.BP I_F.ALTERNATE.ACCOUNT
+    $INSERT I_CAB.AA.SER.FT.PROCESS.COMMON
+    $INCLUDE T24.BP I_F.LOCKING
+*------------------------------------------------------------------------------------------------------------------------------*
+
+    GOSUB INITIALISE
+    GOSUB OPEN.FILES
+
+    RETURN
+***********
+INITIALISE:
+***********
+
+    PASTDUE.FILE= "" ;DUE.FILE = ""; PENALTY.FILE = ""
+    R.LOCKING = "" ; LOCK.ERR =""
+    LOG.DATA= "FT ID ,DEBIT AC ID, AMT, CREDIT AC ID,PYMT.TYPE,STATUS"
+    RETURN
+
+***********
+OPEN.FILES:
+***********
+    FN.ACCOUNT = 'F.ACCOUNT'
+    F.ACCOUNT = ''
+    CALL OPF(FN.ACCOUNT,F.ACCOUNT)
+*
+    FN.ALTERNATE.ACCOUNT  = 'F.ALTERNATE.ACCOUNT'
+    F.ALTERNATE.ACCOUNT  = ''
+    CALL OPF (FN.ALTERNATE.ACCOUNT,F.ALTERNATE.ACCOUNT)
+*
+    FN.FUNDS.TRANSFER = 'F.FUNDS.TRANSFER'
+    F.FUNDS.TRANSFER = ''
+    CALL OPF(FN.FUNDS.TRANSFER,F.FUNDS.TRANSFER)
+*
+    FN.AA.REPBP = 'AA.DUE.BP'
+    F.AA.REPBP =''
+*
+    FN.CAB.GOV.PRD='F.CAB.GOVERNMENT.PRODUCT'
+    F.CAB.GOV.PRD =''
+    CALL OPF(FN.CAB.GOV.PRD,F.CAB.GOV.PRD)
+*
+    FN.CURR = 'F.CURRENCY'
+    F.CURR = ''
+    CALL OPF(FN.CURR,F.CURR)
+*
+    FN.CAB.CUSTOMER='F.CUSTOMER'
+    F.CAB.CUSTOMER=''
+    CALL OPF(FN.CAB.CUSTOMER,F.CAB.CUSTOMER)
+
+*
+    FN.AUTO.HUNT.CONCAT = 'F.AUTO.HUNT.CONCAT'
+    F.AUTO.HUNT.CONCAT = ''
+    CALL OPF(FN.AUTO.HUNT.CONCAT,F.AUTO.HUNT.CONCAT)
+
+
+    OPEN FN.AA.REPBP TO F.AA.REPBP ELSE
+        ETEXT = "CANNOT CREATE SEQUENTIAL FILE"
+        CRT ETEXT
+        RETURN
+    END
+*
+*    FN.LOCKING = 'F.LOCKING'
+*    F.LOCKING = ''
+*    CALL OPF (FN.LOCKING,F.LOCKING)
+*
+*    CALL F.READ(FN.LOCKING,"PASTDUE",R.LOCKING,F.LOCKING,LOCK.ERR)
+*    IF NOT(LOCK.ERR) THEN
+*        Y.FILE.ID = R.LOCKING<EB.LOK.REMARK>
+*        DUE.FILE ="DUE-":Y.FILE.ID
+*        PENALTY.FILE ="PENALTY-":Y.FILE.ID
+*        PASTDUE.FILE ="PASTDUE-PENALTY-":Y.FILE.ID:".csv"
+*    END
+*
+    F.TEMP.DIR = ''
+    OPENSEQ FN.AA.REPBP,'LOG.FT.REP-':TODAY:'_':C$PORT.NO TO F.TEMP.DIR ELSE
+        WRITESEQF LOG.DATA  TO F.TEMP.DIR  ELSE
+            PRINT "UNABLE TO WRITE"
+        END
+    END
+*
+
+    RETURN
+
+END

@@ -1,0 +1,183 @@
+    SUBROUTINE CAB.AA.LOAN.CHANGE.INTEREST.SMS.LOAD
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthu
+* Development Id   : Change Interest - SMS File
+* Date             : 23rd Apr 2019
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Load routine
+* Attached to      : BNK/CAB.AA.LOAN.CHANGE.INTEREST.SMS
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Load Routine is used to generate a file to Send an SMS to the customer
+*                    whenever rate change happened in the arrangement.
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_CAB.AA.LOAN.CHANGE.INTEREST.SMS.COMMON
+    $INSERT I_F.BASIC.INTEREST
+    $INSERT I_F.DATES
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB OPEN.FILES
+    GOSUB GET.REQUIRED.INFO
+    GOSUB GET.CHANGE.DATES
+
+    RETURN
+
+*** </region>
+*** <region name= Main Body>
+
+OPEN.FILES:
+
+    FN.AA.LOAN.BALANCE.DETAILS = "F.AA.LOAN.BALANCE.DETAILS"
+    F.AA.LOAN.BALANCE.DETAILS = ""
+    CALL OPF(FN.AA.LOAN.BALANCE.DETAILS, F.AA.LOAN.BALANCE.DETAILS)
+
+    FN.CUSTOMER = "F.CUSTOMER"
+    F.CUSTOMER = ""
+    CALL OPF(FN.CUSTOMER, F.CUSTOMER)
+
+    FN.AA.ARRANGEMENT = "F.AA.ARRANGEMENT"
+    F.AA.ARRANGEMENT = ""
+    CALL OPF(FN.AA.ARRANGEMENT, F.AA.ARRANGEMENT)
+
+    FN.BASIC.INTEREST = "F.BASIC.INTEREST"
+    F.BASIC.INTEREST = ""
+    CALL OPF(FN.BASIC.INTEREST, F.BASIC.INTEREST)
+
+    FN.CAB.AA.CHANGE.INTEREST = "F.CAB.AA.CHANGE.INTEREST"
+    F.CAB.AA.CHANGE.INTEREST = ""
+    CALL OPF(FN.CAB.AA.CHANGE.INTEREST, F.CAB.AA.CHANGE.INTEREST)
+
+    FN.CAB.AA.CHANGE.INTEREST.PARAM = "F.CAB.AA.CHANGE.INTEREST.PARAM"
+    F.CAB.AA.CHANGE.INTEREST.PARAM = ""
+    CALL OPF(FN.CAB.AA.CHANGE.INTEREST.PARAM, F.CAB.AA.CHANGE.INTEREST.PARAM)
+
+    R.CAB.AA.CHANGE.INTEREST.PARAM = ""
+    ERR.CAB.AA.CHANGE.INTEREST.PARAM = ""
+
+    CALL CACHE.READ(FN.CAB.AA.CHANGE.INTEREST.PARAM, "SYSTEM", R.CAB.AA.CHANGE.INTEREST.PARAM, ERR.CAB.AA.CHANGE.INTEREST.PARAM)
+
+    LAST.WORKING.DATE = R.DATES(EB.DAT.LAST.WORKING.DAY)
+
+    LAST.MONTH = TODAY[5,2] - 1
+    LAST.YEAR = TODAY[1,4]
+
+    IF LAST.MONTH LE 0 THEN
+        LAST.MONTH = 12
+        LAST.YEAR = TODAY[1,4] - 1
+    END
+
+    LAST.MONTH = FMT(LAST.MONTH,"R%2")
+    INTEREST.CHANGE.DATE = LAST.YEAR:LAST.MONTH:"17"
+
+    RETURN
+
+GET.REQUIRED.INFO:
+
+    SEL.CMD  = "SELECT ":FN.BASIC.INTEREST
+
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+
+    LOOP
+        REMOVE BI.KEY FROM SEL.LIST SETTING BI.POS
+    WHILE BI.KEY : BI.POS
+
+        R.BASIC.INTEREST = ""
+        ERR.BASIC.INTEREST = ""
+
+        CALL F.READ(FN.BASIC.INTEREST, BI.KEY, R.BASIC.INTEREST, F.BASIC.INTEREST, ERR.BASIC.INTEREST)
+
+        MODIFIED.DATE.TIME = "20":R.BASIC.INTEREST<EB.BIN.DATE.TIME>[1,6]
+
+        EFF.DATE = ""
+
+        BEGIN CASE
+
+        CASE RIGHT(BI.KEY,8) GE INTEREST.CHANGE.DATE
+            EFF.DATE = RIGHT(BI.KEY,8)
+        CASE MODIFIED.DATE.TIME GE INTEREST.CHANGE.DATE
+            EFF.DATE = MODIFIED.DATE.TIME
+
+        END CASE
+
+        IF EFF.DATE THEN
+
+            KEY.LENGTH = LEN(BI.KEY)
+            BI.KEY = BI.KEY[1,KEY.LENGTH-8]
+
+            LOCATE BI.KEY IN RECORD.LISTS SETTING KEY.POS THEN
+                DEL BI.KEY.LIST<KEY.POS>
+                DEL RECORD.LISTS<KEY.POS>
+                BI.KEY.LIST<-1> = BI.KEY :"*": EFF.DATE
+                RECORD.LISTS<-1> = BI.KEY
+            END ELSE
+                IF BI.KEY.LIST THEN
+                    BI.KEY.LIST<-1> = BI.KEY :"*": EFF.DATE
+                    RECORD.LISTS<-1> = BI.KEY
+                END ELSE
+                    BI.KEY.LIST = BI.KEY :"*": EFF.DATE
+                    RECORD.LISTS = BI.KEY
+                END
+
+            END
+        END
+
+    REPEAT
+    RETURN
+
+GET.CHANGE.DATES:
+
+    YDATE = TODAY
+    YDAYS.ORIG = "-1C"
+    CALL CDT (YREGION,YDATE,YDAYS.ORIG)
+
+    InterestChangeDates = ""
+    HOLIDAY.FLAG = ""
+
+    GOSUB CHECK.DATE
+
+    RETURN
+
+CHECK.DATE:
+
+    IF (YDATE EQ LAST.WORKING.DATE) THEN
+        INS YDATE BEFORE InterestChangeDates<1>
+
+        IF NOT(HOLIDAY.FLAG) THEN
+            YDAYS.ORIG = "-1C"
+            CALL CDT (YREGION,YDATE,YDAYS.ORIG)
+            INS YDATE BEFORE InterestChangeDates<1>
+        END
+
+    END ELSE
+        HOLIDAY.FLAG = 1
+        IF YDATE GT LAST.WORKING.DATE THEN
+            INS YDATE BEFORE InterestChangeDates<1>
+            YDAYS.ORIG = "-1C"
+            CALL CDT (YREGION,YDATE,YDAYS.ORIG)
+            GOSUB CHECK.DATE
+        END
+
+    END
+
+    RETURN
+
+END

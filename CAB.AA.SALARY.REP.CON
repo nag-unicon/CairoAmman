@@ -1,0 +1,82 @@
+    SUBROUTINE CAB.AA.SALARY.REP.CON
+*************************************************************************************
+*************************************************************************************
+*** CAB Jordan Future Due report
+*** For Salary system
+***
+***
+*************************************************************************************
+*************************************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE AN.BP I_CAB.SAL.COMMON
+    $INCLUDE AN.BP I_F.CAB.SALARY.REPORT.LIST
+
+
+    GOSUB INIT
+    GOSUB PROCESS
+    GOSUB STORE.FILES
+
+    RETURN
+
+*****
+INIT:
+*****
+
+
+    FN.CAB.SAL ='F.CAB.SALARY.REPORT.LIST'
+    F.CAB.SAL =''
+    CALL OPF(FN.CAB.SAL,F.CAB.SAL)
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    GOSUB PROCESS.ACRP
+    GOSUB PROCESS.ACCR
+
+    RETURN
+
+*************
+PROCESS.ACRP:
+*************
+    SEL.CMD = "SELECT ": FN.CAB.SAL : " WITH FT.TXN.TYPE EQ 'ACRP' BY LOAN.ACC"
+    CALL EB.READLIST(SEL.CMD, KEY.LIST, LIST.NAME, SELECTED, ERR.CODE)
+    GOSUB BUILD.SELECTED.RECORD
+    RETURN
+
+*************
+PROCESS.ACCR:
+*************
+    SEL.CMD = "SELECT ": FN.CAB.SAL : " WITH FT.TXN.TYPE EQ 'ACCR' BY LOAN.ACC BY BILL.DATE"
+    CALL EB.READLIST(SEL.CMD, KEY.LIST, LIST.NAME, SELECTED, ERR.CODE)
+    GOSUB BUILD.SELECTED.RECORD
+
+    RETURN
+**********************
+BUILD.SELECTED.RECORD:
+**********************
+
+    FOR I= 1 TO SELECTED
+        SAL.ID = KEY.LIST<I>
+        CALL F.READ(FN.CAB.SAL,SAL.ID,R.CAB.SAL,F.CAB.SAL,ERR.SAL)
+        REPORT.LIST<-1> = R.CAB.SAL<AAA.SETT.ACC> :',': R.CAB.SAL<AAA.SETT.COM>  :',': R.CAB.SAL<AAA.SETT.CCY> :',': R.CAB.SAL<AAA.BILL.AMT> :',': R.CAB.SAL<AAA.DUE.AMT> :',': R.CAB.SAL<AAA.RPY.AMT> :',': R.CAB.SAL<AAA.BILL.DATE> :',': R.CAB.SAL<AAA.PAY.TYPE> :',': R.CAB.SAL<AAA.LOAN.ACC> :',': R.CAB.SAL<AAA.LOAN.CCY> :',': R.CAB.SAL<AAA.LOAN.COM> :',': R.CAB.SAL<AAA.FT.TXN.TYPE>
+    NEXT I
+
+
+    RETURN
+************
+STORE.FILES:
+************
+
+    REPORT.LISTS = "Settlement Account,Settlement Company,Settlement Currency,Bill Amount,Due Amount,Repaid Amount,Bill Due Date,Payment Type,Loan Account,Loan Currency,Branch,Transaction Type"
+    REPORT.LISTS<-1> = REPORT.LIST
+
+    KEY.FORMAT = "FUTUREDUES_PASTDUES_SAL_": TODAY :"_": TIMESTAMP():".csv"
+    IF REPORT.LIST THEN
+        WRITELIST REPORT.LISTS TO KEY.FORMAT
+    END
+
+    RETURN

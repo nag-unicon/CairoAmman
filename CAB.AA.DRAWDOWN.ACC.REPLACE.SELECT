@@ -1,0 +1,58 @@
+    SUBROUTINE CAB.AA.DRAWDOWN.ACC.REPLACE.SELECT
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthu
+* Development Id   : Drawdown Account replacement
+* Date             : 23rd Apr 2019
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Select routine
+* Attached to      : BNK/CAB.AA.DRAWDOWN.ACC.REPLACE
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Routine is used to replace the drawdown as settlement account
+*                    if existing drawdown account which is already closed by bank/user.
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_CAB.AA.DRAWDOWN.ACC.REPLACE.COMMON
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB SELECT.STATEMENT
+
+    RETURN
+
+*** </region>
+*** <region name= Select Statment>
+
+SELECT.STATEMENT:
+
+    SEL.LIST = ""
+    SEL.CNT  = ""
+    SEL.ERR  = ""
+    SEL.CMD  = "SELECT FBNK.AA.ARRANGEMENT WITH PRODUCT.LINE EQ LENDING AND (ARR.STATUS EQ CURRENT OR ARR.STATUS EQ EXPIRED)"
+
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+
+    CALL BATCH.BUILD.LIST("",SEL.LIST)
+
+    RETURN
+
+*** </region>
+
+END

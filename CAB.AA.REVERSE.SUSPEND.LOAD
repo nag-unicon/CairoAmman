@@ -1,0 +1,73 @@
+    SUBROUTINE CAB.AA.REVERSE.SUSPEND.LOAD
+*************************************************************************
+*************************************************************************
+* Montly report for refund the suspend
+*
+*
+*************************************************************************
+*************************************************************************
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT
+    $INCLUDE TT.BP I_CAB.AA.ACCRUAL.COMMON
+    $INCLUDE TT.BP I_F.CAB.AA.SUSPEND.PARAM
+
+    GOSUB INIT
+    GOSUB PROCESS
+
+    RETURN
+
+*****
+INIT:
+*****
+
+*
+    FN.AA.ARR ='F.AA.ARRANGEMENT'
+    F.AA.ARR=''
+    CALL OPF(FN.AA.ARR,F.AA.ARR)
+*
+    FN.AA.ACC.DET ='F.AA.ACCOUNT.DETAILS'
+    F.AA.ACC.DET=''
+    CALL OPF(FN.AA.ACC.DET,F.AA.ACC.DET)
+*
+    FN.EB.ACC ='F.EB.ACCRUAL'
+    F.EB.ACC =''
+    CALL OPF(FN.EB.ACC,F.EB.ACC)
+*
+    FN.CAB.PARAM ='F.CAB.AA.SUSPEND.PARAM'
+    F.CAB.PARAM =''
+    CALL OPF(FN.CAB.PARAM,F.CAB.PARAM)
+*
+    FN.EB.ACC ='F.EB.ACCRUAL'
+    F.EB.ACC =''
+    CALL OPF(FN.EB.ACC,F.EB.ACC)
+*
+
+    FN.AA.REPBP = 'AA.DUE.BP'
+    F.AA.REPBP =''
+
+*
+    FN.CAB.SUS.LIST ='F.AA.SUS.LIST'
+    F.CAB.SUS.LIST =''
+    CALL OPF(FN.CAB.SUS.LIST,F.CAB.SUS.LIST)
+*
+
+    RETURN
+********
+PROCESS:
+********
+
+    OPEN FN.AA.REPBP TO F.AA.REPBP ELSE
+        ETEXT = "CANNOT CREATE SEQUENTIAL FILE"
+        CRT ETEXT
+        RETURN
+    END
+
+    REP.DATE = TODAY
+    REP.DATE = LEFT(REP.DATE,6)
+    CALL GET.LAST.DOM(REP.DATE,LAST.DATE,LAST.DAY,MONTH.NAME)
+    REP.END.DATE = LAST.DATE
+    REP.START.DATE = REP.DATE :"01"
+
+    RETURN

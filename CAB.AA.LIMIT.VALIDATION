@@ -1,0 +1,143 @@
+    SUBROUTINE CAB.AA.LIMIT.VALIDATION
+***********************************************************************
+*** Version control routine to restrict the user to overdrawn limit
+***
+***********************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.FUNDS.TRANSFER
+    $INCLUDE T24.BP I_F.ACCOUNT
+    $INCLUDE T24.BP I_F.AA.TERM.AMOUNT
+    $INCLUDE T24.BP I_F.LIMIT
+    $INCLUDE T24.BP I_F.EB.CONTRACT.BALANCES
+
+    GOSUB INIT
+    GOSUB PROCESS
+
+    RETURN
+
+*****
+INIT:
+*****
+
+    FN.CAB.ACC ='F.ACCOUNT'
+    F.CAB.ACC =''
+    CALL OPF(FN.CAB.ACC,F.CAB.ACC)
+
+    FN.CUS.LIMIT ='F.LIMIT'
+    F.CUS.LIMIT =''
+    CALL OPF(FN.CUS.LIMIT,F.CUS.LIMIT)
+
+*** Consider only debit account number for disbursement
+
+    ACC.ID = R.NEW(FT.DEBIT.ACCT.NO)
+    BALANCE.TYPE ='CURACCOUNT'
+    EFFECTIVE.DATE = TODAY
+
+    RETURN
+
+*******************
+CHECK.LIMIT.EXCESS:
+*******************
+
+    OVER.MSG = R.NEW(FT.OVERRIDE)
+    CONVERT @SM TO @VM IN OVER.MSG
+
+    AF = FT.OVERRIDE
+    FINDSTR 'LIM1' IN OVER.MSG SETTING POS THEN
+        ETEXT ='Reversal is not allowed'
+        CALL STORE.END.ERROR
+    END
+
+
+
+
+    RETURN
+
+********
+PROCESS:
+********
+*** This validation has been introduced to restrict
+*** Disbursement amount greater than limit amount
+
+    IF R.NEW(FT.TRANSACTION.TYPE) EQ 'ACDI' THEN
+        IF V$FUNCTION EQ 'R' THEN
+            GOSUB CHECK.LIMIT.EXCESS
+        END ELSE
+            GOSUB PROCESS.CHECK
+        END
+
+    END
+
+    RETURN
+
+**************
+PROCESS.CHECK:
+**************
+
+    DB.ACC.ID = R.NEW(FT.DEBIT.ACCT.NO)
+    CALL F.READ(FN.CAB.ACC,DB.ACC.ID,R.CAB.ACC,F.CAB.ACC,ER.CAB.ACC)
+    ARR.ID = R.CAB.ACC<AC.ARRANGEMENT.ID>
+    CUST.CODE = R.CAB.ACC<AC.CUSTOMER>
+    CHILD.LIMIT = R.CAB.ACC<AC.LIMIT.REF>
+    IF CHILD.LIMIT THEN
+        CHILD.LIMIT.CNT = LEN(CHILD.LIMIT)
+        BEGIN CASE
+        CASE CHILD.LIMIT.CNT EQ '6'
+            LIMIT.ID =  CUST.CODE : ".0000" : CHILD.LIMIT
+        CASE CHILD.LIMIT.CNT EQ '7'
+            LIMIT.ID =  CUST.CODE : ".000" : CHILD.LIMIT
+        CASE CHILD.LIMIT.CNT EQ '8'
+            LIMIT.ID =  CUST.CODE : ".00" : CHILD.LIMIT
+        END CASE
+*    LIMIT.ID = CUST.CODE:'.':FMT(CHILD.LIMIT,'R%7'):'.':CHILD.LIMIT['.',2]
+        CALL F.READ(FN.CUS.LIMIT,LIMIT.ID,R.CUS.LIMIT,F.CUS.LIMIT,ERR.LIMT)
+
+***CALL AA.GET.PROPERTY.RECORD('', ARRANGEMENT.ID, 'COMMITMENT', EFFECTIVE.DATE, 'TERM.AMOUNT', '', R.TERM.AMOUNT, R.ERR)
+        LOAN.AMOUNT =''
+
+        BEGIN CASE
+        CASE R.NEW(FT.CREDIT.AMOUNT)
+            LOAN.AMOUNT = R.NEW(FT.DEBIT.AMOUNT)
+        CASE R.NEW(FT.DEBIT.AMOUNT)
+            LOAN.AMOUNT = R.NEW(FT.DEBIT.AMOUNT)
+        END CASE
+
+*** Consider the curaccount before compare with online limit for topup loans
+
+        CALL AA.GET.ECB.BALANCE.AMOUNT(DB.ACC.ID, BALANCE.TYPE, EFFECTIVE.DATE, BALANCE.AMOUNT,RET.ERR1)
+        CURRENT.ACCOUNT = ABS(BALANCE.AMOUNT)
+
+        LOAN.AMOUNT = LOAN.AMOUNT + CURRENT.ACCOUNT
+
+        IF LOAN.AMOUNT GT R.CUS.LIMIT<LI.ONLINE.LIMIT> THEN
+            GOSUB UPDATE.OVERRIDE
+        END
+
+        IF R.CUS.LIMIT<LI.EXPIRY.DATE> LT TODAY THEN
+            GOSUB UPDATE.OVERRIDE
+            CURR.NO = CURR.NO + 1
+            TEXT= 'AA.LIMIT.EXCESS.INFO'
+            CALL STORE.OVERRIDE(CURR.NO)
+        END
+    END
+
+    RETURN
+
+****************
+UPDATE.OVERRIDE:
+****************
+
+    TEXT = 'AA.LIMIT.EXCESS.INTERNAL' :FM: ABS(LOAN.AMOUNT - R.CUS.LIMIT<LI.ONLINE.LIMIT>)
+    CURR.NO = 1
+    CALL STORE.OVERRIDE(CURR.NO)
+    CURR.NO = 2
+    TEXT= 'AA.LIMIT.EXCESS.INTERNAL1' :FM: ABS(LOAN.AMOUNT - R.CUS.LIMIT<LI.ONLINE.LIMIT>)
+    CALL STORE.OVERRIDE(CURR.NO)
+    CURR.NO = 3
+    TEXT= 'AA.LIMIT.EXCESS.INTERNAL2' :FM: ABS(LOAN.AMOUNT - R.CUS.LIMIT<LI.ONLINE.LIMIT>)
+    CALL STORE.OVERRIDE(CURR.NO)
+
+    RETURN
+
+END

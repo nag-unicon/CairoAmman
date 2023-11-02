@@ -1,0 +1,12 @@
+    SUBROUTINE CAB.AA.FUTURE.FIELDS
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_Table
+    $INSERT I_DataTypes
+
+    CALL Table.defineId("CAB.ID", T24_String)     ;* Define Table id
+    CALL Table.addFieldDefinition("NO.OF.DAYS", "2", "A", "")
+    CALL Table.setAuditPosition         ;* Poputale audit information
+    RETURN
+END

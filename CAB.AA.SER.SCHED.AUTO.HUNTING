@@ -1,0 +1,89 @@
+    SUBROUTINE CAB.AA.SER.SCHED.AUTO.HUNTING
+*------------------------------------------------------------------------------*
+* Date   - 16/06/2014
+* Author - Gokul
+* Desc   - This routine will check the triggering time of Auto Hunting process
+*          for Bill and penalty Settlements
+********************************************************************
+*
+* 02-09-2015  : T24 date and unix server time should be same for running this service
+*
+*
+*------------------------------------------------------------------------------*
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE TT.BP I_F.CAB.AA.H.AUTOSETTLE.TIME
+    $INCLUDE T24.BP I_F.LOCKING
+
+    GOSUB INITIALISE
+    GOSUB PROCESS
+
+    RETURN
+
+***********
+INITIALISE:
+***********
+
+    FN.CAB.AA.H.AUTOSETTLE.TIME = "F.CAB.AA.H.AUTOSETTLE.TIME"
+    F.CAB.AA.H.AUTOSETTLE.TIME = ""
+    CALL OPF(FN.CAB.AA.H.AUTOSETTLE.TIME,F.CAB.AA.H.AUTOSETTLE.TIME)
+    R.AUTOSETTLE.TIME = "" ; AUTO.ERR = ""
+*
+    FN.LOCKING = "F.LOCKING"
+    F.LOCKING = ""
+    CALL OPF(FN.LOCKING,F.LOCKING)
+    R.LOCKING = "" ; LOCK.ERR = ""
+
+    RETURN
+
+********
+PROCESS:
+********
+    CURR.SYS.TIME=TIMEDATE()[1,5]
+    CALL F.READ(FN.CAB.AA.H.AUTOSETTLE.TIME,'SYSTEM',R.AUTOSETTLE.TIME,F.CAB.AA.H.AUTOSETTLE.TIME,AUTO.ERR)
+    AUTO.SCHED.TIME = R.AUTOSETTLE.TIME<CAB.AA.TIME.TRIGGER.TIME>
+    AUTO.SCHED.CNT =DCOUNT(AUTO.SCHED.TIME,@VM)
+*
+    FOR I = 1 TO AUTO.SCHED.CNT
+*
+        IF AUTO.SCHED.TIME<1,I> GT CURR.SYS.TIME THEN
+            SET.RUN.TIME =AUTO.SCHED.TIME<1,I>
+            Y.SCHED.TIME =TRIM(SET.RUN.TIME,':','A')
+            GOSUB CHECK.AND.TRIGGER
+            BREAK
+        END
+*
+    NEXT I
+    RETURN
+
+******************
+CHECK.AND.TRIGGER:
+******************
+* Check the current time against the scheduled time once the scheduled
+* time arrives the Auto Hunting Service is triggered
+*
+    LOOP
+    WHILE CURR.SYS.TIME LT SET.RUN.TIME
+        CRT "CURRENT SYSTEM TIME = ":CURR.SYS.TIME
+        CRT "AUTO HUNTING PROCESS SCHEDULED AT ":SET.RUN.TIME
+        SLEEP 100
+        CURR.SYS.TIME=TIMEDATE()[1,5]
+    REPEAT
+
+* Auto Trigger the service BNK/CAB.AA.SER.FT.PROCESS Once the SChedule time arrives
+* New condition has been introduced to stop the auto hunting run on weekends.
+
+    SERVER.DATE.NOW =  OCONV(DATE(),"DY"):FMT(OCONV(DATE(),"DM"),"R%2"):FMT(OCONV(DATE(),"DD"),"R%2")
+    T24.DATE.NOW = TODAY
+    IF SERVER.DATE.NOW EQ T24.DATE.NOW THEN
+        Y.SERVICE.ID = 'BNK/CAB.AA.SER.FT.PROCESS'
+        Y.OPERATION = 'START'
+        Y.SERVICE.MSG = ''
+        CRT "TRIGGERING AUTO HUNTING PROCESS"
+        CALL SERVICE.CONTROL(Y.SERVICE.ID,Y.OPERATION,Y.SERVICE.MSG)
+    END
+
+    RETURN
+
+END

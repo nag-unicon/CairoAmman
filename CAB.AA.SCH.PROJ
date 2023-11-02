@@ -1,0 +1,21 @@
+    SUBROUTINE CAB.AA.SCH.PROJ(ARR.ID,TOT.PAYMENT,DUE.DATES,DUE.TYPES,DUE.METHODS,DUE.TYPE.AMTS,DUE.PROPS,DUE.PROP.AMTS,DUE.OUTS)
+********************************************************
+********************************************************
+*** Wrapper routine for schedule projector for CAB
+***
+*** Author : Arun K
+***
+*** 17/02/2016  : AML Report Development
+********************************************************
+********************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.AA.PAYMENT.SCHEDULE
+****
+*** Schedule projector for the arrangement full views
+
+    SIM.REF = ''; CYCLE.DATE = ''; NO.OF.DAYS = '';DUE.DATES = ''; DUE.TYPE.AMTS = '' ; DUE.PROPS = '' ;
+    CYCLE.DATE = '';TOT.PAYMENT = '';DUE.TYPES = '';DUE.METHODS = ''; DUE.PROP.AMTS = ''; DUE.OUTS = '';
+    CALL AA.SCHEDULE.PROJECTOR(ARR.ID, SIM.REF, "",CYCLE.DATE, TOT.PAYMENT, DUE.DATES, DUE.TYPES, DUE.METHODS, DUE.TYPE.AMTS, DUE.PROPS, DUE.PROP.AMTS, DUE.OUTS)
+
+    RETURN

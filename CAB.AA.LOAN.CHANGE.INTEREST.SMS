@@ -1,0 +1,473 @@
+    SUBROUTINE CAB.AA.LOAN.CHANGE.INTEREST.SMS(ARRANGEMENT.ID)
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthu
+* Development Id   : Change Interest - SMS File
+* Date             : 23rd Apr 2019
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Load routine
+* Attached to      : BNK/CAB.AA.LOAN.CHANGE.INTEREST.SMS
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Load Routine is used to generate a file to Send an SMS to the customer
+*                    whenever rate change happened in the arrangement.
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.AA.ARRANGEMENT
+    $INSERT I_F.AA.INTEREST
+    $INSERT I_F.CUSTOMER
+    $INSERT I_F.AA.ACTIVITY.HISTORY
+    $INSERT I_F.AA.PAYMENT.SCHEDULE
+    $INSERT I_F.AA.ACCOUNT.DETAILS
+    $INSERT TT.BP I_F.AA.LOAN.BALANCE.DETAILS
+    $INSERT I_CAB.AA.LOAN.CHANGE.INTEREST.SMS.COMMON
+    $INSERT I_F.CAB.AA.CHANGE.INTEREST.PARAM
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB GET.REQUIRED.INFO
+
+    IF MOBILE.NO THEN
+        GOSUB PROCESS
+    END
+
+    RETURN
+
+GET.REQUIRED.INFO:
+
+    ARRANGEMENT.ID = FIELD(ARRANGEMENT.ID, "*", 1)
+
+    R.AA.ARRANGEMENT = ""
+    CALL F.READ(FN.AA.ARRANGEMENT, ARRANGEMENT.ID, R.AA.ARRANGEMENT, F.AA.ARRANGEMENT, ERR.AA.ARRANGEMENT)
+
+    CUSTOMER.ID = R.AA.ARRANGEMENT<AA.ARR.CUSTOMER,1>
+    PROCESS.FLAG = ""
+
+    LOCATE R.AA.ARRANGEMENT<AA.ARR.PRODUCT,1> IN R.CAB.AA.CHANGE.INTEREST.PARAM<INT.PARAM.PRODUCT, 1> SETTING ProdPos THEN
+        PROCESS.FLAG = 1
+    END ELSE
+        LOCATE R.AA.ARRANGEMENT<AA.ARR.PRODUCT.GROUP,1> IN R.CAB.AA.CHANGE.INTEREST.PARAM<INT.PARAM.PRODUCT.GROUP,1> SETTING GroupPos THEN
+            PROCESS.FLAG = 1
+        END
+    END
+
+    IF NOT(PROCESS.FLAG) THEN
+        GOSUB PROGRAM.END
+    END
+
+    R.CUSTOMER = ""
+    CALL F.READ(FN.CUSTOMER, CUSTOMER.ID, R.CUSTOMER, F.CUSTOMER, ERR.CUSTOMER)
+
+    MOBILE.NO = R.CUSTOMER<EB.CUS.SMS.1, 1>
+
+    SMS.LANGUAGE = R.CUSTOMER<EB.CUS.LANGUAGE>
+    CUSTOMER.NAME = R.CUSTOMER<EB.CUS.SHORT.NAME, SMS.LANGUAGE>
+
+    R.ACTIVITY.HISTORY = ""
+    REQD.MODE = ""
+    CALL AA.READ.ACTIVITY.HISTORY(ARRANGEMENT.ID, REQD.MODE, EFF.DATE, R.ACTIVITY.HISTORY)
+
+    ACTIVITY.EFFECTIVE.DATE = ""
+
+    FINDSTR "LENDING-CALCULATE-REPAYMENT.SCHEDULE" IN R.ACTIVITY.HISTORY<AA.AH.ACTIVITY> SETTING FmPos, VmPos, SmPos THEN
+        ACTIVITY.EFFECTIVE.DATE = R.ACTIVITY.HISTORY<AA.AH.EFFECTIVE.DATE, VmPos>
+    END
+
+    RETURN
+
+PROCESS:
+
+    INT.EFF.DATES = InterestChangeDates
+    MODIFICATION.DATE = ""
+
+    effectiveDate = INT.EFF.DATES<2>
+    GOSUB GET.INTEREST.RECORD
+    GOSUB PROCESS.INTEREST
+
+    RETURN
+
+GET.INTEREST.RECORD:
+
+    returnIds = ""
+    R.AA.INTEREST = ""
+    returnError = ""
+
+    idPropertyClass = "INTEREST"
+    idProperty = "PRINCIPALINT"
+    returnConditions = ""
+
+    CALL AA.GET.ARRANGEMENT.CONDITIONS(ARRANGEMENT.ID, idPropertyClass, idProperty, effectiveDate, returnIds, returnConditions, returnError)
+
+    R.AA.INTEREST = RAISE(returnConditions)
+    INT.RATE = R.AA.INTEREST<AA.INT.EFFECTIVE.RATE>
+    MIN.RATE = R.AA.INTEREST<AA.INT.TIER.MIN.RATE,1>
+    MAX.RATE = R.AA.INTEREST<AA.INT.TIER.MAX.RATE,1>
+
+    RETURN
+
+PROCESS.INTEREST:
+
+    BEGIN CASE
+
+    CASE R.AA.INTEREST<AA.INT.PERIODIC.INDEX> NE ''         ;* Periodic Interest
+
+        FINDSTR "LENDING-PERIODIC.RESET-PRINCIPALINT" IN R.ACTIVITY.HISTORY<AA.AH.ACTIVITY> SETTING FmPos, VmPos, SmPos THEN
+            ACTIVITY.EFFECTIVE.DATE = R.ACTIVITY.HISTORY<AA.AH.EFFECTIVE.DATE, VmPos>
+        END
+
+        IF ACTIVITY.EFFECTIVE.DATE GE LAST.WORKING.DATE THEN
+            INT.RATE = R.AA.INTEREST<AA.INT.EFFECTIVE.RATE>
+            GOSUB GET.PERIODIC.INTEREST.RATE
+        END
+
+    CASE R.AA.INTEREST<AA.INT.FLOATING.INDEX> NE ''         ;* Floating Interest
+
+        GOSUB GET.CALCULATE.REPAYMENT.SCHEDULE.DATE
+        GOSUB GET.FLOATING.INTEREST.RATE
+        NEW.INTEREST.RATE = INT.RATE    ;* New Interest Rate
+
+        IF effectiveDate THEN
+            YDAYS.ORIG = "-1C"
+            CALL CDT (YREGION,effectiveDate,YDAYS.ORIG)
+        END
+
+        GOSUB GET.FLOATING.INTEREST.RATE
+        OLD.INTEREST.RATE = INT.RATE
+
+        IF NEW.INTEREST.RATE AND OLD.INTEREST.RATE AND NEW.INTEREST.RATE NE OLD.INTEREST.RATE THEN
+            effectiveDate = CHANGE.INT.DATE
+            GOSUB SEND.CHANGE.INTEREST.SMS
+        END
+
+    CASE 1
+        GOSUB PROGRAM.END
+
+    END CASE
+
+    RETURN
+
+GET.PERIODIC.INTEREST.RATE:
+
+    TOTAL.CHANGE.DATES = DCOUNT(INT.EFF.DATES, FM)
+
+    FOR INT.DATE.CNT = 1 TO TOTAL.CHANGE.DATES
+
+        IF INT.EFF.DATES<2> THEN
+            SEND.SMS = ""
+            NEW.INTEREST.RATE = ""
+            OLD.INTEREST.RATE = ""
+
+            effectiveDate = INT.EFF.DATES<2>      ;* First always check with (LWD +1C Date)date
+            GOSUB GET.INTEREST.RECORD
+            NEW.INTEREST.RATE = INT.RATE          ;* New Interest Rate
+
+            effectiveDate = INT.EFF.DATES<1>
+            GOSUB GET.INTEREST.RECORD   ;* Get old interest rate
+            OLD.INTEREST.RATE = INT.RATE
+
+            IF NEW.INTEREST.RATE AND OLD.INTEREST.RATE AND NEW.INTEREST.RATE NE OLD.INTEREST.RATE THEN
+                effectiveDate = INT.EFF.DATES<2>
+                GOSUB SEND.CHANGE.INTEREST.SMS
+                DEL INT.EFF.DATES<1>
+                TOTAL.CHANGE.DATES = TOTAL.CHANGE.DATES -1
+            END
+        END
+
+    NEXT INT.DATE.CNT
+
+    RETURN
+
+
+*** </region>
+
+*** </region>
+*** <region name= Get the Floating Interest Rate>
+
+GET.FLOATING.INTEREST.RATE:
+
+    IF SEND.SMS THEN
+        INTEREST.RATE.KEY = R.AA.INTEREST<AA.INT.FLOATING.INDEX> : R.AA.ARRANGEMENT<AA.ARR.CURRENCY> : effectiveDate
+
+        CALL EB.GET.INTEREST.RATE(INTEREST.RATE.KEY, INT.RATE)
+
+        GOSUB GET.MARGIN.CAL
+        GOSUB GET.MIN.MAX.CHECK
+    END
+
+    RETURN
+
+*** </region>
+*** <region name= Interest Rate should consider the Margin Rate (Either ADD/SUB/MULTIPLE)
+*** <AA Loan Interests are defined only with MARGIN.TYPE as SINGLE
+
+GET.MARGIN.CAL:
+
+*** Currently code consider only first margin type, and add/sub
+*** In future it may extend based on the requirement
+
+    IF R.AA.INTEREST<AA.INT.MARGIN.TYPE,1,1> EQ 'SINGLE' THEN
+
+        BEGIN CASE
+
+        CASE R.AA.INTEREST<AA.INT.MARGIN.OPER,1,1> EQ 'ADD'
+            INT.RATE + = R.AA.INTEREST<AA.INT.MARGIN.RATE,1,1>
+
+        CASE R.AA.INTEREST<AA.INT.MARGIN.OPER,1,1> EQ 'SUB'
+            INT.RATE  - = R.AA.INTEREST<AA.INT.MARGIN.RATE,1,1>
+
+        CASE R.AA.INTEREST<AA.INT.MARGIN.OPER,1,1> EQ 'MULTIPLY'
+
+            IF MOD(INT.RATE,R.AA.INTEREST<AA.INT.MARGIN.RATE,1,1>) = 0 THEN
+            END ELSE
+                INT.RATE = (FIELD((INT.RATE / R.AA.INTEREST<AA.INT.MARGIN.RATE,1,1>),'.',1) + 1) * R.AA.INTEREST<AA.INT.MARGIN.RATE,1,1>
+            END
+
+        END CASE
+
+    END
+
+    RETURN
+
+GET.CALCULATE.REPAYMENT.SCHEDULE.DATE:
+
+    ACTIVITY.EFFECTIVE.DATE = ""
+
+    FINDSTR "LENDING-CALCULATE-REPAYMENT.SCHEDULE" IN R.ACTIVITY.HISTORY<AA.AH.ACTIVITY> SETTING FmPos, VmPos, SmPos THEN
+        ACTIVITY.EFFECTIVE.DATE = R.ACTIVITY.HISTORY<AA.AH.EFFECTIVE.DATE, VmPos>
+    END
+
+    INT.KEY = R.AA.INTEREST<AA.INT.FLOATING.INDEX> : R.AA.ARRANGEMENT<AA.ARR.CURRENCY>
+
+    GOSUB GET.BI.LIST
+
+    LOCATE INT.KEY IN BI.KEYS SETTING KeyPos THEN
+
+        CHANGE.INT.DATE = BI.KEY.LIST<KeyPos>
+        CHANGE.INT.DATE = FIELD(CHANGE.INT.DATE, "*", 2)
+
+        BEGIN CASE
+
+        CASE ACTIVITY.EFFECTIVE.DATE GT CHANGE.INT.DATE AND ACTIVITY.EFFECTIVE.DATE LE LAST.WORKING.DATE      ;* Already SMS Sent to customer
+            GOSUB PROGRAM.END
+
+        CASE ACTIVITY.EFFECTIVE.DATE GE CHANGE.INT.DATE AND ACTIVITY.EFFECTIVE.DATE LE TODAY
+            effectiveDate = CHANGE.INT.DATE
+            SEND.SMS = 1
+
+        CASE 1
+            GOSUB PROGRAM.END
+
+        END CASE
+    END
+
+
+    RETURN
+
+GET.BI.LIST:
+
+    KEY.COUNT = DCOUNT(BI.KEY.LIST, FM)
+    REC.CNT =1
+    LOOP
+    WHILE REC.CNT LE KEY.COUNT
+
+        IF BI.KEYS THEN
+            BI.KEYS<-1> = FIELD(BI.KEY.LIST<REC.CNT>, "*", 1)
+        END ELSE
+            BI.KEYS = FIELD(BI.KEY.LIST<REC.CNT>, "*", 1)
+        END
+
+        REC.CNT + =1
+    REPEAT
+
+    RETURN
+
+GET.PAYMENT.AMOUNT:
+
+    PropertyClass = "PAYMENT.SCHEDULE"
+    Property = ""
+    returnConditions = ""
+
+    CALL AA.GET.ARRANGEMENT.CONDITIONS(ARRANGEMENT.ID, idPropertyClass, idProperty, effectiveDate, returnIds, returnConditions, returnError)
+
+    R.AA.PAYMENT.SCHEDULE = RAISE(returnConditions)
+
+    TOTAL.PAYMENT.TYPES = DCOUNT(R.AA.PAYMENT.SCHEDULE<AA.PS.PAYMENT.TYPE>, VM)
+
+    FOR PAYMENT.TYPE.CNT = 1 TO TOTAL.PAYMENT.TYPES
+
+        IF R.AA.PAYMENT.SCHEDULE<AA.PS.BILL.TYPE,PAYMENT.TYPE.CNT> EQ "PAYMENT" THEN
+
+            ACTUAL.AMT = R.AA.PAYMENT.SCHEDULE<AA.PS.ACTUAL.AMT,PAYMENT.TYPE.CNT,1>
+            CALC.AMT   = R.AA.PAYMENT.SCHEDULE<AA.PS.CALC.AMOUNT,PAYMENT.TYPE.CNT,1>
+            START.DATE = R.AA.PAYMENT.SCHEDULE<AA.PS.START.DATE,PAYMENT.TYPE.CNT,1>
+            END.DATE   = R.AA.PAYMENT.SCHEDULE<AA.PS.END.DATE,PAYMENT.TYPE.CNT,1>
+
+            IF (END.DATE AND END.DATE GE TODAY) OR NOT(END.DATE) THEN
+
+                BEGIN CASE
+
+                CASE ACTUAL.AMT
+                    NEXT.PAY.AMT = ACTUAL.AMT
+
+                CASE CALC.AMT
+                    NEXT.PAY.AMT = CALC.AMT
+                END CASE
+                PAYMENT.TYPE.CNT = TOTAL.PAYMENT.TYPES      ;* Stop the loop
+            END
+        END
+    NEXT PAYMENT.TYPE.CNT
+
+
+    RETURN
+
+SEND.CHANGE.INTEREST.SMS:
+
+    ACC.STATUS   = ''
+    PROCESS.TYPE = 'INITIALISE'
+    UPDATE.INFO  = ''
+
+    CALL AA.PROCESS.ACCOUNT.DETAILS(ARRANGEMENT.ID, PROCESS.TYPE, UPDATE.TYPE,R.AA.ACC.DETAILS, RET.ERROR)
+    MATURITY.DATE = R.AA.ACC.DETAILS<AA.AD.MATURITY.DATE>
+
+    IF R.AA.ARRANGEMENT<AA.ARR.ORIG.CONTRACT.DATE> THEN
+        DISBURSEMENT.DATE = R.AA.ARRANGEMENT<AA.ARR.ORIG.CONTRACT.DATE>
+    END ELSE
+        DISBURSEMENT.DATE = R.AA.ACC.DETAILS<AA.AD.START.DATE>
+    END
+
+    R.AA.LOAN.BALANCE.DETAILS = ""
+    ERR.AA.LOAN.BALANCE.DETAILS = ""
+
+    REC.ID = ARRANGEMENT.ID :"*": R.AA.ARRANGEMENT<AA.ARR.CO.CODE>
+
+    CALL F.READ(FN.AA.LOAN.BALANCE.DETAILS, REC.ID, R.AA.LOAN.BALANCE.DETAILS, F.AA.LOAN.BALANCE.DETAILS, ERR.AA.LOAN.BALANCE.DETAILS)
+
+    IF R.AA.LOAN.BALANCE.DETAILS THEN
+        NEXT.PAY.AMT = R.AA.LOAN.BALANCE.DETAILS<AA.LOAN.BAL.NEXT.PAYMENT.AMT>
+        DISBURSEMENT.DATE = R.AA.LOAN.BALANCE.DETAILS<AA.LOAN.BAL.DISBURSEMENT.DATE>
+    END ELSE
+*       GOSUB GET.PAYMENT.AMOUNT
+    END
+
+    GOSUB GET.FINAL.PAYMENT.AMOUNT
+
+    R.CAB.AA.CHANGE.INTEREST = CUSTOMER.ID:",":CUSTOMER.NAME:",":ARRANGEMENT.ID:"-":R.AA.ARRANGEMENT<AA.ARR.CURRENCY>:",":NEW.INTEREST.RATE:",":NEXT.PAY.AMT:",":DISBURSEMENT.DATE:",":MOBILE.NO:",":effectiveDate :",": MATURITY.DATE :",": FINAL.PAY.AMOUNT
+    REC.ARR.ID = ARRANGEMENT.ID:"*":effectiveDate
+    CALL F.WRITE(FN.CAB.AA.CHANGE.INTEREST, REC.ARR.ID, R.CAB.AA.CHANGE.INTEREST)
+
+    RETURN
+*** </region>
+*** <region name= Reassign the Calculated Interest Rate if INT.RATE is Lesser than Min rate or greater than Max Rate>
+
+GET.MIN.MAX.CHECK:
+
+    IF INT.RATE AND MIN.RATE THEN       ;*** Interest rate minimum rate
+        IF INT.RATE < MIN.RATE THEN
+            INT.RATE = MIN.RATE
+        END
+    END
+
+    IF INT.RATE AND MAX.RATE THEN       ;*** Interest rate maximum rate
+        IF INT.RATE > MAX.RATE THEN
+            INT.RATE = MAX.RATE
+        END
+    END
+
+    RETURN
+
+GET.FINAL.PAYMENT.AMOUNT:
+
+    SCHEDULE.INFO<1> = ARRANGEMENT.ID
+    SCHEDULE.INFO<2> = TODAY
+    SCHEDULE.INFO<3> = "REPAYMENT.SCHEDULE"
+    START.DATE    = TODAY
+    DATE.RANGE<1> = TODAY
+
+    CALL AA.SCHEDULE.PROJECTOR(ARRANGEMENT.ID, SIMULATION.REF, NO.RESET, DATE.RANGE, TOT.PAYMENT, PAYMENT.DATES, DUE.TYPES, PAYMENT.METHODS,DUE.TYPE.AMTS, DUE.PROPS, PAYMENT.PROPERTIES.AMT, DUE.OUTS)
+
+    GOSUB GET.NEXT.PAYMENT.AMOUNT
+    GOSUB GET.LAST.PAYMENT.AMOUNT
+
+    RETURN
+
+GET.NEXT.PAYMENT.AMOUNT:
+
+    PAYMENT.METHOD.COUNT = DCOUNT(PAYMENT.METHODS, FM)
+    PAYMENT.CNT          = 1
+    TOTAL.PAY.CNT        = 1
+    FINAL.PAY.AMOUNT = ""
+
+    LOOP
+    WHILE PAYMENT.CNT LE PAYMENT.METHOD.COUNT
+        PAY.METHODS = PAYMENT.METHODS<PAYMENT.CNT>
+        CHANGE SM TO VM IN PAY.METHODS
+        IF "DUE" MATCHES PAY.METHODS THEN
+
+            IF NOT(NEXT.PAY.AMT) THEN
+
+                NEXT.PAY.AMT = SUM(PAYMENT.PROPERTIES.AMT<PAYMENT.CNT,1>)
+
+            END ELSE
+                PAYMENT.CNT = PAYMENT.METHOD.COUNT
+            END
+
+        END
+
+        PAYMENT.CNT + =1
+
+    REPEAT
+
+    RETURN
+
+GET.LAST.PAYMENT.AMOUNT:
+
+    PAYMENT.METHOD.COUNT = DCOUNT(PAYMENT.METHODS, FM)
+    PAYMENT.CNT          = 1
+    TOTAL.PAY.CNT        = 1
+    BILL.PAY.DATE        = ""
+    FINAL.PAY.AMOUNT = ""
+
+    LOOP
+    WHILE PAYMENT.CNT LE PAYMENT.METHOD.COUNT
+        PAY.METHODS = PAYMENT.METHODS<PAYMENT.METHOD.COUNT>
+        CHANGE SM TO VM IN PAY.METHODS
+        IF "DUE" MATCHES PAY.METHODS THEN
+
+            IF NOT(FINAL.PAY.AMOUNT) THEN
+
+                FINAL.PAY.AMOUNT = SUM(PAYMENT.PROPERTIES.AMT<PAYMENT.METHOD.COUNT,1>)
+
+            END ELSE
+                PAYMENT.CNT = PAYMENT.METHOD.COUNT
+            END
+
+        END
+
+        PAYMENT.METHOD.COUNT - =1
+        PAYMENT.CNT + =1
+
+    REPEAT
+
+    RETURN
+
+
+PROGRAM.END:
+
+    RETURN TO PROGRAM.END
+
+END

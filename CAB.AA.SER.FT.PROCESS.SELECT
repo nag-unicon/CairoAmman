@@ -1,0 +1,113 @@
+*-----------------------------------------------------------------------------
+* <Rating>-32</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AA.SER.FT.PROCESS.SELECT
+
+* Author - Gokul J
+* Date   - 12/06/2014
+* Desc  - Selection routine for Auto Hunting process which raises FT transaction to auto settle
+*         Selects the Penalty file and Due file for the accounts from AA.REP.BP
+*         Process each file data seperately and create FT for Auto Hunting Process
+
+* Incoming Arguments
+* ------------------
+
+* Outgoing Arguments
+* ------------------
+*
+
+* Modification History
+************************
+* Author          :
+* Reference       :
+* Description     :
+*
+*
+* 25-03-2015 : Change to run on DB2 environment.
+*
+**********************************************************************************************************************************
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.FUNDS.TRANSFER
+    $INCLUDE T24.BP I_F.ACCOUNT
+    $INCLUDE T24.BP I_F.LOCKING
+    $INCLUDE T24.BP I_BATCH.FILES
+    $INSERT I_CAB.AA.SER.FT.PROCESS.COMMON
+
+*------------------------------------------------------------------------------------------------------------------------------*
+
+    GOSUB INITIALISE
+    GOSUB SEL.PROCESS
+
+    RETURN
+
+***********
+INITIALISE:
+***********
+    SEL.CMD = ""
+    SEL.LIST = ""
+    SEL.CNT = ""
+    SEL.ERR = ""
+    FT.DATA = ""
+*
+
+*  IF CONTROL.LIST EQ '' THEN          ;* In order to Create FT for Penalty Process and then Dues
+*      CONTROL.LIST<1> = 'CREATE.FT.PENALTY'
+*      CONTROL.LIST<2> = 'CREATE.FT.DUE'
+*  END
+*
+    RETURN
+
+************
+SEL.PROCESS:
+************
+
+*    BEGIN CASE
+*    CASE CONTROL.LIST<1,1> EQ 'CREATE.FT.PENALTY'
+*        SEL.CMD = "SELECT ":FN.AA.REPBP: " EQ ":PENALTY.FILE
+*        CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+*        PROCESS.FILE = PENALTY.FILE
+*        GOSUB PROCESS.DATA
+*        GOSUB BUILD.LIST
+*
+*    CASE CONTROL.LIST<1,1> EQ 'CREATE.FT.DUE'
+*        FT.DATA = ""
+*        SEL.CMD = "SELECT ":FN.AA.REPBP: " EQ ":DUE.FILE
+*        CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+*        PROCESS.FILE =DUE.FILE
+*    END CASE
+*
+
+    GOSUB PROCESS.DATA
+    GOSUB BUILD.LIST
+
+    RETURN
+*************
+PROCESS.DATA:
+*************
+*    IF SEL.LIST THEN
+*        READ FT.DATA FROM F.AA.REPBP,PROCESS.FILE ELSE FT.DATA = ''
+*        DEL FT.DATA<1>
+*        SEL.CNT = DCOUNT(FT.DATA,@FM)
+*        PRINT " TOTAL Records to be Processed ":SEL.CNT
+*        SLEEP 1
+*        CALL BATCH.BUILD.LIST("",FT.DATA)
+*    END ELSE
+*        PRINT "Empty file Cannot be processed"
+*    END
+
+    RETURN
+
+***********
+BUILD.LIST:
+***********
+
+    SEL.CMD = "SELECT ": FN.AUTO.HUNT.CONCAT
+    CALL EB.READLIST(SEL.CMD,SEL.LIST.IDS,'',SEL.CNT.LIST,SEL.ERR)
+
+    CALL BATCH.BUILD.LIST('',SEL.LIST.IDS)
+
+    RETURN
+
+END

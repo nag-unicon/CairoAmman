@@ -1,0 +1,266 @@
+*-----------------------------------------------------------------------------
+* <Rating>140</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AA.LEGAL.LOAN.MOVEMENT(ARR.ID)
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 28th Sep 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Batch Routine
+* Attached to      : BNK/CAB.AA.LEGAL.LOAN.MOVEMENT
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This routine used to Create a new account and move the amort charge amount
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.FUNDS.TRANSFER
+    $INSERT I_F.AA.ARRANGEMENT
+    $INSERT TT.BP I_F.CAB.AA.LEGAL.LOAN
+    $INSERT TT.BP I_CAB.AA.LEGAL.LOAN.MOVEMENT.COMMON
+
+    GOSUB GET.CAB.AA.LEGAL.LOAN.RECORD
+    GOSUB PROCESS
+
+    IF DO.WRITE THEN
+        CALL F.WRITE(FN.CAB.AA.LEGAL.LOAN, ARR.ID, R.CAB.AA.LEGAL.LOAN)
+    END
+
+    RETURN
+
+*** </region>
+
+*** <region name= PROCESS>
+
+PROCESS:
+
+    GOSUB GET.ARRAGEMENT.RECORD
+
+    IF R.CAB.AA.LEGAL.LOAN<CAB.AA.LEGAL.COMM.SUSPENSE.ACCT> EQ "" THEN          ;* Creat a new account and move the balance which is related to  Annual Commission and Easy Installement.
+
+        COMMISSION.PROPERTIES =  "ANNUALCOMM" :VM: "EASYINSTLMENT" :VM: "EASYINSTLMENT2"
+        COMM.PROCESS = 1
+        INT.PROCESS = 0
+
+        R.ACCOUNT = ""
+        R.ACCOUNT<AC.CATEGORY> = "8913"
+
+        FT.RECORD = ''
+        FT.RECORD<FT.DEBIT.ACCT.NO> = "PL52251"
+
+        GOSUB PROCESS.TO.CHECK.AMORT.CHARGE
+    END
+
+    IF R.CAB.AA.LEGAL.LOAN<CAB.AA.LEGAL.INT.SUSPENSE.ACCT> EQ "" THEN ;* Creat a new account and move the balance which is related to  Discounted Interest.
+
+        COMMISSION.PROPERTIES = "DISCOUNTINT" :VM: "DISCOUNTINT1" :VM: "FLATINTEREST"
+        COMM.PROCESS = 0
+        INT.PROCESS = 1
+
+        R.ACCOUNT = ""
+        R.ACCOUNT<AC.CATEGORY> = "8903"
+
+        FT.RECORD =''
+        FT.RECORD<FT.DEBIT.ACCT.NO> = "PL51001"
+
+        GOSUB PROCESS.TO.CHECK.AMORT.CHARGE
+    END
+
+    RETURN
+
+*** </region>
+
+*** <region name= PROCESS.TO.CHECK.AMORT.CHARGE>
+
+PROCESS.TO.CHECK.AMORT.CHARGE:
+
+    BALANCE.AMOUNT = 0
+    PROCESS.FLAG   = 0
+
+    LOOP
+        REMOVE ARR.PROPERTY FROM COMMISSION.PROPERTIES SETTING PROP.POS
+    WHILE ARR.PROPERTY : PROP.POS
+
+        BALANCE.TYPE = "ACC": ARR.PROPERTY
+        GOSUB GET.ECB.BALANCE
+
+        IF ABS(TOTALAMT) GT 0 THEN
+
+            PROCESS.FLAG = 1
+
+            IF COMM.PROCESS THEN
+                R.CAB.AA.LEGAL.LOAN<CAB.AA.LEGAL.COMM.BALANCE.TYPE, -1> = BALANCE.TYPE
+                R.CAB.AA.LEGAL.LOAN<CAB.AA.LEGAL.COMM.AMOUNT, -1> = ABS(TOTALAMT)
+            END
+
+            IF INT.PROCESS THEN
+                R.CAB.AA.LEGAL.LOAN<CAB.AA.LEGAL.INT.BALANCE.TYPE, -1> = BALANCE.TYPE
+                R.CAB.AA.LEGAL.LOAN<CAB.AA.LEGAL.INT.AMOUNT, -1> = ABS(TOTALAMT)
+            END
+        END
+
+    REPEAT
+
+    IF PROCESS.FLAG THEN
+        GOSUB PROCESS.NEW.ACCOUNT
+    END
+
+    RETURN
+
+*** </region>
+
+*** <region name= GET.CAB.AA.LEGAL.LOAN.RECORD>
+
+*** <desc = Read CAB.AA.LEGAL.LOAN record>
+
+GET.CAB.AA.LEGAL.LOAN.RECORD:
+
+    DO.WRITE = ""
+    R.CAB.AA.LEGAL.LOAN = ""
+    ERR.CAB.AA.LEGAL.LOAN = ""
+
+    CALL F.READ(FN.CAB.AA.LEGAL.LOAN, ARR.ID, R.CAB.AA.LEGAL.LOAN, F.CAB.AA.LEGAL.LOAN, ERR.CAB.AA.LEGAL.LOAN)
+
+    RETURN
+
+*** </region>
+
+*** <region name= GET.ARRANGEMENT.RECORD>
+
+*** <desc>Get Arrangement Record </desc>
+
+GET.ARRAGEMENT.RECORD:
+
+    R.ARRANGEMENT = ""
+    ARR.ERROR = ""
+    CALL AA.GET.ARRANGEMENT(ARR.ID, R.ARRANGEMENT, ARR.ERROR)         ;* Arrangement record
+
+    ACCOUNT.NO = R.ARRANGEMENT<AA.ARR.LINKED.APPL.ID,1>
+
+    ARRANGMENT.PROPERTIES = R.ARRANGEMENT<AA.ARR.PROPERTY>
+    CHANGE SM TO VM IN ARRANGMENT.PROPERTIES
+
+    RETURN
+
+*** </region>
+
+*** <region name= GET.ECB.BALANCE>
+
+GET.ECB.BALANCE:
+
+    REQUEST.DATE = TODAY
+    CALL AA.GET.ECB.BALANCE.AMOUNT(ACCOUNT.NO, BALANCE.TYPE, REQUEST.DATE, TOTALAMT ,RET.ERROR)
+
+    BALANCE.AMOUNT + = ABS(TOTALAMT)
+
+    RETURN
+
+PROCESS.NEW.ACCOUNT:
+
+    APP.NAME     = 'ACCOUNT'
+    PROCESS      = 'PROCESS'
+    OFS.VERSION  = 'ACCOUNT,INP'
+    OFS.FUNCTION = 'I'
+    GTS.MODE     = ''
+    NO.OF.AUTH   = '0'
+    TRANSACTION.ID = ''
+    OFS.MESSAGE    = ''
+    OFS.SOURCE.ID  = 'AA.COB'
+
+    COMP.ID = R.ARRANGEMENT<AA.ARR.CO.CODE>
+    CALL LOAD.COMPANY(COMP.ID)
+
+    R.ACCOUNT<AC.CUSTOMER> = R.ARRANGEMENT<AA.ARR.CUSTOMER,1>
+    R.ACCOUNT<AC.CURRENCY> = R.ARRANGEMENT<AA.ARR.CURRENCY>
+
+    CALL OFS.BUILD.RECORD(APP.NAME,OFS.FUNCTION,PROCESS, OFS.VERSION, GTS.MODE, NO.OF.AUTH, TRANSACTION.ID, R.ACCOUNT, OFS.RECORD)
+
+    theResponse    = ""
+    txnCommitted   = ""
+    options        = ""
+    options<1>     = "AA.COB"
+    options<4>     = "HLD"
+
+    CALL OFS.CALL.BULK.MANAGER(options,OFS.RECORD,theResponse,txnCommitted)
+
+    STATUS.MSG = FIELD(theResponse,',',1)
+    STATUS.FLAG = FIELD(STATUS.MSG,'/',3)
+    COMMISSION.ACCOUNT = FIELD(STATUS.MSG, '/', 1)
+
+    IF NUM(COMMISSION.ACCOUNT) AND STATUS.FLAG EQ 1 THEN
+        GOSUB PROCESS.COMMISSION.TXN
+    END
+
+    RETURN
+
+PROCESS.COMMISSION.TXN:
+
+    APP.NAME     = 'FUNDS.TRANSFER'
+    PROCESS      = 'PROCESS'
+    OFS.VERSION  = 'FUNDS.TRANSFER,INP'
+    OFS.FUNCTION = 'I'
+    GTS.MODE     = ''
+    NO.OF.AUTH   = '0'
+    TRANSACTION.ID = ''
+    OFS.MESSAGE    = ''
+    OFS.SOURCE.ID  = 'AA.COB'
+
+    FT.RECORD<FT.DEBIT.CURRENCY>   = R.ARRANGEMENT<AA.ARR.CURRENCY>
+    FT.RECORD<FT.DEBIT.AMOUNT>     = BALANCE.AMOUNT
+    FT.RECORD<FT.TRANSACTION.TYPE> = "AC"
+    FT.RECORD<FT.CREDIT.ACCT.NO>   = COMMISSION.ACCOUNT
+    FT.RECORD<FT.CREDIT.VALUE.DATE>= R.CAB.AA.LEGAL.LOAN<CAB.AA.LEGAL.LEGAL.DATE>
+    FT.RECORD<FT.DEBIT.VALUE.DATE> = R.CAB.AA.LEGAL.LOAN<CAB.AA.LEGAL.LEGAL.DATE>
+    FT.RECORD<FT.ORDERING.CUST,1>  = "Loan Account Number"
+    FT.RECORD<FT.DEBIT.THEIR.REF>  = "Loan Account Num"
+
+    TRANSACTION.ID = ""
+    CALL FT.GENERATE.ID(TYPE, TRANSACTION.ID)
+
+    CALL OFS.BUILD.RECORD(APP.NAME,OFS.FUNCTION,PROCESS, OFS.VERSION, GTS.MODE, NO.OF.AUTH, TRANSACTION.ID, FT.RECORD, OFS.RECORD)
+
+    theResponse    = ""
+    txnCommitted   = ""
+    options        = ""
+    options<1>     = "AA.COB"
+    options<4>     = "HLD"
+
+    CALL OFS.POST.MESSAGE(OFS.RECORD,'', OFS.SOURCE.ID, '')
+
+    STATUS.MSG = FIELD(theResponse,',',1)
+    STATUS.FLAG = FIELD(STATUS.MSG,'/',3)
+
+    IF TRANSACTION.ID THEN
+        DO.WRITE = 1
+        IF COMM.PROCESS THEN
+            R.CAB.AA.LEGAL.LOAN<CAB.AA.LEGAL.COMM.TXN.ID> = TRANSACTION.ID
+            R.CAB.AA.LEGAL.LOAN<CAB.AA.LEGAL.COMM.SUSPENSE.ACCT> = COMMISSION.ACCOUNT
+        END
+
+        IF INT.PROCESS THEN
+            R.CAB.AA.LEGAL.LOAN<CAB.AA.LEGAL.INT.TXN.ID> = TRANSACTION.ID
+            R.CAB.AA.LEGAL.LOAN<CAB.AA.LEGAL.INT.SUSPENSE.ACCT> = COMMISSION.ACCOUNT
+        END
+    END
+
+    RETURN
+
+END

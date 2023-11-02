@@ -1,0 +1,385 @@
+*-----------------------------------------------------------------------------
+* <Rating>-32</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AA.SER.FT.PROCESS(FEED.ID)
+
+* Author - Gokul J
+* Date   - 12/06/2014
+* Desc  - This record routine will create the FT records according to the Loan details passed
+*
+* Incoming Arguments
+* ------------------
+*
+*
+* Outgoing Arguments
+* ------------------
+*
+*
+* Modification History
+************************
+* Author          : Arunkabalieswaran@itssglobal.com
+* Reference       : Palastine multi currency settlement account code changes done
+* Description     :
+*
+* 17-03-2015 : Alternate account id need to consider before triggering the FT
+*
+*
+* 28-05-2015 : Multiple settlement account leads to UNCBALANCE
+*
+* 12-08-2015 : FT is not trigger by the system
+*
+*
+**********************************************************************************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.FUNDS.TRANSFER
+    $INCLUDE T24.BP I_F.ACCOUNT
+    $INCLUDE T24.BP I_F.CUSTOMER
+    $INCLUDE T24.BP I_F.AA.ACCOUNT
+    $INCLUDE TT.BP I_F.CAB.GOVERNMENT.PRODUCT
+    $INCLUDE T24.BP I_F.ALTERNATE.ACCOUNT
+    $INCLUDE TT.BP I_CAB.AA.SER.FT.PROCESS.COMMON
+    $INCLUDE T24.BP I_F.CURRENCY
+
+    GOSUB INITIALISE
+    IF BILL.AMT NE '' OR BILL.AMT GT '0' THEN
+        FOR NO.OF.SAC = 1 TO NO.OF.SETT.ACC
+            GOSUB PROCESS
+*** No need to process remaining account if already is settled.
+            IF TOT.BILL.AMT EQ '0' THEN
+                NO.OF.SAC = NO.OF.SETT.ACC
+            END
+        NEXT NO.OF.SAC
+    END
+***Remove the process record from the concat file
+
+
+    GOSUB REMOVE.LOCK
+
+    RETURN
+
+*----------
+REMOVE.LOCK:
+*----------
+
+**CALL F.RELEASE(FN.ACCOUNT,LOAN.AC.ID,FN.ACCOUNT)
+
+    CALL F.DELETE(FN.AUTO.HUNT.CONCAT,FEED.ID)
+
+    RETURN
+
+***********
+INITIALISE:
+***********
+
+    R.AUTO.HUNT = ''
+    CONCAT.ERR = ''
+    CALL F.READ(FN.AUTO.HUNT.CONCAT,FEED.ID,FEED.DATA,F.AUTO.HUNT.CONCAT,CONCAT.ERR)
+    PYMT.TYPE =FIELD(FEED.DATA,',',8)
+    FT.OFS.STR = ""
+    OFS.SRC = "AA.COB"
+    FT.OFS.STR = ""
+    TAXN.TYPE ='ACRP'
+    APP.NAME = 'FUNDS.TRANSFER'
+    VERSION.NAME = 'FUNDS.TRANSFER,AA'
+    INPUT.AMT = ''
+    INPUT.CCY = ''
+
+
+    IF PYMT.TYPE EQ 'SUBSIDY' THEN RETURN
+
+    AC.ID = FIELD(FEED.DATA,',',1)
+    COMP.ID =  FIELD(FEED.DATA,',',2)
+    SET.CCY = FIELD(FEED.DATA,',',3)
+    BILL.AMT = FIELD(FEED.DATA,',',4)
+    TOT.BILL.AMT = BILL.AMT
+
+    CR.AC.ID = FIELD(FEED.DATA,',',9)
+
+    LOAN.AC.ID = FIELD(FEED.DATA,',',9)
+    LOAN.CCY = FIELD(FEED.DATA,',',10)
+*   LOAN.AMT = FIELD(FEED.DATA,',',7)
+    TOT.BILL.CCY = LOAN.CCY
+
+    TXN.TYPE ='ACRP'
+    R.ACCOUNT = "" ;ACC.ERR = ""
+    R.ALTERNATE.ACCOUNT = "" ; ALT.ERR = ""
+
+*** Pay from the loan company
+
+    CALL LOAD.COMPANY(COMP.ID)
+    EFFECTIVE.DATE = TODAY
+*** Multi thread
+    CALL F.READU(FN.ACCOUNT,LOAN.AC.ID,R.LOAN.ACCOUNT,F.ACCOUNT,ACC.ERR,'R')
+
+    ARR.ID = R.LOAN.ACCOUNT<AC.ARRANGEMENT.ID>
+    CALL AA.GET.PROPERTY.RECORD('', ARR.ID, 'ACCOUNT', EFFECTIVE.DATE, 'ACCOUNT', '', R.ACCOUNT.RECORD, R.ERR)
+
+*** Considering the all settlement account
+
+    CALL GET.LOC.REF('AA.ARR.ACCOUNT','SETTLE.ACCOUNT',ST.POS)
+    SETT.ACC = R.ACCOUNT.RECORD<AA.AC.LOCAL.REF,ST.POS>
+
+    CONVERT @SM TO @FM IN SETT.ACC
+    NO.OF.SETT.ACC = DCOUNT(SETT.ACC,@FM)
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    DB.AC.ID = TRIM(SETT.ACC<NO.OF.SAC>)
+
+    R.ALTERNATE.ACCOUNT =''
+*** New settlement account alternate check introduced. ARUN
+    CALL F.READ(FN.ALTERNATE.ACCOUNT,DB.AC.ID,R.ALTERNATE.ACCOUNT,F.ALTERNATE.ACCOUNT,ERR.ALT.AC)
+
+    IF NOT(ERR.ALT.AC) AND R.ALTERNATE.ACCOUNT NE '' THEN
+        DB.AC.ID = R.ALTERNATE.ACCOUNT<AAC.GLOBUS.ACCT.NUMBER>
+    END
+    R.ACCOUNT =''
+    CALL F.READU(FN.ACCOUNT,DB.AC.ID,R.ACCOUNT,F.ACCOUNT,ACC.ERR,'R')
+    SET.CCY = R.ACCOUNT<AC.CURRENCY>
+    IF R.ACCOUNT THEN
+*** Changes done based on the discussion with Taysir,
+*** AC.BAL = R.ACCOUNT<AC.ONLINE.CLEARED.BAL>
+        CALL CAB.ICBS.AVAIL.BALANCE(DB.AC.ID,R.ACCOUNT,WRK.BAL,AVAIL.BAL)
+        AC.BAL = AVAIL.BAL
+        GOSUB GET.VALID.ACC
+        GOSUB UPD.DBT.AMT
+    END ELSE
+        PRINT "DB.AC.ID":DB.AC.ID
+        LOG.MSG = "ACCOUNT ": DB.AC.ID: " IS NOT AVAILABLE"
+        PRINT LOG.MSG
+    END
+    RETURN
+**************
+GET.VALID.ACC:
+**************
+*** Check the account level restriction is available or not
+
+    CALL F.READ(FN.CAB.GOV.PRD,'SYSTEM',R.CAB.GOV.PRD,F.CAB.GOV.PRD,ERR.PRD)
+    ACC.RES.LIST = R.CAB.GOV.PRD<CAB.ACC.EXCLUDE>
+    ACC.RES = R.ACCOUNT<AC.POSTING.RESTRICT>
+
+* Posting Restrict Account will be ignored.
+
+    IF ACC.RES MATCHES ACC.RES.LIST THEN
+        AC.BAL ='0'
+    END
+
+* Addition check introducted to check
+
+* Customer level restriction has introduct to stop hunting
+    ARR.CUSTOMER = R.ACCOUNT<AC.CUSTOMER>
+    CALL F.READ(FN.CAB.CUSTOMER,ARR.CUSTOMER,R.CUSTOMER,F.CAB.CUSTOMER,ERR.CAB)
+
+    CUS.RES = R.CUSTOMER<EB.CUS.POSTING.RESTRICT>
+    CUS.RES.LIST = R.CAB.GOV.PRD<CAB.ACC.EXCLUDE>
+
+    IF CUS.RES MATCHES CUS.RES.LIST THEN
+        AC.BAL = '0'
+    END
+
+
+    RETURN
+
+************
+UPD.DBT.AMT:
+************
+
+    BEGIN CASE
+
+    CASE AC.BAL LE 0
+        PRINT DB.AC.ID :" BALANCE IS LESS THAN 0"
+
+    CASE SET.CCY EQ LOAN.CCY
+
+        GOSUB BUILD.FT
+        GOSUB CREATE.FT
+
+    CASE 1
+* Both the currency are different
+
+        GOSUB PAL.EXC.RATE
+        GOSUB CREATE.FT
+    END CASE
+
+    RETURN
+
+*********
+BUILD.FT:
+*********
+    IF TOT.BILL.AMT GE AC.BAL THEN
+* Settlement account not having sufficent balance
+        FT.AMT = AC.BAL
+        CAL<2>='D'
+    END ELSE
+        FT.AMT = TOT.BILL.AMT
+        CAL<2>='U'
+* If settlement account having sufficent balance then go for the due balance
+    END
+    INPUT.AMT = FT.AMT
+    INPUT.CCY = SET.CCY
+    GOSUB FT.ROUND.AMT
+    FT.AMT = INPUT.AMT
+
+    FT.OFS.STR = ''
+    FT.OFS.STR<FT.TRANSACTION.TYPE> = TAXN.TYPE
+    FT.OFS.STR<FT.DEBIT.ACCT.NO> = DB.AC.ID
+    FT.OFS.STR<FT.DEBIT.AMOUNT> = FT.AMT
+    FT.OFS.STR<FT.CREDIT.ACCT.NO> = CR.AC.ID
+    FT.OFS.STR<FT.DEBIT.CURRENCY> = SET.CCY
+    FINAL.REPAY.AMT = FT.AMT
+    TOT.BILL.AMT = TOT.BILL.AMT - FT.AMT
+*** Amount reduced from the from the total due
+    RETURN
+
+*************
+FT.ROUND.AMT:
+*************
+
+    CURR.ID = INPUT.CCY
+    AMOUNT = INPUT.AMT
+    CAL<1>='2'
+    CUSTOMER.ID =''
+
+    CALL EB.ROUND.AMOUNT(CURR.ID,AMOUNT,CAL,CUSTOMER.ID)
+    INPUT.AMT = AMOUNT
+
+    RETURN
+
+*************
+PAL.EXC.RATE:
+*************
+
+    CALL F.READ(FN.CURR,SET.CCY,R.CCY,F.CURR,R.ER)
+    TARGET.PRICE = R.CCY<EB.CUR.CURRENCY.MARKET>
+    LOCATE '1' IN TARGET.PRICE<1,1> SETTING POS THEN
+        EXCHRATE = R.CCY<EB.CUR.SELL.RATE,POS>
+    END
+    IF SET.CCY NE 'JOD' THEN
+        IF EXCHRATE GE '1' THEN
+            SET.LCCY.AMT = AC.BAL / EXCHRATE
+        END ELSE
+            SET.LCCY.AMT = AC.BAL * EXCHRATE
+        END
+
+        CCY.MKT ='1';
+        BUY.CCY = LOAN.CCY;
+        BUY.AMT ='';
+        SELL.CCY = 'JOD';
+        SELL.AMT = SET.LCCY.AMT;
+        BASE.CCY ='';
+        EXCHRATE ='';
+        DIFFERENCE ='';
+        LCY.AMT ='';
+        RET.CODE ='';
+
+        CALL EXCHRATE(CCY.MKT,BUY.CCY,BUY.AMT,SELL.CCY,SELL.AMT,BASE.CCY,EXCHRATE,DIFFERENCE,LCY.AMT,RET.CODE)
+
+    END ELSE
+*** Settlement currency is JOD then
+        CALL F.READ(FN.CURR,LOAN.CCY,R.CCY,F.CURR,R.ER)
+        TARGET.PRICE = R.CCY<EB.CUR.CURRENCY.MARKET>
+        LOCATE '1' IN TARGET.PRICE<1,1> SETTING POS THEN
+            EXCHRATE = R.CCY<EB.CUR.SELL.RATE,POS>
+        END
+
+        IF EXCHRATE GE '1' THEN
+            SET.LCCY.AMT = AC.BAL * EXCHRATE
+        END ELSE
+            SET.LCCY.AMT = AC.BAL / EXCHRATE
+        END
+        BUY.AMT = SET.LCCY.AMT
+        SELL.CCY = 'JOD';
+***SET.LCCY.AMT = AC.BAL
+    END
+
+*   Buy amount is express the value of loan account
+
+*    IF BUY.AMT LE BILL.AMT THEN
+    IF BUY.AMT LE TOT.BILL.AMT THEN
+        CAL<2>='D'
+        INPUT.AMT = AC.BAL
+        INPUT.CCY = SET.CCY
+        GOSUB FT.ROUND.AMT
+        AC.BAL = INPUT.AMT
+        FT.OFS.STR = ''
+        FT.OFS.STR<FT.TRANSACTION.TYPE> = TAXN.TYPE
+        FT.OFS.STR<FT.DEBIT.ACCT.NO> = DB.AC.ID
+        FT.OFS.STR<FT.DEBIT.AMOUNT> = AC.BAL
+        FT.OFS.STR<FT.CREDIT.ACCT.NO> = CR.AC.ID
+        FT.OFS.STR<FT.DEBIT.CURRENCY> = SET.CCY
+        FT.OFS.STR<FT.CREDIT.CURRENCY> = LOAN.CCY
+        FINAL.REPAY.AMT = BUY.AMT
+        TOT.BILL.AMT = TOT.BILL.AMT - BUY.AMT
+* Settlement account not having sufficent balance
+    END ELSE
+* If settlement account having sufficent balance then go for the due balance
+        CAL<2>='U'
+        INPUT.AMT = TOT.BILL.AMT
+        INPUT.CCY = LOAN.CCY
+        GOSUB FT.ROUND.AMT
+        TOT.BILL.AMT = INPUT.AMT
+        FINAL.REPAY.AMT = TOT.BILL.AMT
+*TOT.BILL.AMT - BILL.AMT
+        FT.OFS.STR = ''
+        FT.OFS.STR<FT.TRANSACTION.TYPE> = TAXN.TYPE
+        FT.OFS.STR<FT.DEBIT.ACCT.NO> = DB.AC.ID
+        FT.OFS.STR<FT.CREDIT.AMOUNT> = TOT.BILL.AMT
+        FT.OFS.STR<FT.CREDIT.ACCT.NO> = CR.AC.ID
+        FT.OFS.STR<FT.DEBIT.CURRENCY> = SET.CCY
+        FT.OFS.STR<FT.CREDIT.CURRENCY> = LOAN.CCY
+        TOT.BILL.AMT = '0'
+    END
+
+    RETURN
+
+**********
+CREATE.FT:
+**********
+
+    FUNCT = "I"
+    NO.AUTH ='0'
+    RESPONSE = ''
+    GTS.CONTROL = '1'         ;* Put errors in HLD
+    NO.OF.AUTH = '0'
+    TXN.ID = ''
+    IN.REC = ''
+    OFS.RECORD = ''
+
+    CALL OFS.BUILD.RECORD(APP.NAME, FUNCT, "PROCESS", VERSION.NAME, GTS.CONTROL, NO.OF.AUTH, TXN.ID, FT.OFS.STR, OFS.RECORD)
+*
+    CALL.INFO = ""
+    CALL.INFO<1> = OFS.SRC
+    CALL.INFO<4> = "HLD"      ;* Processing should put errors in HLD
+
+    CALL OFS.CALL.BULK.MANAGER(CALL.INFO, OFS.RECORD, OFS.RESPONSE, '')
+    GOSUB LOG.MESSAGE
+    FT.OFS.STR = ''
+*
+    RETURN
+*
+************
+LOG.MESSAGE:
+*************
+* Status of FT processed for past due bills and penalty accounts are logged here
+
+    STATUS.MSG = FIELD(OFS.RESPONSE,',',1)
+    STATUS.MSG = FIELD(STATUS.MSG,'/',3)
+    T24.RESP.MSG = FIELD(OFS.RESPONSE,',',2)
+    T24.REF.ID = FIELD(OFS.RESPONSE,'/',1)
+    IF STATUS.MSG EQ 1 AND T24.REF.ID[2,3] EQ 'req' THEN
+        LOG.VAL = T24.REF.ID:',':COMP.ID:',':DB.AC.ID:',':FINAL.REPAY.AMT:',':CR.AC.ID:',':PYMT.TYPE:',SUCCESS'
+    END ELSE
+        LOG.VAL = T24.REF.ID:',':COMP.ID:',':DB.AC.ID:',':FINAL.REPAY.AMT:',':CR.AC.ID:',':PYMT.TYPE:',FAILURE'
+    END
+
+    WRITESEQF LOG.VAL APPEND TO F.TEMP.DIR ELSE
+        PRINT " Invalid path to write "
+    END
+*
+    RETURN
+END

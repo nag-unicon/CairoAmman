@@ -1,0 +1,24 @@
+    SUBROUTINE CAB.AA.PENDING.CASHPOOL.REVERSE.SELECT
+
+* Desc   - Multithread routine developed to reverse the cashpool automatically during COB.
+* Author - BalaGnanaPandian
+* ITSS Development
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_GTS.COMMON
+    $INSERT I_BATCH.FILES
+    $INSERT I_CAB.AA.PENDING.CASHPOOL.REVERSE.COMMON
+
+
+
+    SEL.LIST = ''
+    SEL.CMD = 'SELECT ' : FN.AA.ARR : ' WITH ARR.STATUS EQ PENDING.CLOSURE BY CO.CODE'
+    CALL EB.READLIST (SEL.CMD,SEL.LIST,'',NO.OF.REC,SEL.ERR)
+    IF SEL.LIST THEN
+        CALL BATCH.BUILD.LIST('',SEL.LIST)
+    END
+
+
+    RETURN
+END

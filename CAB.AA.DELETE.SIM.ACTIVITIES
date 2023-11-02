@@ -1,0 +1,147 @@
+    SUBROUTINE CAB.AA.DELETE.SIM.ACTIVITIES(ARRANGEMENT.ID)
+
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT CAB.BP I_CAB.AA.DELETE.SIM.ACTIVITIES.COMMON
+    $INSERT T24.BP I_F.AA.ARRANGEMENT.ACTIVITY
+    $INSERT T24.BP I_F.AA.ACTIVITY.HISTORY
+    $INSERT T24.BP I_F.AA.ARRANGEMENT
+    $INSERT T24.BP I_F.AA.ACCOUNT
+
+    GOSUB GET.REQUIRED.INFO
+
+    IF PROCESS.FLAG THEN
+        GOSUB PROCESS
+    END
+
+    RETURN
+
+GET.REQUIRED.INFO:
+
+    R.AA.ARRANGEMENT.SIM = ""
+    ERR.AA.ARRANGEMENT.SIM = ""
+
+    CALL F.READ(FN.AA.ARRANGEMENT.SIM, ARRANGEMENT.ID, R.AA.ARRANGEMENT.SIM, F.AA.ARRANGEMENT.SIM, ERR.AA.ARRANGEMENT.SIM)
+
+    PROCESS.FLAG = 0
+
+    IF R.AA.ARRANGEMENT.SIM<AA.ARR.START.DATE> LE SIM.ARC.EFF.DATE THEN
+        PROCESS.FLAG = 1
+    END
+
+
+    RETURN
+
+PROCESS:
+
+    R.AA.ARRANGEMENT = ""
+    ERR.AA.ARRANGEMENT = ""
+
+    CALL F.READ(FN.AA.ARRANGEMENT, ARRANGEMENT.ID, R.AA.ARRANGEMENT, F.AA.ARRANGEMENT, ERR.AA.ARRANGEMENT)
+
+    IF NOT(R.AA.ARRANGEMENT) THEN
+
+        R.AA.ACTIVITY.HISTORY.SIM = ""
+        ERR.AA.ACTIVITY.HISTORY.SIM = ""
+
+        CALL F.READ(FN.AA.ACTIVITY.HISTORY.SIM, ARRANGEMENT.ID, R.AA.ACTIVITY.HISTORY.SIM, F.AA.ACTIVITY.HISTORY.SIM, ERR.AA.ACTIVITY.HISTORY.SIM)
+
+        ACTIVITY.REF.LIST = R.AA.ACTIVITY.HISTORY.SIM<AA.AH.ACTIVITY.REF>
+        CHANGE SM TO VM IN ACTIVITY.REF.LIST
+
+        ActivityCnt = DCOUNT(ACTIVITY.REF.LIST, VM)
+        RecCnt =1
+        LOOP
+        WHILE RecCnt LE ActivityCnt
+
+            R.AA.SIMULATION.CAPTURE = ""
+            ERR.AA.SIMULATION.CAPTURE = ""
+
+            CAPTURE.ID = ACTIVITY.REF.LIST<1,RecCnt>
+            CALL F.READ(FN.AA.SIMULATION.CAPTURE, CAPTURE.ID, R.AA.ARRANGEMENT.ACTIVITY, F.AA.SIMULATION.CAPTURE, ERR.AA.SIMULATION.CAPTURE)
+
+            IF CAPTURE.ID EQ R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.MASTER.AAA> THEN
+
+                R.APDS = '' ; Y.RD.ERR = '' ; Y.NOT.PROCESS = 0
+                CALL F.READ(FN.APDS,CAPTURE.ID,R.APDS,F.APDS,Y.RD.ERR)
+                IF R.APDS NE '' THEN
+                    Y.ACC.POS = ''
+                    LOCATE 'ACCOUNT' IN R.APDS<1,1> SETTING Y.ACC.POS ELSE Y.ACC.POS = ''
+                    IF Y.ACC.POS NE '' THEN
+                        Y.SIM.ACC.ID = '' ; Y.SIM.ACC.ID = FIELD(R.APDS<2,Y.ACC.POS,1>,' ',3)
+                        R.SIM.ACC = '' ; Y.RD.ERR = ''
+                        CALL F.READ(FN.SIM.ACC,Y.SIM.ACC.ID,R.SIM.ACC,F.SIM.ACC,Y.RD.ERR)
+                        IF R.SIM.ACC NE '' THEN
+                            Y.SET.ACC = '' ; Y.DRA.ACC = ''
+                            IF R.SIM.ACC<AA.AC.LOCAL.REF,10> NE '' THEN
+                                Y.SET.ACC = R.SIM.ACC<AA.AC.LOCAL.REF,10>
+                                R.SET.ACC = '' ; Y.RD.ERR = ''
+                                CALL F.READ(FN.ACC,Y.SET.ACC,R.SET.ACC,F.ACC,Y.RD.ERR)
+                                IF R.SET.ACC = '' THEN Y.NOT.PROCESS = 1
+                            END
+                            IF R.SIM.ACC<AA.AC.LOCAL.REF,3> NE '' THEN
+                                Y.DRA.ACC = R.SIM.ACC<AA.AC.LOCAL.REF,3>
+                                R.DRA.ACC = '' ; Y.RD.ERR = ''
+                                CALL F.READ(FN.ACC,Y.DRA.ACC,R.DRA.ACC,F.ACC,Y.RD.ERR)
+                                IF R.DRA.ACC = '' THEN Y.NOT.PROCESS = 1
+                            END
+                        END
+
+                    END
+                END
+
+                IF Y.NOT.PROCESS THEN
+                    RecCnt += 1
+                    CONTINUE
+                END
+
+                ARR.COMPANY = R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.CO.CODE>
+                RUNNER.ID = R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.SIM.RUN.REF>
+
+                APP.NAME = "AA.SIMULATION.CAPTURE"
+                TRANSACTION.ID = CAPTURE.ID
+                GOSUB PROCESS.OFS.MESSAGE
+
+                APP.NAME = "AA.SIMULATION.RUNNER"
+                TRANSACTION.ID = RUNNER.ID
+                GOSUB PROCESS.OFS.MESSAGE
+
+*  GOSUB DELETE.SIMULATION.RUNNER
+            END
+
+            RecCnt + = 1
+        REPEAT
+
+    END
+
+    RETURN
+
+PROCESS.OFS.MESSAGE:
+
+    OFS.RECORD = ''
+    OFSVERSION = APP.NAME:","
+    NO.OF.AUTH = "0"
+    GTS.MODE = 1
+    FUNCT = "R"
+
+    SAVE.ID.COMPANY = ID.COMPANY
+    ID.COMPANY = ARR.COMPANY
+
+    CALL OFS.BUILD.RECORD(APP.NAME, FUNCT, "PROCESS", OFSVERSION, GTS.MODE, NO.OF.AUTH, TRANSACTION.ID, R.AA.ARRANGEMENT.ACTIVITY, OFS.RECORD)
+
+    theResponse    = ""
+    txnCommitted   = ""
+    options        = ""
+    options<1>     = "AA.ONLINE"
+
+    CALL OFS.CALL.BULK.MANAGER(options,OFS.RECORD,theResponse,txnCommitted)
+
+    RETURN
+
+DELETE.SIMULATION.RUNNER:
+
+    CALL F.DELETE(FN.AA.SIMULATION.RUNNER, RUNNER.ID)
+
+    RETURN
+
+END

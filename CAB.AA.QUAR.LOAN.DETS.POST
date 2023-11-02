@@ -1,0 +1,39 @@
+    SUBROUTINE CAB.AA.QUAR.LOAN.DETS.POST
+************************************************************
+* Quartely report of Opic developement
+* Consolidate routine
+*
+************************************************************
+
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+
+    FN.FLAT.FILE = 'F.CAB.AA.QUART.ACCT.DETAILS'
+    F.FLAT.FILE = ''
+    CALL OPF(FN.FLAT.FILE,F.FLAT.FILE)
+
+    RET.ARRAY = 'Account Number,Customer Name,Branch Name,Currency,principal outstanding as of the end of the previous quarter,'
+    RET.ARRAY := 'Disbursement activities during the current quarter,Cancellation,repayment activities during this quarter,'
+    RET.ARRAY := 'principal outstanding as of the end of the current quarter,amount of unpaid scheduled payments for each loan as of the end of the previous quarter,'
+    RET.ARRAY := 'amount of unpaid scheduled payments for each loan as of the end of the current quarter,recovered amounts of the claimed loans,'
+    RET.ARRAY := 'undrawn commitment (Approved loan amount -disbursed amount),Legal Loan'
+
+    SEL.CMD = 'SELECT ' : FN.FLAT.FILE
+    SEL.LIST = '';
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',NO.OF.REC,ERR)
+
+    LOOP
+        REMOVE REC.ID FROM SEL.LIST SETTING POS
+    WHILE REC.ID : POS
+        CALL F.READ(FN.FLAT.FILE,REC.ID,R.FLAT.FILE,F.FLAT.FILE,FLT.ERR)
+        CONVERT '*' TO ',' IN R.FLAT.FILE
+        RET.ARRAY <-1> = R.FLAT.FILE
+    REPEAT
+
+    OPEN '','&SAVEDLISTS&' TO F$SAVEDLISTS ELSE
+        ERR.OPEN ='EB.RTN.CANT.OPEN.&SAVEDLISTS'
+    END
+    WRITE RET.ARRAY TO F$SAVEDLISTS,'Quartely_details_':TODAY:'.csv'
+    RETURN
+END

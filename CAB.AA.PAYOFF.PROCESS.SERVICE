@@ -1,0 +1,411 @@
+*-----------------------------------------------------------------------------
+* <Rating>-58</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AA.PAYOFF.PROCESS.SERVICE(ARR.ID)
+*----------------------------------------------------------------------------------------------------------------
+*
+* Description           : Batch routine to update CAB.AA.PAYOFF.PROCESS.SERVICE
+*
+* Developed By          : ITSS - Nabeel
+*
+* Development Reference : Automatic payoff for loan
+*
+* Attached To           : Attached To the Batch Job BNK/CAB.AA.PAYOFF.PROCESS.SERVICE
+*
+* Attached As           : Batch JOB
+*-----------------------------------------------------------------------------------------------------------------
+* Input Parameter:
+* ---------------*
+* Argument#1 : ARR.ID
+*
+*-----------------*
+* Output Parameter:
+* ----------------*
+* Argument#2 : N/A
+*-----------------------------------------------------------------------------------------------------------------
+*  M O D I F I C A T I O N S
+* ***************************
+*01-04-2017 Mudassir
+* New Field(L.BLUE.RING) included for LO purpose if the field value appear as Y then it'll zero authoriser or else normal scenairo
+*13-03-2018 Mudassir
+* Remove CAB.AA.CLEAR.PAYBILL to stop LENDING-ISSUE-PAYOFF REVERSE
+* Remove UNC CALL ROUTINE CAB.CLEAR.UNC since system will calculate auto payoff
+*-----------------------------------------------------------------------------------------------------------------
+* Defect Reference       Modified By                    Date of Change        Change Details
+*-----------------------------------------------------------------------------------------------------------------
+* 16-08-2015 - Before and After payoff arrangement account should have zero balance in UNC.
+* 09-10-2018 - Changes made to generate @ID for AC.LOCKED.EVENTS dynamically and to avoid locking for the same arrangement, multiple times
+*
+*-----------------------------------------------------------------------------------------------------------------
+* Include files
+*-----------------------------------------------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.FUNDS.TRANSFER
+    $INSERT I_F.AA.BILL.DETAILS
+    $INSERT I_F.AA.ARRANGEMENT
+    $INSERT I_F.AA.CHARGE
+    $INSERT I_F.AA.ACCOUNT
+    $INSERT I_F.AA.ACCOUNT.DETAILS
+    $INSERT I_F.AC.LOCKED.EVENTS
+    $INSERT CAB.BP I_CAB.AA.PAYOFF.PROCESS.SERVICE.COMMON
+    $INSERT T24.BP I_F.DATES
+    PRINT "ARR.ID = " : ARR.ID
+    GOSUB INITIALISE
+
+    GOSUB GET.REQUIRED.INFO
+    GOSUB GET.SETTLEMENT.ACCOUNT
+    GOSUB PROCESS
+
+    ID.COMPANY = SAVE.ID.COMPANY
+
+    RETURN
+
+
+INITIALISE:
+    FN.CONCAT = 'F.CAB.AA.CONCAT.FILE'
+    F.CONCAT = ''
+    CALL OPF(FN.CONCAT,F.CONCAT)
+    CON.REC = ''
+FN.CHG.AA = 'F.AA.ARR.CHARGE'
+F.CHG.AA = ''
+CALL OPF(FN.CHG.AA,F.CHG.AA)
+    RETURN
+
+GET.REQUIRED.INFO:
+
+    ARR.ID.OLD      = ARR.ID
+    PAYOFF.EFF.DATE = FIELD(ARR.ID,'-',2)
+    ARR.ID          = FIELD(ARR.ID,'-',1)
+    Y.TODAY         = R.DATES(EB.DAT.TODAY)
+    EFFECTIVE.DATE  = TODAY
+    R.ARRANGEMENT   = ""
+    ARR.ERROR       = ""
+
+    CALL AA.GET.ARRANGEMENT(ARR.ID, R.ARRANGEMENT, ARR.ERROR)
+
+    IF R.ARRANGEMENT<AA.ARR.ARR.STATUS> EQ "CURRENT" OR R.ARRANGEMENT<AA.ARR.ARR.STATUS> EQ "EXPIRED" THEN
+
+        CREDIT.CCY          = R.ARRANGEMENT<AA.ARR.CURRENCY>
+        ARRANGEMENT.COMPANY = R.ARRANGEMENT<AA.ARR.CO.CODE>
+
+    END ELSE
+
+        CALL F.DELETE(FN.CAB.PAYOFF, ARR.ID)      ;* Delete the concat file if loan is already settled/paid off.
+        GOSUB PROGRAM.END
+    END
+
+    SAVE.ID.COMPANY = ID.COMPANY
+    CALL LOAD.COMPANY(R.ARRANGEMENT<AA.ARR.CO.CODE>)
+
+    RETURN
+
+GET.SETTLEMENT.ACCOUNT:
+
+    PROP.CLASS     = 'CHARGE'
+    PROP.VAL       = 'PAYOFFFEE'
+    R.CHARGE.ARRAY = ''
+
+    GOSUB GET.ARRANGEMENT.CONDITION
+
+    R.CHARGE.ARRAY = RAISE(returnConditions)
+    CHG.SETT.AC    = R.CHARGE.ARRAY<AA.CHG.LOCAL.REF,SET.ACCT.POS>
+    Y.BR.STATUS    = R.CHARGE.ARRAY<AA.CHG.LOCAL.REF,Y.BR.POS>
+
+    IF CHG.SETT.AC EQ '' THEN
+
+        TEMP.DT = R.CHARGE.ARRAY<61>
+        CHG.ID = ARR.ID:'-PAYOFFFEE-':TEMP.DT
+
+
+        AA.CHG.REC = ''
+
+        CHG.ERR = ''
+        CALL F.READ(FN.CHG.AA,CHG.ID,AA.CHG.REC,F.CHG.AA,CHG.ERR)
+
+        IF CHG.ERR THEN
+            RETURN
+        END
+
+        CHG.SETT.AC = AA.CHG.REC<AA.CHG.LOCAL.REF,10>
+
+
+    END
+    IF Y.BR.STATUS EQ '' THEN
+        Y.BR.STATUS = AA.CHG.REC<AA.CHG.LOCAL.REF,12>
+
+    END
+
+
+    IF CHG.SETT.AC THEN
+        SETTLEMENT.ACCOUNT = CHG.SETT.AC
+
+    END ELSE
+
+        PROP.CLASS      = 'ACCOUNT'
+        PROP.VAL        = ''
+        R.ACCOUNT.ARRAY = ''
+
+        GOSUB GET.ARRANGEMENT.CONDITION
+
+        R.ACCOUNT.ARRAY = RAISE(returnConditions)
+        SETTLEMENT.ACCOUNT      = R.ACCOUNT.ARRAY<AA.AC.LOCAL.REF,SET.AC.POS>
+
+    END
+
+    IF SETTLEMENT.ACCOUNT THEN
+        CREDIT.AC = SETTLEMENT.ACCOUNT
+    END
+
+    PRINT "CREDIT.AC = " : CREDIT.AC
+
+    RETURN
+
+GET.ARRANGEMENT.CONDITION:
+
+    RET.ARR.ID       = ''
+    returnConditions = ''
+    ARR.ERROR        = ''
+
+    CALL AA.GET.ARRANGEMENT.CONDITIONS(ARR.ID, PROP.CLASS, PROP.VAL, EFFECTIVE.DATE, RET.ARR.ID, returnConditions, ARR.ERROR)
+
+    RETURN
+
+PROCESS:
+
+    IF PAYOFF.EFF.DATE LE Y.TODAY THEN
+
+        LockedEventID = "ACLK":CREDIT.AC
+        CALL F.READ(FN.AC.LOCKED.EVENTS, LockedEventID, R.AC.LOCK, F.AC.LOCKED.EVENTS,EVENT.ERR)
+        IF R.AC.LOCK NE '' THEN
+            GOSUB PROCESS.AC.LOCKED.EVENTS
+            RETURN
+        END
+        GOSUB AUTO.PAYOFF.PROCESS       ;* Do the Auto auto payoff process.
+
+    END ELSE
+        LockedEventID = "ACLK":CREDIT.AC
+
+        GOSUB GET.PAYOFF.BILL ;* Get the PAYOFF bill amount to Lock the settlement account with same amount
+
+
+        CALL F.READ(FN.AC.LOCKED.EVENTS, LockedEventID, R.AC.LOCK, F.AC.LOCKED.EVENTS,EVENT.ERR)
+
+
+
+
+        IF R.AC.LOCK EQ '' AND CREDIT.AMOUNT NE '' THEN
+            GOSUB PROCESS.AC.LOCKED.EVENTS
+        END
+
+    END
+
+    RETURN
+
+AUTO.PAYOFF.PROCESS:
+
+    BEGIN CASE
+
+    CASE CHG.SETT.AC AND CHG.SETT.AC NE SETTLEMENT.ACCOUNT<1,1>       ;* Get the settlement account from Payofffee property
+        DEBIT.AC = CHG.SETT.AC
+
+    CASE SETTLEMENT.ACCOUNT<1,1>        ;* Get the settlement account from Account property
+        DEBIT.AC = SETTLEMENT.ACCOUNT<1,1>
+
+    END CASE
+
+    GOSUB GET.PAYOFF.BILL     ;*** Need to check the current payoff bill
+
+
+    IF DEBIT.AC AND CREDIT.AMOUNT THEN  ;* Process PAYOFF only if there is a valid PAYOFF bill
+
+        GOSUB PROCESS.OFS.MESSAGE
+        GOSUB DO.WRITE        ;* Update the concat file to maintain the processed FT details.
+
+    END
+
+    RETURN
+
+GET.PAYOFF.BILL:
+
+    PROCESS.TYPE = 'INITIALISE'
+    R.AA.ACCOUNT.DETAILS = ''
+
+    CALL AA.PROCESS.ACCOUNT.DETAILS(ARR.ID, PROCESS.TYPE, UPDATE.TYPE, R.AA.ACCOUNT.DETAILS, RET.ERROR)
+
+    BILL.TYPE = "PAYOFF"      ;* Get only payment related bills
+    PAYMENT.METHOD = "INFO"   ;* Get only payments which needs to be made due and not capitalise
+    BILL.STATUS = "ISSUED"
+
+    BILL.REFERENCE = ""
+
+    CALL AA.GET.BILL(ARR.ID, "", "", "", BILL.TYPE, PAYMENT.METHOD, BILL.STATUS, "", "", "", "", BILL.REFERENCE, RET.ERROR)
+
+    CREDIT.AMOUNT = ''
+    BILL.DETAILS = ''
+    RET.ERROR = ''
+
+
+    IF BILL.REFERENCE THEN
+
+        CALL AA.GET.BILL.DETAILS(ARR.ID, BILL.REFERENCE, BILL.DETAILS, RET.ERROR)
+        CREDIT.AMOUNT = BILL.DETAILS<AA.BD.OR.TOTAL.AMOUNT>
+
+    END
+
+    RETURN
+
+PROCESS.OFS.MESSAGE:
+
+    APP.NAME     = 'FUNDS.TRANSFER'
+    PROCESS      = 'PROCESS'
+    OFS.VERSION  = 'FUNDS.TRANSFER,'
+    OFS.FUNCTION = 'I'
+    GTS.MODE     = ''
+    NO.OF.AUTH   = '1'
+    TRANSACTION.ID = ''
+    OFS.MESSAGE    = ''
+    OFS.SOURCE.ID  = 'AA.ONLINE'
+
+    CALL FT.GENERATE.ID("USR",TRANSACTION.ID)
+
+    FT.OFS.ARRAY = ""
+
+    FT.OFS.ARRAY<FT.CREDIT.CURRENCY>   = CREDIT.CCY
+    FT.OFS.ARRAY<FT.CREDIT.AMOUNT>     = CREDIT.AMOUNT
+    FT.OFS.ARRAY<FT.DEBIT.ACCT.NO>     = DEBIT.AC
+    FT.OFS.ARRAY<FT.TRANSACTION.TYPE>  = 'ACPO'
+    FT.OFS.ARRAY<FT.CREDIT.ACCT.NO>    = R.ARRANGEMENT<AA.ARR.LINKED.APPL.ID,1> ;* CREDIT.AC
+    FT.OFS.ARRAY<FT.CREDIT.VALUE.DATE> = TODAY
+    FT.OFS.ARRAY<FT.DEBIT.VALUE.DATE>  = TODAY
+    FT.OFS.ARRAY<FT.ORDERING.BANK,1>   = "AA"
+
+
+    IF Y.BR.STATUS EQ 'Y' THEN
+        Y.BR.STATUS = 'REGULAR'
+    END
+
+    IF Y.BR.STATUS EQ 'REGULAR' OR Y.BR.STATUS EQ 'SPECIAL' THEN      ;* Through Loan Origination process
+
+        NO.OF.AUTH = '0'
+        CALL OFS.BUILD.RECORD(APP.NAME,OFS.FUNCTION,PROCESS, OFS.VERSION, GTS.MODE, NO.OF.AUTH, TRANSACTION.ID, FT.OFS.ARRAY, OFS.MESSAGE)
+
+    END ELSE
+
+        CALL OFS.BUILD.RECORD(APP.NAME,OFS.FUNCTION,PROCESS, OFS.VERSION, GTS.MODE, NO.OF.AUTH, TRANSACTION.ID, FT.OFS.ARRAY, OFS.MESSAGE)
+
+    END
+
+    THE.RESPONSE  = ""
+    TXN.COMMITTED = ""
+    OPTIONS       = ''
+    OPTIONS<1>    = "AA.ONLINE"
+
+
+
+    CALL OFS.CALL.BULK.MANAGER(OPTIONS, OFS.MESSAGE, THE.RESPONSE, TXN.COMMITTED)
+
+
+    RETURN
+
+PROCESS.AC.LOCKED.EVENTS:
+
+    APP.NAME      = 'AC.LOCKED.EVENTS'
+    OFS.VERSION   = APP.NAME:',INP'
+    NO.OF.AUTH    = 0
+    OFS.SOURCE.ID = 'AA.ONLINE'
+    LockedEventID = ''
+    OFSMSG.ID     = ''
+    Y.RECORD      = ""
+
+    IF CHG.SETT.AC THEN
+        AC.SETT.AC = CHG.SETT.AC
+    END ELSE
+        AC.SETT.AC=SETTLEMENT.ACCOUNT<1,1>
+    END
+
+
+    IF PAYOFF.EFF.DATE GT TODAY THEN
+        GOSUB CHECK.CONCAT.FILE
+        IF FLAG EQ '1' THEN
+            FUNCT         = 'I'
+            Y.RECORD<AC.LCK.ACCOUNT.NUMBER> = AC.SETT.AC
+            Y.RECORD<AC.LCK.DESCRIPTION>    = 'Future payoff'
+            Y.RECORD<AC.LCK.FROM.DATE>      = TODAY
+            NEW.DT = TODAY
+            CALL CDT ('',NEW.DT,'+2W')
+            Y.RECORD<AC.LCK.TO.DATE> = NEW.DT
+            Y.RECORD<AC.LCK.LOCKED.AMOUNT>  = CREDIT.AMOUNT
+
+            CALL OFS.BUILD.RECORD(APP.NAME, FUNCT, "PROCESS", OFS.VERSION, "", NO.OF.AUTH, LockedEventID, Y.RECORD, OFS.RECORD)
+
+        END
+    END
+
+
+
+    theResponse = ""
+    txnCommitted = ""
+    options = ''
+    options<1> = "AA.ONLINE"
+
+
+    CALL OFS.CALL.BULK.MANAGER(options,OFS.RECORD,theResponse,txnCommitted)
+
+
+
+
+    RETURN
+
+CHECK.CONCAT.FILE:
+    FLAG = 0
+    CON.ERR = ''
+    AC.ID=SETTLEMENT.ACCOUNT
+
+    PRINT "ARR.ID=" : ARR.ID
+    CALL F.READ(FN.CONCAT,AC.ID,CON.REC,F.CONCAT,CON.ERR)
+    IF CON.ERR THEN
+        CON.REC<-1> = ARR.ID
+        WRITE CON.REC TO F.CONCAT, AC.ID
+        FLAG = 1
+    END ELSE
+        LOCATE ARR.ID IN CON.REC<1> SETTING POS ELSE
+            CON.REC<-1> = ARR.ID
+            WRITE CON.REC TO F.CONCAT, AC.ID
+            FLAG = 1
+
+        END
+    END
+
+    RETURN
+
+DO.WRITE:
+
+    R.CAB.AUTO.PAYOFF.DETAILS = ''
+    CALL F.READ(FN.CAB.AUTO.PAYOFF.DETAILS,TODAY,R.CAB.AUTO.PAYOFF.DETAILS,F.CAB.AUTO.PAYOFF.DETAILS,CON.ERR)
+
+    FND.POS = ''
+    PROCESS.DATE = TODAY
+
+    R.CAB.AUTO.PAYOFF.DETAILS<-1> = ARR.ID.OLD :"-":TRANSACTION.ID:"-":CREDIT.AMOUNT:"-":R.ARRANGEMENT<AA.ARR.CO.CODE>
+
+
+
+    CALL F.WRITE(FN.CAB.AUTO.PAYOFF.DETAILS,PROCESS.DATE,R.CAB.AUTO.PAYOFF.DETAILS)
+
+    CALL F.DELETE(FN.CAB.PAYOFF,ARR.ID.OLD)
+
+
+    IF Y.BR.STATUS NE '' THEN
+        Y.TRANS.ID<-1> = TRANSACTION.ID
+        CALL F.WRITE(FN.CAB.LOS.PAYOFF,ARR.ID.OLD,Y.TRANS.ID)
+    END
+
+    RETURN
+
+PROGRAM.END:
+
+    RETURN TO PROGRAM.END
+
+END

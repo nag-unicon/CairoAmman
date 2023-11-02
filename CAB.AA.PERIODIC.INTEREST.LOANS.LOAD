@@ -1,0 +1,58 @@
+    SUBROUTINE CAB.AA.PERIODIC.INTEREST.LOANS.LOAD
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan
+* Development Id   : AA Periodic Interest Loan details
+* Date             : 31st May 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Batch Routine
+* Attached to      : BATCH>BNK/CAB.AA.PERIODIC.INTEREST.LOANS
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This routine is used to display the AA Periodic Interest Loan details
+*                  :
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    :
+* ARGS -(Output)   :
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+*----------------------------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT TT.BP I_CAB.AA.PERIODIC.INTEREST.LOANS.COMMON
+
+    GOSUB OPEN.FILES
+
+    RETURN
+
+OPEN.FILES:
+
+    FN.AA.ARRANGEMENT = 'F.AA.ARRANGEMENT'
+    F.AA.ARRANGEMENT = ''
+    CALL OPF(FN.AA.ARRANGEMENT,F.AA.ARRANGEMENT)
+
+    FN.ACCOUNT = "F.ACCOUNT"
+    F.ACCOUNT = ""
+    CALL OPF(FN.ACCOUNT,F.ACCOUNT)
+
+    FN.CUSTOMER ="F.CUSTOMER"
+    F.CUSTOMER = ""
+    CALL OPF(FN.CUSTOMER,F.CUSTOMER)
+
+    FN.COMPANY = "F.COMPANY"
+    F.COMPANY = ""
+    CALL OPF(FN.COMPANY,F.COMPANY)
+
+    FN.CAB.AA.LOAN.INTEREST.DETAILS = "F.CAB.AA.LOAN.INTEREST.DETAILS"
+    F.CAB.AA.LOAN.INTEREST.DETAILS = ""
+    CALL OPF(FN.CAB.AA.LOAN.INTEREST.DETAILS, F.CAB.AA.LOAN.INTEREST.DETAILS)
+
+    RETURN
+
+END

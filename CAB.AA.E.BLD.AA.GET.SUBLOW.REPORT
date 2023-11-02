@@ -1,0 +1,161 @@
+    SUBROUTINE CAB.AA.E.BLD.AA.GET.SUBLOW.REPORT
+*------------------------------------------------------------------------------------------*
+* Date - 24/06/2014
+* Desc - This Build routine is used to send the Settlement ids to EB.COTNRACT.BALANCES file
+*        to know the balances of UNCACCOUNT and SUBSIDY payment types
+* Attached Enquiry - CAB.HOUSEHOLD.BALANCES
+*------------------------------------------------------------------------------------------*
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT
+    $INCLUDE T24.BP I_ENQUIRY.COMMON
+    $INCLUDE T24.BP I_F.EB.CONTRACT.BALANCES
+
+    FN.AA.ARRANGEMENT = "F.AA.ARRANGEMENT"
+    F.AA.ARRANGEMENT  = ""
+    CALL OPF(FN.AA.ARRANGEMENT,F.AA.ARRANGEMENT)
+*
+    FN.AA.REPBP = 'AA.DUE.BP'
+    F.AA.REPBP =''
+
+    OPEN FN.AA.REPBP TO F.AA.REPBP ELSE
+        ETEXT = "CANNOT CREATE SEQUENTIAL FILE"
+        CRT ETEXT
+        RETURN
+    END
+
+    FN.EB.CONTRACT.BALANCES = "F.EB.CONTRACT.BALANCES"
+    F.EB.CONTRACT.BALANCES = ""
+    CALL OPF(FN.EB.CONTRACT.BALANCES,F.EB.CONTRACT.BALANCES)
+*
+    SEL.CMD = ""; SEL.LIST = "" ; SEL.CNT = ""; SEL.ERR = ""
+    ENQ.IDS = ""
+    R.AA.ARRANGEMENT = "" ; ARR.ERR = ""
+    R.CONTRACT.BALANCES = "" ; BAL.ERR = ""
+
+    SEL.CMD = "SELECT ": FN.AA.ARRANGEMENT :" WITH LINKED.APPL.ID NE '' AND WITH EVAL 'PRODUCT<1,1>' EQ 'HOUSE.LOAN.SUB.FL.LOW'"
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+    LOOP
+
+        REMOVE SEL.ID FROM SEL.LIST SETTING SEL.POS
+    WHILE SEL.ID:SEL.POS
+        CALL F.READ(FN.AA.ARRANGEMENT,SEL.ID,R.AA.ARRANGEMENT,F.AA.ARRANGEMENT,ARR.ERR)
+        AC.ID=R.AA.ARRANGEMENT<AA.ARR.LINKED.APPL.ID>
+        COMP= R.AA.ARRANGEMENT<AA.ARR.CO.CODE>
+        CALL LOAD.COMPANY(COMP)
+        CALL F.READ (FN.EB.CONTRACT.BALANCES,AC.ID,R.CONTRACT.BALANCES,F.EB.CONTRACT.BALANCES,BAL.ERR)
+        Y.CURR.ASSET.TYPE = R.CONTRACT.BALANCES<ECB.CURR.ASSET.TYPE>
+        Y.CR.MVMT = R.CONTRACT.BALANCES<ECB.CREDIT.MVMT>
+        Y.DR.MVMT = R.CONTRACT.BALANCES<ECB.DEBIT.MVMT>
+        Y.CURR.MAT.DATE = R.CONTRACT.BALANCES<ECB.MAT.DATE>
+        Y.CURR.OPEN.BAL = R.CONTRACT.BALANCES<ECB.OPEN.BALANCE>
+        CRT  Y.CURR.ASSET.TYPE
+
+        CONVERT VM TO FM IN Y.CURR.ASSET.TYPE
+        CONVERT VM TO FM IN Y.CR.MVMT
+        CONVERT VM TO FM IN Y.DR.MVMT
+        CONVERT VM TO FM IN Y.CURR.MAT.DATE
+        CONVERT VM TO FM IN Y.CURR.OPEN.BAL
+
+FN.POS =""
+        FINDSTR 'HOUSESUBLOW' IN Y.CURR.ASSET.TYPE SETTING FN.POS THEN
+            UN.CNT =  DCOUNT(Y.CURR.ASSET.TYPE,@FM)
+       
+                A.CR.MVMT =0
+                A.DR.MVMT =0
+                A.OPEN.BAL =0
+                A.CLOSE.BAL =0
+       UNC.POS = ''
+            FOR J = 1 TO UN.CNT
+                BAL.TYPE  = Y.CURR.ASSET.TYPE
+             IF AC.ID EQ '090005757885' THEN DEBUG
+
+                FINDSTR 'HOUSESUBLOW' IN Y.CURR.ASSET.TYPE SETTING UNC.POS THEN
+               * J =UNC.POS
+        
+                    YY.BAL.TYPE = 	Y.CURR.ASSET.TYPE<UNC.POS>
+                    YY.CR.MVMT = 	Y.CR.MVMT<UNC.POS>
+                    YY.DR.MVMT = 	Y.DR.MVMT<UNC.POS>
+                    YY.CURR.MAT.DATE = 	Y.CURR.MAT.DATE<UNC.POS>
+                    YY.CURR.OPEN.BAL = 	Y.CURR.OPEN.BAL<UNC.POS>
+                    IF YY.CURR.OPEN.BAL EQ '' THEN
+                        YY.CURR.OPEN.BAL = 0
+                    END
+                    IF YY.CR.MVMT EQ '' THEN
+                        YY.CR.MVMT = 0
+                    END
+                    IF YY.DR.MVMT EQ '' THEN
+                        YY.DR.MVMT = 0
+                    END
+                    A.CR.MVMT+=YY.CR.MVMT
+                    A.DR.MVMT+=YY.DR.MVMT
+                    A.OPEN.BAL+=YY.CURR.OPEN.BAL
+                    Y.CURRENCY = R.CONTRACT.BALANCES<ECB.CURRENCY>                  
+                        Y.BAL =  A.OPEN.BAL + A.CR.MVMT +A.DR.MVMT
+                   DEL Y.CURR.ASSET.TYPE<UNC.POS>
+                   DEL Y.CR.MVMT<UNC.POS>        
+                   DEL Y.DR.MVMT<UNC.POS>        
+                   DEL Y.CURR.MAT.DATE<UNC.POS>  
+                   DEL Y.CURR.OPEN.BAL<UNC.POS>  
+                   
+                END
+UNC.POS = ''
+            NEXT J
+              ENQ.IDS<-1> = SEL.ID:'*':AC.ID:'*':YY.BAL.TYPE:'*':COMP:'*':Y.CURRENCY:'*':A.OPEN.BAL:'*':A.CR.MVMT:'*':A.DR.MVMT:'*':Y.BAL  
+            UN.CNT = ""
+        END
+  	  FN.POS = ""
+  	  REPEAT
+
+    WRITE ENQ.IDS  TO F.AA.REPBP,"HouseLoan2.csv"
+
+    RETURN
+END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,160 @@
+    SUBROUTINE CAB.AA.PROSPECTIVE.REPORT(ARR.ID)
+*************************************************************************************
+*************************************************************************************
+*** CAB Jordan Future Due report
+*** For Salary system
+***
+***
+*************************************************************************************
+*************************************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT
+    $INCLUDE T24.BP I_F.AA.BILL.DETAILS
+    $INCLUDE T24.BP I_F.AA.ACCOUNT.DETAILS
+    $INCLUDE T24.BP I_F.AA.ACCOUNT
+    $INCLUDE T24.BP I_F.ALTERNATE.ACCOUNT
+    $INCLUDE T24.BP I_F.AC.CASH.POOL
+    $INCLUDE T24.BP I_F.ACCOUNT
+    $INCLUDE AN.BP I_CAB.SAL.COMMON
+    $INCLUDE AN.BP I_F.CAB.SALARY.REPORT.LIST
+
+
+    GOSUB INIT
+    GOSUB PROCESS
+
+    RETURN
+
+*****
+INIT:
+*****
+
+*** Assume that always account property name as account
+
+    BALANCE.TYPE = 'UNCACCOUNT'
+    REQUEST.DATE = TODAY
+    PROCESS.TYPE = 'INITIALISE'
+
+***    EMI.REPORT<-1> = "Settlement Account,Settlement Company,Settlement Currency,Bill Amount,Due Amount,Repaid Amount,Bill Due Date,Payment Type,Loan Account,Loan Currency,Branch,Transaction Type"
+
+    CALL AA.PROCESS.ACCOUNT.DETAILS(ARR.ID, PROCESS.TYPE, UPDATE.TYPE,R.AA.ACC.DET, RET.ACCT.ERROR)
+    CALL AA.GET.PROPERTY.RECORD('', ARR.ID, 'ACCOUNT', EFFECTIVE.DATE, 'ACCOUNT', '', R.ACCOUNT.RECORD, R.ERR)
+
+    CALL AA.GET.ARRANGEMENT(ARR.ID, R.ARRANGEMENT, ARR.ERROR)
+    ARR.FWD.CCY = R.ARRANGEMENT<AA.ARR.CURRENCY>
+    ARR.COMPANY.ID = R.ARRANGEMENT<AA.ARR.CO.CODE>
+    ARR.START.DATE = R.ARRANGEMENT<AA.ARR.START.DATE>
+    ARR.ACC.NUMBER = R.ARRANGEMENT<AA.ARR.LINKED.APPL.ID>
+
+    GOSUB DETERMINE.SETTLE.ACCOUNT
+
+    RETURN
+
+*************************
+DETERMINE.SETTLE.ACCOUNT:
+*************************
+
+*** 1st position Settlement Account took it from Arrangement Level
+    SETT.ACC = ''
+    SETT.ACC = R.ACCOUNT.RECORD<AA.AC.LOCAL.REF,SETT.POS,1>
+    R.SETTLEMENT.ACCOUNT=''
+    CALL F.READ(FN.SETT.ACC,SETT.ACC,R.SETTLEMENT.ACCOUNT,F.SETT.ACC,ERR.SETT.ACC)
+
+*** 2nd Level AC.CASH.POOL
+
+    IF R.SETTLEMENT.ACCOUNT EQ '' THEN
+        CALL F.READ(FN.AC.CASH.POOL,LOAN.ACC,R.AC.CASH.POOL,F.AC.CASH.POOL,REC.ERR)
+        SETT.ACC = R.AC.CASH.POOL<AC.CP.LINK.ACCT,1>
+        CALL F.READ(FN.SETT.ACC,SETT.ACC,R.SETTLEMENT.ACCOUNT,F.SETT.ACC,ERR.SETT.ACC)
+    END
+
+    SETTLEMENT.CCY = R.SETTLEMENT.ACCOUNT<AC.CURRENCY>
+    SETTLEMENT.COMPANY = R.SETTLEMENT.ACCOUNT<AC.CO.CODE>
+
+    RETURN
+
+
+********
+PROCESS:
+********
+
+    UNCAMT = ''
+    CALL AA.GET.ECB.BALANCE.AMOUNT(ARR.ACC.NUMBER, BALANCE.TYPE, REQUEST.DATE, BALANCE.AMOUNT,RET.ERROR)
+    IF BALANCE.AMOUNT THEN
+        UNCAMT = BALANCE.AMOUNT
+    END
+
+*** Get the UNCACCOUNT balance from the account as on todays date
+
+    DATE.RANGE<1> = START.DATE
+    DATE.RANGE<2> = END.DATE
+
+    CALL AA.SCHEDULE.PROJECTOR(ARR.ID, SIMULATION.REF, NO.RESET, DATE.RANGE, TOT.PAYMENT, SCH.DATES, PAY.TYPES, PAY.METHODS,SCH.TYPE.AMTS, SCH.PROPS, SCH.PROP.AMTS, DUE.OUT.AMT)
+
+    FUR.CNT = DCOUNT(TOT.PAYMENT,FM)
+    FOR CNT =1 TO FUR.CNT
+        IF PAY.METHODS<CNT,1,1> EQ 'DUE' THEN
+            ARR.TOT.PAYMENT = TOT.PAYMENT<CNT>
+            ARR.SCH.DATES = SCH.DATES<CNT>
+            ARR.PAY.TYPES = PAY.TYPES<CNT>
+            IF ARR.PAY.TYPES EQ 'SUBSIDY' THEN
+                CONTINUE
+            END
+            ARR.PAY.METHODS = PAY.METHODS<1,CNT>
+            ARR.SCH.TYPE.AMTS = SCH.TYPE.AMTS<1,CNT>
+            ARR.SCH.PROPS = SCH.PROPS<1,CNT>
+            ARR.SCH.PROP.AMTS = SCH.PROP.AMTS<1,CNT>
+            ARR.DUE.OUT.AMT = DUE.OUT.AMT<1,CNT>
+            LOCATE 'SUBSIDY' IN ARR.PAY.TYPES<1,1> SETTING SUBS.POS THEN
+                ARR.TOT.PAYMENT = TOT.PAYMENT<CNT>-SCH.TYPE.AMTS<1,SUBS.POS>
+                DEL ARR.PAY.TYPES<1,SUBS.POS>
+                DEL ARR.SCH.TYPE.AMTS<1,SUBS.POS>
+            END
+            IF ARR.TOT.PAYMENT NE 0 THEN
+                TUNCAMT = UNCAMT
+                PAIDUNCAMT = ARR.TOT.PAYMENT - TUNCAMT
+                IF PAIDUNCAMT GT '0' THEN
+                    GOSUB BUILD.RECORD.FUTURE
+                END
+            END
+        END
+
+    NEXT CNT
+
+    RETURN
+
+********************
+BUILD.RECORD.FUTURE:
+********************
+
+    CONVERT @SM TO '' IN ARR.PAY.TYPES
+    CONVERT @VM TO '' IN ARR.PAY.TYPES
+
+    FUR.ID =ARR.ID :'-': ARR.SCH.DATES :'-': ARR.PAY.TYPES
+    R.FUR.INT<AAA.SETT.ACC> = SETT.ACC
+    R.FUR.INT<AAA.SETT.COM> = SETTLEMENT.COMPANY
+    R.FUR.INT<AAA.SETT.CCY> = SETTLEMENT.CCY
+    R.FUR.INT<AAA.BILL.AMT> = ARR.TOT.PAYMENT
+    R.FUR.INT<AAA.DUE.AMT> = PAIDUNCAMT
+    R.FUR.INT<AAA.RPY.AMT> = UNCAMT
+    R.FUR.INT<AAA.BILL.DATE> = ARR.SCH.DATES
+    R.FUR.INT<AAA.PAY.TYPE> = ARR.PAY.TYPES
+    R.FUR.INT<AAA.LOAN.ACC> = ARR.ACC.NUMBER
+    R.FUR.INT<AAA.LOAN.CCY> = ARR.FWD.CCY
+    R.FUR.INT<AAA.LOAN.COM> = ARR.COMPANY.ID
+    R.FUR.INT<AAA.FT.TXN.TYPE> = "ACCR"
+
+*** Write into the disk
+    CRT "Processing : ": FUR.ID
+
+*** Write only when settlement account is present
+
+    IF SETT.ACC THEN
+        CALL F.READ(FN.SETT.ACC,SETT.ACC,R.SETT.ACC,F.SETT.ACC,ERR.ACC)
+        R.FUR.INT<AAA.SETT.ACC> = R.SETT.ACC<AC.ALT.ACCT.ID,1>
+        IF R.FUR.INT<AAA.SETT.ACC> NE '' THEN
+            CALL F.WRITE(FN.CAB.SAL,FUR.ID,R.FUR.INT)
+        END
+    END
+
+    RETURN

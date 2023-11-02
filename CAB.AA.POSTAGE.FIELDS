@@ -1,0 +1,61 @@
+*-----------------------------------------------------------------------------
+* <Rating>-24</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AA.POSTAGE.FIELDS
+*-------------------------------------------------------------------------------------------------------------------
+*<doc>
+* Template for field definitions routine CAB.INTERNAL.ACCT.FIELDS
+*
+* @author jaheerhussain@temenos.com
+* @stereotype fields template
+* @uses Table
+* @public Table Creation
+* @package infra.eb
+* </doc>
+*-------------------------------------------------------------------------------------------------------------------
+* Modification History :
+*
+* 22/07/09 - ODR-2010-XX-XXXX
+*            Field descriptions for the template CAB.INTERNAL.ACCT
+*-------------------------------------------------------------------------------------------------------------------
+*** <region name= Header>
+*** <desc>Inserts and control logic</desc>
+    $INCLUDE GLOBUS.BP I_COMMON
+    $INCLUDE GLOBUS.BP I_EQUATE
+    $INCLUDE GLOBUS.BP I_DataTypes
+*** </region>
+*-------------------------------------------------------------------------------------------------------------------
+*
+    CALL Table.defineId("POST.CHG.ID", T24_String)          ;* Define Table id
+    ID.N = "7" ; ID.T = "A"
+
+*
+*-------------------------------------------------------------------------------------------------------------------
+*
+    neighbour = '' ;
+    fieldName = 'CHG.AMOUNT'                  ; fieldLength = '4' ; fieldType = 'AMT'      ;  GOSUB ADD.FIELDS
+    CALL Table.setAuditPosition         ;* Poputale audit information
+*
+    RETURN
+*
+*--------------------------------------------------------------------------------------------------------------------
+********************
+ADD.RESERVED.FIELDS:
+********************
+*
+    CALL Table.addField(fieldName, fieldType, args, neighbour)        ;* Add a new fields
+*
+    RETURN
+*
+*-------------------------------------------------------------------------------------------------------------------
+*
+***********
+ADD.FIELDS:
+***********
+*
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour) ;* Add a new field
+*
+    RETURN
+*
+*---------------------------------------------------------------------------------------------------------------------
+END

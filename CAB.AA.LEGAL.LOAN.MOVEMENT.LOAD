@@ -1,0 +1,42 @@
+*-----------------------------------------------------------------------------
+* <Rating>140</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AA.LEGAL.LOAN.MOVEMENT.LOAD
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 28th Sep 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Batch Routine
+* Attached to      : BNK/CAB.AA.LEGAL.LOAN.MOVEMENT
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This routine used to Create a new account and move the amort charge amount
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_CAB.AA.LEGAL.LOAN.MOVEMENT.COMMON
+
+    FN.CAB.AA.LEGAL.LOAN = "F.CAB.AA.LEGAL.LOAN"
+    F.CAB.AA.LEGAL.LOAN = ""
+    CALL OPF(FN.CAB.AA.LEGAL.LOAN, F.CAB.AA.LEGAL.LOAN)
+
+    RETURN
+
+END

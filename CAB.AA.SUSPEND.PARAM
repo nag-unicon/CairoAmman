@@ -1,0 +1,21 @@
+    SUBROUTINE CAB.AA.SUSPEND.PARAM
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_Table
+
+    Table.name = 'CAB.AA.SUSPEND.PARAM'
+    Table.title = 'Cab Suspend Param'
+    Table.stereotype = 'H'
+    Table.product = 'AA'
+    Table.subProduct = ''
+    Table.classification = 'INT'
+    Table.systemClearFile = 'Y'
+    Table.relatedFiles = ''
+    Table.isPostClosingFile = ''
+    Table.equatePrefix = 'CAB'
+    Table.idPrefix = ''
+    Table.blockedFunctions = ''
+    Table.trigger = ''
+
+    RETURN

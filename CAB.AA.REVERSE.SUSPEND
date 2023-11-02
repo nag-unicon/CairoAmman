@@ -1,0 +1,103 @@
+    SUBROUTINE CAB.AA.REVERSE.SUSPEND(ACC.ID)
+*************************************************************************
+*************************************************************************
+* Montly report for refund the suspend
+*
+*
+*************************************************************************
+*************************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT
+    $INCLUDE T24.BP I_F.EB.ACCRUAL
+    $INCLUDE T24.BP I_F.AA.ACCOUNT.DETAILS
+    $INCLUDE TT.BP I_CAB.AA.ACCRUAL.COMMON
+    $INCLUDE TT.BP I_F.CAB.AA.SUSPEND.PARAM
+
+    GOSUB INIT
+    IF AA.SUP.DATE NE '' THEN
+        GOSUB PROCESS
+        GOSUB CONSOL.REPORT
+
+        IF CRF.TYPE MATCHES CAB.CHG.AMORT THEN
+            GOSUB WRITE.LOG
+        END
+    END
+
+    RETURN
+
+**********
+WRITE.LOG:
+**********
+    R.RECORD = Y.DATA
+    REC.KEY = ACC.ID
+    CALL F.WRITE(FN.CAB.SUS.LIST,REC.KEY,R.RECORD)
+
+    RETURN
+
+*****
+INIT:
+*****
+
+    ARR.ID = FIELD(ACC.ID,'*',1)
+    CALL AA.PROCESS.ACCOUNT.DETAILS(ARR.ID, "INITIALISE", "", R.ACCOUNT.DETAILS, RET.ERR)
+    AA.SUP.DATE = R.ACCOUNT.DETAILS<AA.AD.SUSP.DATE,1>
+    CAB.CHG.AMORT ='DISCOUNTINT':@VM:'DISCOUNTINT1':@VM:'FLATINTEREST'
+
+    RETURN
+
+**************
+CONSOL.REPORT:
+**************
+
+    Y.DATA<-1>  = ACC.ID : ',': ARR.ID : ',': CONT.ID : ',': CUST.ID : ',': COMP.CODE : ',': CRF.TYPE : ',':
+    Y.DATA := ARR.CCY : ',': TOT.CHG.AMT : ',': PL.CAT : ',': START.DATE : ',': END.DATE : ',': NO.DIFF: ',':
+    Y.DATA := DAILY.ACC :',': AA.SUP.DATE :',': NO.DIFF.SUP :',': CURR.SUP.AMT  :',': TOT.SUP.AMORT :',':
+    Y.DATA := CUR.SUP.AMORT  :',': CURR.MONTH
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    CALL F.READ(FN.EB.ACC,ACC.ID,R.CAB.ACCRUAL,F.EB.ACC,ER.EB.ERR)
+    CONT.ID = R.CAB.ACCRUAL<EB.ACC.CONTRACT.BAL.ID>
+    CUST.ID = R.CAB.ACCRUAL<EB.ACC.CUSTOMER>
+    COMP.CODE = R.CAB.ACCRUAL<EB.ACC.CO.CODE>
+    CRF.TYPE = R.CAB.ACCRUAL<EB.ACC.CRF.TYPE>[4,50]
+    ARR.CCY = R.CAB.ACCRUAL<EB.ACC.CHARGE.CCY>
+    TOT.CHG.AMT = R.CAB.ACCRUAL<EB.ACC.CHARGE.AMT.LCY>
+    PL.CAT = R.CAB.ACCRUAL<EB.ACC.PL.CATEGORY>
+    START.DATE = R.CAB.ACCRUAL<EB.ACC.START.DATE>
+    END.DATE = R.CAB.ACCRUAL<EB.ACC.END.DATE>
+
+    GOSUB CALCULATE.PROCESS
+
+    RETURN
+
+******************
+CALCULATE.PROCESS:
+******************
+
+    NO.DIFF='C'
+    CALL CDD ('',START.DATE,END.DATE,NO.DIFF)
+
+    DAILY.ACC = (TOT.CHG.AMT / NO.DIFF)
+
+    DATE.REP = REP.END.DATE
+
+    NO.DIFF.SUP ='C'
+    CALL CDD ('',AA.SUP.DATE,DATE.REP,NO.DIFF.SUP)
+
+    CURR.SUP.AMT = NO.DIFF.SUP * DAILY.ACC
+
+    CURR.MONTH = TODAY[5,2]
+
+*** CALL F.READ(FN.PL.REFUND,ACC.ID,R.PL.REFUND,F.PL.REFUND,ERR.PL)
+
+*** TOT.SUP.AMORT = R.PL.REFUND<1>
+    TOT.SUP.AMORT ='0'
+    CUR.SUP.AMORT = CURR.SUP.AMT - TOT.SUP.AMORT
+
+    RETURN

@@ -1,0 +1,174 @@
+    SUBROUTINE CAB.AA.DRAWDOWN.ACC.REPLACE(ARRANGEMENT.ID)
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthu
+* Development Id   : Drawdown Account Replacement
+* Date             : 23rd Apr 2019
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Service routine
+* Attached to      : BNK/CAB.AA.DRAWDOWN.ACC.REPLACE
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Routine is used to replace the drawdown as settlement account
+*                    if existing drawdown account which is already closed by bank/user.
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.AA.ARRANGEMENT
+    $INSERT I_F.AA.ARRANGEMENT.ACTIVITY
+    $INSERT I_F.AA.ACCOUNT
+    $INSERT I_CAB.AA.DRAWDOWN.ACC.REPLACE.COMMON
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB GET.DRAWACCOUNT.ACCOUNT
+
+    IF ACCOUNT.CATEGORY NE "1053" THEN  ;* No need to update for Legal Loans
+        GOSUB VAL.DRAWACCOUNT.ACCOUNT
+    END
+
+    RETURN
+
+GET.DRAWACCOUNT.ACCOUNT:
+
+    returnIds = ""
+    R.AA.ACCOUNT = ""
+    returnError = ""
+
+    idPropertyClass = "ACCOUNT"
+    idProperty = "ACCOUNT"
+    returnConditions = ""
+
+    CALL AA.GET.ARRANGEMENT.CONDITIONS(ARRANGEMENT.ID, idPropertyClass, idProperty, effectiveDate, returnIds, returnConditions, returnError)
+
+    R.AA.ACCOUNT = RAISE(returnConditions)
+
+    DRAWDOWN.ACCOUNT = R.AA.ACCOUNT<AA.AC.LOCAL.REF, DRAWACCOUNT.POS>
+    SETTLE.ACCOUNT   = R.AA.ACCOUNT<AA.AC.LOCAL.REF, SETTLE.ACCOUNT.POS>
+    ACCOUNT.CATEGORY = R.AA.ACCOUNT<AA.AC.CATEGORY>
+
+    R.AA.ARRANGEMENT = ""
+    CALL F.READ(FN.AA.ARRANGEMENT, ARRANGEMENT.ID, R.AA.ARRANGEMENT, F.AA.ARRANGEMENT, ERR.AA.ARRANGEMENT)
+
+    RETURN
+
+VAL.DRAWACCOUNT.ACCOUNT:
+
+    IF DRAWDOWN.ACCOUNT THEN
+
+        R.ACCOUNT = ""
+        ERR.ACCOUNT = ""
+
+        CALL F.READ(FN.ACCOUNT, DRAWDOWN.ACCOUNT, R.ACCOUNT, F.ACCOUNT, ERR.ACCOUNT)
+
+        IF NOT(R.ACCOUNT) THEN
+
+            GOSUB CHECK.SETTLEMENT.ACCOUNT
+            GOSUB PROCESS.UPDATE.ACCOUNT
+        END
+    END
+
+    RETURN
+
+CHECK.SETTLEMENT.ACCOUNT:
+
+    R.ACCOUNT = ""
+    ERR.ACCOUNT = ""
+    SETTLEMENT.FLAG = ""
+
+    CALL F.READ(FN.ACCOUNT, SETTLE.ACCOUNT, R.ACCOUNT, F.ACCOUNT, ERR.ACCOUNT)
+
+    IF R.ACCOUNT THEN
+        ReplaceAccount = SETTLE.ACCOUNT
+    END ELSE
+        SETTLEMENT.FLAG = 1
+        GOSUB GET.CURRENT.ACCOUNT
+    END
+
+    RETURN
+
+GET.CURRENT.ACCOUNT:
+
+    CustomerID = R.AA.ARRANGEMENT<AA.ARR.CUSTOMER,1>
+
+    ERR.CUSTOMER.ACCOUNT = ""
+    R.CUSTOMER.ACCOUNT = ""
+
+    CALL F.READ(FN.CUSTOMER.ACCOUNT, CustomerID, R.CUSTOMER.ACCOUNT, F.CUSTOMER.ACCOUNT, ERR.CUSTOMER.ACCOUNT)
+
+    LOOP
+        REMOVE AccountID FROM R.CUSTOMER.ACCOUNT SETTING AccPos
+    WHILE AccountID : AccPos
+
+        R.ACCOUNT = ""
+        ERR.ACCOUNT = ""
+
+        CALL F.READ(FN.ACCOUNT, AccountID, R.ACCOUNT, F.ACCOUNT, ERR.ACCOUNT)
+
+        IF R.ACCOUNT<AC.CATEGORY> EQ "1001" THEN
+            ReplaceAccount = AccountID
+            R.CUSTOMER.ACCOUNT = ""
+        END
+    REPEAT
+
+    RETURN
+
+PROCESS.UPDATE.ACCOUNT:
+
+    CALL LOAD.COMPANY(R.AA.ARRANGEMENT<AA.ARR.CO.CODE>)
+
+    APP.NAME     = 'AA.ARRANGEMENT.ACTIVITY'
+    PROCESS      = 'PROCESS'
+    OFS.VERSION  = "AA.ARRANGEMENT.ACTIVITY,"
+    OFS.FUNCTION = 'I'
+    GTS.MODE     = ''
+    NO.OF.AUTH   = '0'
+    TRANSACTION.ID = ''
+    OFS.RECORD = ""
+    OFS.SOURCE.ID  = 'AA.ONLINE'
+
+    R.AA.ARRANGEMENT.ACTIVITY = ""
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ARRANGEMENT> = ARRANGEMENT.ID
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ACTIVITY>    = "LENDING-UPDATE-ACCOUNT"
+
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.PROPERTY,1,1>  = "ACCOUNT"
+
+    FIELD.CNT + = 1
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,FIELD.CNT>  = "DRAWACCOUNT"
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,FIELD.CNT> = ReplaceAccount
+
+    IF SETTLEMENT.FLAG THEN
+        FIELD.CNT + = 1
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,FIELD.CNT>  = "SETTLE.ACCOUNT"
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,FIELD.CNT> = ReplaceAccount
+    END
+
+    CALL OFS.BUILD.RECORD(APP.NAME,OFS.FUNCTION, PROCESS, OFS.VERSION, GTS.MODE, NO.OF.AUTH, TRANSACTION.ID, R.AA.ARRANGEMENT.ACTIVITY, OFS.RECORD)
+
+    theResponse    = ""
+    txnCommitted   = ""
+    options        = ""
+    options<1>     = "AA.ONLINE"
+    options<4>     = "HLD"
+
+    CALL OFS.CALL.BULK.MANAGER(options,OFS.RECORD,theResponse,txnCommitted)
+
+    RETURN
+
+END

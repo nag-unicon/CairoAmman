@@ -1,0 +1,55 @@
+    SUBROUTINE CAB.AA.DEFAULT.SIM.END.DATE
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthu
+* Development Id   :
+* Date             : 18th Apr 2019
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Record Reoutine
+* Attached to      : VERSION.CONTROL>AA.SIMULATION.RUNNER
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Routine used to default the activity effective date in SIM.U.DATE
+* ----------------------------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.AA.SIMULATION.RUNNER
+    $INSERT I_F.AA.ARRANGEMENT.ACTIVITY
+
+    GOSUB GET.REQUIRED.INFO
+    GOSUB GET.CAPTURE.RECORD
+    GOSUB DEFAULT.SIMULATION.DATE
+
+    RETURN
+
+GET.REQUIRED.INFO:
+
+    FN.AA.SIMULATION.CAPTURE = "F.AA.SIMULATION.CAPTURE"
+    F.AA.SIMULATION.CAPTURE = ""
+    CALL OPF(FN.AA.SIMULATION.CAPTURE, F.AA.SIMULATION.CAPTURE)
+
+    CaptureID = R.NEW(AA.SIM.SIM.CAPTURE.REF)
+
+    RETURN
+
+GET.CAPTURE.RECORD:
+
+    R.AA.SIMULATION.CAPTURE = ""
+    ERR.AA.SIMULATION.CAPTURE = ""
+    CALL F.READ(FN.AA.SIMULATION.CAPTURE, CaptureID, R.AA.SIMULATION.CAPTURE, F.AA.SIMULATION.CAPTURE, ERR.AA.SIMULATION.CAPTURE)
+
+    RETURN
+
+DEFAULT.SIMULATION.DATE:
+
+    SIM.EFFECTIVE.DATE = R.AA.SIMULATION.CAPTURE<AA.ARR.ACT.EFFECTIVE.DATE>
+
+    IF SIM.EFFECTIVE.DATE AND R.NEW(AA.SIM.SIM.U.DATE) AND SIM.EFFECTIVE.DATE GT R.NEW(AA.SIM.SIM.U.DATE) THEN
+        R.NEW(AA.SIM.SIM.RUN.DATE) = SIM.EFFECTIVE.DATE
+        R.NEW(AA.SIM.SIM.END.DATE) = SIM.EFFECTIVE.DATE
+        R.NEW(AA.SIM.SIM.U.DATE)   = SIM.EFFECTIVE.DATE
+    END
+
+    RETURN
+
+END

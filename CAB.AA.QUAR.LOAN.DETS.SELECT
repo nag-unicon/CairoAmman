@@ -1,0 +1,34 @@
+    SUBROUTINE CAB.AA.QUAR.LOAN.DETS.SELECT
+************************************************************
+* Quartely report of Opic developement
+*
+*
+************************************************************
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE TT.BP I_F.CAB.AA.QUAR.LOAN.COMMON
+
+    GOSUB DO.CLEAR
+    GOSUB PROCESS
+
+    RETURN
+*********
+PROCESS:
+*********
+    SEL.CMD = 'SELECT ' : FN.AA.ARR :' WITH PRODUCT.LINE EQ LENDING'
+    SEL.LIST = ''
+
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',NO.OF.REC,SEL.ERR)
+    CALL BATCH.BUILD.LIST('',SEL.LIST)
+
+    RETURN
+
+*********
+DO.CLEAR:
+*********
+
+    EXECUTE "CLEAR.FILE " : FN.FLAT.FILE
+
+    RETURN
+END

@@ -1,0 +1,103 @@
+    SUBROUTINE CAB.AA.LOAN.CHANGE.INTEREST.SMS.POST
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthu
+* Development Id   : Change Interest - SMS File
+* Date             : 23rd Apr 2019
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Load routine
+* Attached to      : BNK/CAB.AA.LOAN.CHANGE.INTEREST.SMS
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Load Routine is used to generate a file to Send an SMS to the customer
+*                    whenever rate change happened in the arrangement.
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT TT.BP I_F.CAB.PATH.PARAMETER
+    $INSERT I_CAB.AA.LOAN.CHANGE.INTEREST.SMS.COMMON
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB OPEN.FILES
+    WRITE R.CAB.AA.CHANGE.INTEREST TO F.DIR.NAME, "ChangeInterest_Loans_":TODAY:'.csv'
+
+    RETURN
+
+*** </region>
+*** <region name= Main Body>
+
+OPEN.FILES:
+
+    FN.CAB.AA.CHANGE.INTEREST = "F.CAB.AA.CHANGE.INTEREST"
+    F.CAB.AA.CHANGE.INTEREST = ""
+    CALL OPF(FN.CAB.AA.CHANGE.INTEREST, F.CAB.AA.CHANGE.INTEREST)
+
+
+    FN.CAB.PATH.PARAMETER = "F.CAB.PATH.PARAMETER"
+    F.CAB.PATH.PARAMETER = ""
+    CALL OPF(FN.CAB.PATH.PARAMETER, R.CAB.PATH.PARAMETER)
+
+    R.CAB.PATH.PARAMETER = ""
+    ERR.CAB.PATH.PARAMETER = ""
+
+    CALL CACHE.READ(FN.CAB.PATH.PARAMETER, "SYSTEM", R.CAB.PATH.PARAMETER, F.CAB.PATH.PARAMETER, ERR.CAB.PATH.PARAMETER)
+
+    LOCATE "BNK/CAB.AA.LOAN.CHANGE.INTEREST.SMS" IN R.CAB.PATH.PARAMETER<CAB.PATH.PARAMETER.SERVICE.NAME, 1> SETTING SERVICE.POS THEN
+        DIR.NAME = R.CAB.PATH.PARAMETER<CAB.PATH.PARAMETER.DIRECTORY.PATH, SERVICE.POS>
+
+    END ELSE
+        DIR.NAME = "CHANGE.INTEREST"
+    END
+
+    FN.DIR.NAME = DIR.NAME
+    F.DIR.NAME = ""
+
+    OPEN FN.DIR.NAME TO F.DIR.NAME ELSE
+        EXECUTE "CREATE FN.DIR.NAME TYPE=UD"
+    END
+
+    RETURN
+
+GET.REQUIRED.INFO:
+
+    R.INTEREST.DETAILS = "Customer,Customer Name,ArrangementID-Currency,New Rate,Next Payment,Disbursement Date,Mobile No,Interest Change Date,Maturity Date, Last Payment"
+    SEL.CMD  = "SELECT ":FN.CAB.AA.CHANGE.INTEREST
+
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+
+    LOOP
+        REMOVE REC.ID FROM SEL.LIST SETTING BI.POS
+    WHILE REC.ID : BI.POS
+
+        R.CAB.AA.CHANGE.INTEREST = ""
+        ERR.CAB.AA.CHANGE.INTEREST = ""
+
+        CALL F.READ(FN.CAB.AA.CHANGE.INTEREST, REC.ID, R.CAB.AA.CHANGE.INTEREST, F.CAB.AA.CHANGE.INTEREST, ERR.CAB.AA.CHANGE.INTEREST)
+        IF R.INTEREST.DETAILS THEN
+            R.INTEREST.DETAILS<-1> = R.CAB.AA.CHANGE.INTEREST
+        END ELSE
+            R.INTEREST.DETAILS = R.CAB.AA.CHANGE.INTEREST
+        END
+
+    REPEAT
+
+    RETURN
+
+END

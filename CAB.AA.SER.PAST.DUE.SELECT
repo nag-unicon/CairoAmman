@@ -1,0 +1,98 @@
+    SUBROUTINE CAB.AA.SER.PAST.DUE.SELECT
+
+* Author - Gokul J
+* Date   - 12/06/2014
+* Desc  - This selection routine select the AA.BILL.DETAILS in order to generate the Past dues for arrangement
+*
+* Incoming Arguments
+* ------------------
+
+* Outgoing Arguments
+* ------------------
+*
+
+*Modification History
+************************
+* Author          :
+* Reference       :
+* Description     :
+
+**********************************************************************************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_BATCH.FILES
+    $INCLUDE T24.BP I_AA.APP.COMMON
+    $INCLUDE T24.BP I_F.AA.INTEREST.ACCRUALS
+    $INCLUDE T24.BP I_F.AC.CASH.POOL
+    $INCLUDE T24.BP I_F.ACCOUNT
+    $INCLUDE T24.BP I_F.AA.BILL.DETAILS
+    $INCLUDE T24.BP I_F.LOCKING
+    $INCLUDE TT.BP I_CAB.AA.SER.PAST.DUE.COMMON
+    $INCLUDE TT.BP I_F.CAB.GOVERNMENT.PRODUCT
+
+
+    GOSUB INITIALISE
+    GOSUB SEL.PROCESS
+
+    RETURN
+
+***********
+INITIALISE:
+***********
+    SEL.CMD = ""
+    SEL.LIST = ""
+    LIST.NAME =""
+    SEL.CNT = ""
+    SEL.ERR = ""
+
+    IF CONTROL.LIST EQ '' THEN
+        CONTROL.LIST<1> = 'PENALTY.PROCESS'
+        CONTROL.LIST<2> = 'DUE.PROCESS'
+        CONTROL.LIST<3> = 'WRITE.LIST'
+    END
+
+    RETURN
+
+************
+SEL.PROCESS:
+*************
+
+
+
+* Selects the AA.ARRANGEMENT file to extract the accounts for which the penalty is to be charged
+
+    BEGIN CASE
+
+    CASE CONTROL.LIST<1,1> EQ 'PENALTY.PROCESS'
+
+        EXECUTE "CLEAR.FILE " :FN.AUTO.HUNT.CONCAT
+
+        SEL.PEN.CMD = "SELECT FBNK.AA.ARRANGEMENT WITH PRODUCT.LINE EQ 'LENDING' AND ARR.STATUS UNLIKE ...CLO...  BY CUSTOMER"
+        CALL EB.READLIST(SEL.PEN.CMD, SEL.PEN.LIST, PEN.LIST.NAME, SEL.PEN.CNT, PEN.ERR)
+        CALL BATCH.BUILD.LIST('',SEL.PEN.LIST)
+*
+    CASE CONTROL.LIST<1,1> EQ 'DUE.PROCESS'
+*
+* Selects the AA.BILL.DETAILS file to extract account details for which the Past Dues need to be paid
+*
+        SEL.CMD = "SELECT ":FN.AA.BILL.DETAILS:" WITH EVAL 'BILL.STATUS<1,1>' NE 'CAPITALISE' AND WITH EVAL 'BILL.STATUS<1,1>' NE 'SETTLED' BY PAYMENT.DATE"
+        CALL EB.READLIST(SEL.CMD, SEL.LIST, LIST.NAME, SEL.CNT, SEL.ERR)
+        CALL BATCH.BUILD.LIST('',SEL.LIST)
+*
+    CASE CONTROL.LIST<1,1> EQ 'WRITE.LIST'
+        RECORDS =''
+        SEL.CMD ="SELECT ":FN.AUTO.HUNT.CONCAT
+        CALL EB.READLIST(SEL.CMD, SEL.VAL, LIST.NAME, SEL.LIST.CNT, SEL.ERR)
+        FOR I =1 TO SEL.LIST.CNT
+            KEY.ID = SEL.VAL<I>
+            CALL F.READ(FN.AUTO.HUNT.CONCAT,KEY.ID,R.AUTO.HUNT,F.AUTO.HUNT.CONCAT,ERR.ACT)
+            RECORDS<-1> = R.AUTO.HUNT
+        NEXT I
+
+        KEY.FORMAT = "AutoHuntingLog":TIME():".txt"
+        CALL F.WRITE(FN.AA.REPBP,KEY.FORMAT,RECORDS)
+        WRITELIST RECORDS TO KEY.FORMAT
+    END CASE
+
+    RETURN
+END

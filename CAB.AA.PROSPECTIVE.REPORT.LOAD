@@ -1,0 +1,69 @@
+    SUBROUTINE CAB.AA.PROSPECTIVE.REPORT.LOAD
+*************************************************************************************
+*************************************************************************************
+*** CAB Jordan Future Due report
+*** For Salary system
+***
+***
+*************************************************************************************
+*************************************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_AA.APP.COMMON
+    $INCLUDE AN.BP I_CAB.SAL.COMMON
+
+    GOSUB INIT
+    GOSUB PROCESS
+
+    RETURN
+
+*****
+INIT:
+*****
+
+    END.DATE = TODAY
+    START.DATE = TODAY
+
+    FN.CAB.REPORT = 'F.CAB.DUES.REPORT'
+    F.CAB.REPORT = ''
+    CALL OPF (FN.CAB.REPORT,F.CAB.REPORT)
+
+
+    FN.SETT.ACC ='F.ACCOUNT'
+    F.SETT.ACC = ''
+    CALL OPF (FN.SETT.ACC,F.SETT.ACC)
+
+    FN.SAVED.LISTS ='&SAVEDLISTS&'
+    F.SAVEDLISTS = ''
+    CALL OPF(FN.SAVED.LISTS,F.SAVEDLISTS)
+
+    FN.AA.ARR='F.AA.ARRANGEMENT'
+    F.AA.ARR=''
+    CALL OPF(FN.AA.ARR,F.AA.ARR)
+
+    FN.CAB.SAL ='F.CAB.SALARY.REPORT.LIST'
+    F.CAB.SAL =''
+    CALL OPF(FN.CAB.SAL,F.CAB.SAL)
+
+    FN.AC.CASH.POOL='F.AC.CASH.POOL'
+    F.AC.CASH.POOL =''
+    CALL OPF(FN.AC.CASH.POOL,F.AC.CASH.POOL)
+
+
+    RETURN
+********
+PROCESS:
+********
+
+    CALL F.READ(FN.CAB.REPORT,'SYSTEM',R.RECORD,F.CAB.REPORT,ERR)
+
+    FWD.DATE = R.RECORD<1>
+    FWD.DATE = "+":FWD.DATE:"C"
+    CALL CDT('',END.DATE,FWD.DATE)
+
+    CALL CDT('',START.DATE,"+1C")
+
+    CALL GET.LOC.REF('AA.ARR.ACCOUNT','SETTLE.ACCOUNT',SETT.POS)
+
+
+    RETURN

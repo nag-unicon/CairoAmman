@@ -1,0 +1,99 @@
+    SUBROUTINE CAB.AA.PERIODIC.INTEREST.POST
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan
+* Development Id   : AA Periodic Interest Loan details
+* Date             : 31st May 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Batch Routine
+* Attached to      : BATCH>BNK/CAB.AA.PERIODIC.INTEREST.LOANS
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This routine is used to display the AA Periodic Interest Loan details
+*                  :
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    :
+* ARGS -(Output)   :
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+*----------------------------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+
+    GOSUB PROCESS.OPEN.FILES
+    GOSUB PROCESS.SELECT.STATEMENT
+    GOSUB PROCESS
+
+    RETURN
+
+PROCESS.OPEN.FILES:
+
+    FN.CAB.AA.LOAN.INTEREST.DETAILS = "F.CAB.AA.LOAN.INTEREST.DETAILS"
+    F.CAB.AA.LOAN.INTEREST.DETAILS = ""
+    CALL OPF(FN.CAB.AA.LOAN.INTEREST.DETAILS, F.CAB.AA.LOAN.INTEREST.DETAILS)
+
+    OUT.DIRECTORY = "&SAVEDLISTS&"
+    OUT.FILENAME = "AA_Periodic_Interest_Loans.csv"
+
+    OPENSEQ OUT.DIRECTORY,OUT.FILENAME TO F.OUT.PATH ELSE NULL
+
+    RETURN
+
+PROCESS.SELECT.STATEMENT:
+
+    SEL.CMD = "SELECT ":FN.CAB.AA.LOAN.INTEREST.DETAILS
+
+    SEL.LIST = ''
+    SEL.CNT = ''
+    SEL.ERR = ''
+
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+
+    RETURN
+
+PROCESS:
+
+    R.CAB.AA.LOAN.INTEREST.DETAILS  = "Customer" :",": "Customer Name" :",": "Account No" :",": "Product Name" :",": "Currency" :",": "Total Principal" :","
+    R.CAB.AA.LOAN.INTEREST.DETAILS := "Arrangement" :",": "Branch" :",": "Category" :","
+    R.CAB.AA.LOAN.INTEREST.DETAILS := "Principal Interest Rate" :",": "Principal Index" :",": "Principal Periodic Rate" :",": "Principal Period" :","
+    R.CAB.AA.LOAN.INTEREST.DETAILS := "Principal Reset" :",": "Principal Min Rate" :",": "Principal Margin Rate" :","
+    R.CAB.AA.LOAN.INTEREST.DETAILS := "Penalty Interest Rate" :",": "Penalty Index" :",": "Penalty Periodic Rate" :",": "Penalty Period" :",":
+    R.CAB.AA.LOAN.INTEREST.DETAILS := "Penalty Reset" :",": "Penalty Min Rate" :",": "Penalty Margin Rate"
+
+    CHANGE "," TO "|" IN R.CAB.AA.LOAN.INTEREST.DETAILS
+
+    GOSUB DO.WRITE.PROCESS
+    ARR.COUNT = 1
+
+    LOOP
+    WHILE ARR.COUNT LE SEL.CNT
+
+        ARR.ID = SEL.LIST<ARR.COUNT>
+
+        R.CAB.AA.LOAN.INTEREST.DETAILS = ""
+        ERR.CAB.AA.LOAN.INTEREST.DETAILS = ""
+        CALL F.READ(FN.CAB.AA.LOAN.INTEREST.DETAILS, ARR.ID, R.CAB.AA.LOAN.INTEREST.DETAILS, F.CAB.AA.LOAN.INTEREST.DETAILS, ERR.CAB.AA.LOAN.INTEREST.DETAILS)
+
+        CHANGE FM TO '|' IN R.CAB.AA.LOAN.INTEREST.DETAILS
+
+        GOSUB DO.WRITE.PROCESS
+
+        ARR.COUNT + = 1
+    REPEAT
+
+    RETURN
+
+DO.WRITE.PROCESS:
+
+    WRITESEQ R.CAB.AA.LOAN.INTEREST.DETAILS APPEND TO F.OUT.PATH ELSE
+        WRITELIST R.CAB.AA.LOAN.INTEREST.DETAILS TO OUT.FILENAME
+    END
+
+    RETURN
+END

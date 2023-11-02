@@ -1,0 +1,66 @@
+    SUBROUTINE CAB.AA.LOAN.CHANGE.INTEREST.SMS.SELECT
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthu
+* Development Id   : Change Interest - SMS File
+* Date             : 23rd Apr 2019
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Load routine
+* Attached to      : BNK/CAB.AA.LOAN.CHANGE.INTEREST.SMS
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Load Routine is used to generate a file to Send an SMS to the customer
+*                    whenever rate change happened in the arrangement.
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_CAB.AA.LOAN.CHANGE.INTEREST.SMS.COMMON
+
+*** </region>
+*** <region name= Main Body>
+
+    EXECUTE 'CLEAR.FILE ' : FN.CAB.AA.CHANGE.INTEREST
+
+    GOSUB SELECT.STATEMENT
+
+    RETURN
+
+*** </region>
+*** <region name= Select Statment>
+
+SELECT.STATEMENT:
+
+    SEL.LIST = ""
+    SEL.CNT  = ""
+    SEL.ERR  = ""
+    SEL.CMD  = "SELECT ":FN.AA.LOAN.BALANCE.DETAILS :" WITH CURRENT.PRINCIPAL LT '0' AND PRINCIPAL.INDEX NE ''"
+
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+
+    IF NOT(SEL.CNT) THEN
+        SEL.LIST = ""
+        SEL.CMD  = "SELECT ":FN.AA.ARRANGEMENT : " WITH ARR.STATUS EQ CURRENT AND PRODUCT.LINE EQ LENDING"
+        CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+    END
+
+    CALL BATCH.BUILD.LIST("",SEL.LIST)
+
+    RETURN
+
+*** </region>
+
+END

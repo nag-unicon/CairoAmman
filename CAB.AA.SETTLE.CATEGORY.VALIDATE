@@ -1,0 +1,91 @@
+    SUBROUTINE CAB.AA.SETTLE.CATEGORY.VALIDATE
+***************************************************************************
+*** CAB Development for Settlement account
+***
+*** This validation routine will check the category provide in this application
+*** should match the customer accounts available at ACCOUNT.PARAMETER File
+***
+***
+***************************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.CUSTOMER
+    $INCLUDE TT.BP I_F.CAB.AA.SETTLE.CATEGORY
+    $INCLUDE T24.BP I_F.ACCOUNT.PARAMETER
+
+
+    GOSUB INIT
+    GOSUB PROCESS
+    GOSUB NEW.CHECK
+
+    RETURN
+
+*****
+INIT:
+*****
+
+    FN.AC.PARAM='F.ACCOUNT.PARAMETER'
+    F.AC.PARAM=''
+    CALL OPF(FN.AC.PARAM,F.AC.PARAM)
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    AF=CAB.CUSTOMER.ACC
+    CALL DUP
+
+    RETURN
+
+************
+CATEG.CHECK:
+************
+
+    CALL F.READ(FN.AC.PARAM,'SYSTEM',R.AC.PARAM,F.AC.PARAM,ER.PAR)
+
+    NO.OF.CNT = DCOUNT(R.NEW(CAB.CUSTOMER.ACC),@VM)
+
+    FOR I = 1 TO NO.OF.CNT
+
+        IF NOT(R.NEW(CAB.CUSTOMER.ACC)<1,I> GT '1000' AND R.NEW(CAB.CUSTOMER.ACC)<1,I> LT '9000') THEN
+            AF = CAB.CUSTOMER.ACC
+            AV = I
+            ETEXT ='Category is not in range'
+            CALL STORE.END.ERROR
+        END
+
+    NEXT I
+
+    RETURN
+
+**********
+NEW.CHECK:
+**********
+
+    CALL F.READ(FN.AC.PARAM,'SYSTEM',R.AC.PARAM,F.AC.PARAM,ER.PAR)
+
+    NO.OF.CNT = DCOUNT(R.NEW(CAB.CUSTOMER.ACC),@VM)
+    AC.PR.CNT = DCOUNT(R.AC.PARAM<AC.PAR.ACCT.CATEG.DESC>,@VM)
+    AF = CAB.CUSTOMER.ACC
+    FOR I = 1 TO NO.OF.CNT
+        FLG.CHECK = '1'
+        FOR J = 1 TO AC.PR.CNT
+            IF R.NEW(CAB.CUSTOMER.ACC)<1,I> GE R.AC.PARAM<AC.PAR.ACCT.CATEG.STR,J> AND R.NEW(CAB.CUSTOMER.ACC)<1,I> LE R.AC.PARAM<AC.PAR.ACCT.CATEG.END,J> THEN
+                FLG.CHECK = '0'
+                J = AC.PR.CNT
+            END
+        NEXT J
+
+        IF FLG.CHECK THEN
+            AV = I
+            ETEXT ='Category is not in range'
+            CALL STORE.END.ERROR
+            I = NO.OF.CNT
+        END
+
+    NEXT I
+
+
+    RETURN

@@ -1,0 +1,74 @@
+    SUBROUTINE CAB.AA.DRAWDOWN.ACC.REPLACE.LOAD
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthu
+* Development Id   : Drawdown Account Replacement
+* Date             : 23rd Apr 2019
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Load routine
+* Attached to      : BNK/CAB.AA.DRAWDOWN.ACC.REPLACE
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Load Routine is used to replace the drawdown as settlement account
+*                    if existing drawdown account which is already closed by bank/user.
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_CAB.AA.DRAWDOWN.ACC.REPLACE.COMMON
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB OPEN.FILES
+    GOSUB GET.LOCAL.REFERENCE.POSITIONS
+
+    RETURN
+
+*** </region>
+*** <region name= Main Body>
+
+OPEN.FILES:
+
+    FN.AA.ARRANGEMENT = "F.AA.ARRANGEMENT"
+    F.AA.ARRANGEMENT = ""
+    CALL OPF(FN.AA.ARRANGEMENT, F.AA.ARRANGEMENT)
+
+    FN.ACCOUNT = "F.ACCOUNT"
+    F.ACCOUNT = ""
+    CALL OPF(FN.ACCOUNT, F.ACCOUNT)
+
+    FN.CUSTOMER.ACCOUNT = "F.CUSTOMER.ACCOUNT"
+    F.CUSTOMER.ACCOUNT = ""
+    CALL OPF(FN.CUSTOMER.ACCOUNT, F.CUSTOMER.ACCOUNT)
+
+    RETURN
+
+GET.LOCAL.REFERENCE.POSITIONS:
+
+    APPLS   = 'AA.PRD.DES.ACCOUNT'
+    FLD.VALS = 'DRAWACCOUNT' :VM: 'SETTLE.ACCOUNT'
+    FLD.POS  = ''
+
+    CALL MULTI.GET.LOC.REF(APPLS,FLD.VALS,FLD.POS)
+
+    DRAWACCOUNT.POS     = FLD.POS<1,1>
+    SETTLE.ACCOUNT.POS  = FLD.POS<1,2>
+
+    RETURN
+
+END

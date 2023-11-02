@@ -1,0 +1,43 @@
+    SUBROUTINE CAB.AA.REPORT.DATES.FIELDS
+*-----------------------------------------------------------------------------
+*<doc>
+* Template for field definitions routine Collateral Parameter
+*
+* @author ArunKabalieswaran
+* ITSS Development
+*
+* </doc>
+*-----------------------------------------------------------------------------
+* Modification History :
+*
+*** <desc>Inserts and control logic</desc>
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_DataTypes
+
+*** </region>
+*-----------------------------------------------------------------------------
+
+    dataType = ''
+    dataType<2> = '16.1'
+    dataType<3> = ''
+    dataType<3,2> = 'SYSTEM'
+    CALL Table.defineId("PERIODIC.PARAM.ID",dataType)
+
+    fieldName = 'START.DATE'
+    fieldLength = '11'
+    fieldType = 'D'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'END.DATE'
+    fieldLength = '11'
+    fieldType = 'D'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    CALL Table.setAuditPosition
+
+    RETURN
+END

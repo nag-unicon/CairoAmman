@@ -1,0 +1,270 @@
+*-----------------------------------------------------------------------------
+* <Rating>-32</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AA.SER.PAST.DUE(DUE.DATA)
+*
+* Author - Gokul J
+* Date   - 12/06/2014
+* Desc  - This record routine will create the Past Due report for the loans for which FT need to be generated
+*         According to the id passed from selection, the penalty report is build first and then the bill report
+*
+*         This report contains single settlement account for multi settlement account handled under the CAB.AA.SER.FT.PROCESS Routine
+*
+* Incoming Arguments
+* ------------------
+*
+* Outgoing Arguments
+* ------------------
+*
+*
+* Modification History
+************************
+* 12-01-2015   : Changes done for considering multi settlement account with multi currency
+*                Developement changes done
+*
+* 20-01-2015   : For Government employee auto hunting is stoped if there salary is coming late
+*                New Flag has been introduced in Routine
+*
+* 28-06-2016   : Auto hunting has been stoped for customer level restriction
+*
+**********************************************************************************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_AA.APP.COMMON
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT
+    $INCLUDE T24.BP I_F.AA.BILL.DETAILS
+    $INCLUDE T24.BP I_F.ACCT.ACTIVITY
+    $INCLUDE T24.BP I_AA.ID.COMPONENT
+    $INCLUDE T24.BP I_AA.CONTRACT.DETAILS
+    $INCLUDE T24.BP I_F.AA.ACCOUNT.DETAILS
+    $INCLUDE T24.BP I_F.AA.TERM.AMOUNT
+    $INCLUDE T24.BP I_F.AA.INTEREST.ACCRUALS
+    $INCLUDE T24.BP I_F.AC.CASH.POOL
+    $INCLUDE T24.BP I_F.CUSTOMER
+    $INCLUDE T24.BP I_F.ACCOUNT
+    $INCLUDE T24.BP I_F.AA.ACCOUNT
+    $INCLUDE T24.BP I_F.ALTERNATE.ACCOUNT
+    $INCLUDE TT.BP I_F.CAB.GOVERNMENT.PRODUCT
+    $INCLUDE TT.BP I_CAB.AA.SER.PAST.DUE.COMMON
+
+* For Government Instruction auto hunting working
+
+    STOP.HUNTING.FLAG = '1'
+
+    BEGIN CASE
+*
+    CASE DUE.DATA[3,4] EQ 'BILL'
+
+        GOSUB BILL.PROCESS
+        GOSUB STORE.BILL.REPORT
+*
+    CASE DUE.DATA[3,4] NE 'BILL'
+        GOSUB PENALTY.PROCESS
+
+    END CASE
+
+    RETURN
+
+*************
+BILL.PROCESS:
+**************
+* Extracts the Bill details of Account
+    CALL F.READ(FN.AA.BILL.DETAILS, DUE.DATA, R.BILL.DETAILS, F.AA.BILL.DETAILS, ERR.MSG)
+    BILL.DETAILS = R.BILL.DETAILS
+*
+    BILL.AMOUNT = BILL.DETAILS<AA.BD.OS.TOTAL.AMOUNT>
+    DUE.AMOUNT = BILL.DETAILS<AA.BD.OS.TOTAL.AMOUNT>
+    REPAID.AMOUNT = BILL.DETAILS<AA.BD.OR.TOTAL.AMOUNT> - BILL.DETAILS<AA.BD.OS.TOTAL.AMOUNT>
+    BILL.DATE = BILL.DETAILS<AA.BD.PAYMENT.DATE,1>
+    PAYMENT.TYPE = BILL.DETAILS<AA.BD.PAYMENT.TYPE,1>
+    Y.PROPERTY = BILL.DETAILS<AA.BD.PROPERTY>
+    ARRANGEMENT.ID = BILL.DETAILS<AA.BD.ARRANGEMENT.ID>
+    LOCATE 'HOUSESUBLOW' IN Y.PROPERTY<1,1> SETTING PROP.POS THEN
+        Y.PROP.AMT =BILL.DETAILS<AA.BD.OS.PROP.AMOUNT,PROP.POS>
+        BILL.AMOUNT = BILL.AMOUNT -Y.PROP.AMT
+        DUE.AMOUNT = BILL.AMOUNT
+    END
+    LOCATE 'SUBSIDY' IN PAYMENT.TYPE<1,1> SETTING SUBS.POS THEN
+        DEL PAYMENT.TYPE<1,SUBS.POS>
+    END
+*** No Need process subsidy and payoff bill details
+
+    IF PAYMENT.TYPE NE 'SUBSIDY' THEN
+        IF PAYMENT.TYPE NE 'PAYOFF$CURRENT' THEN
+            GOSUB SETTLEMENT.DETAILS
+            GOSUB ADD.BILL.DETAILS
+        END
+    END
+*
+    RETURN
+
+******************
+SETTLEMENT.DETAILS:
+*******************
+
+    CALL AA.GET.ARRANGEMENT(ARRANGEMENT.ID, R.ARRANGEMENT, ARR.ERROR)
+    ARR.FWD.CCY = R.ARRANGEMENT<AA.ARR.CURRENCY>
+    ARR.COMPANY.ID = R.ARRANGEMENT<AA.ARR.CO.CODE>
+    ARR.START.DATE = R.ARRANGEMENT<AA.ARR.START.DATE>
+    ARR.ACC.NUMBER = R.ARRANGEMENT<AA.ARR.LINKED.APPL.ID>
+    ARR.CUSTOMER  = R.ARRANGEMENT<AA.ARR.CUSTOMER>
+    ARR.PRODUCT  = R.ARRANGEMENT<AA.ARR.PRODUCT,1>
+    GOSUB GET.CASH.POOL
+    RETURN
+
+**************
+GET.CASH.POOL:
+**************
+* Extracts the CASH POOL details for the account
+
+    EFFECTIVE.DATE = TODAY
+    ARR.ID = ARRANGEMENT.ID
+    CALL AA.GET.PROPERTY.RECORD('', ARR.ID, 'ACCOUNT', EFFECTIVE.DATE, 'ACCOUNT', '', R.ACCOUNT.RECORD, R.ERR)
+
+    CALL GET.LOC.REF('AA.ARR.ACCOUNT','SETTLE.ACCOUNT',ST.POS)
+    SETT.ACC = R.ACCOUNT.RECORD<AA.AC.LOCAL.REF,ST.POS,1>
+    R.ALT.ACCOUNT =''
+
+    CALL F.READ(FN.ALT.ACCOUNT,SETT.ACC,R.ALT.ACCOUNT,F.ALT.ACCOUNT,ERR.ALT.ACCOUNT)
+    IF NOT(ERR.ALT.ACCOUNT) AND R.ALT.ACCOUNT NE '' THEN
+***Alternate account need to consider before checking account
+        SETT.ACC = R.ALT.ACCOUNT<AAC.GLOBUS.ACCT.NUMBER>
+    END
+
+    CALL F.READ(FN.SETT.ACC,SETT.ACC,R.AC.ACCOUNT,F.SETT.ACC,REC.ERR)
+    SETTLEMENT.ACC = SETT.ACC
+    SETTLEMENT.COMPANY = R.AC.ACCOUNT<AC.CO.CODE>
+    SETTLEMENT.CCY = R.AC.ACCOUNT<AC.CURRENCY>
+*    SETT.AMT = R.AC.ACCOUNT<AC.ONLINE.CLEARED.BAL>
+
+    RETURN
+
+*****************
+ADD.BILL.DETAILS:
+*****************
+    EMI.BILL = ''
+    GOSUB CHECK.GOVERNMENT.INST
+    IF STOP.HUNTING.FLAG THEN
+        IF SETTLEMENT.ACC NE '' THEN
+            EMI.BILL = SETTLEMENT.ACC :',': SETTLEMENT.COMPANY :',': SETTLEMENT.CCY :',': BILL.AMOUNT :',': DUE.AMOUNT :',': REPAID.AMOUNT :',': BILL.DATE :',': PAYMENT.TYPE : ',' : ARR.ACC.NUMBER :',': ARR.FWD.CCY :',':  ARR.COMPANY.ID :',': "ACRP" :',': ARR.CUSTOMER :',': ARR.PRODUCT
+        END
+    END
+    RETURN
+
+****************
+PENALTY.PROCESS:
+****************
+
+    ARRANGEMENT.ID = DUE.DATA
+    CALL AA.GET.ARRANGEMENT(ARRANGEMENT.ID, R.ARRANGEMENT, ARR.ERROR)
+    ARR.FWD.CCY = R.ARRANGEMENT<AA.ARR.CURRENCY>
+    ARR.COMPANY.ID = R.ARRANGEMENT<AA.ARR.CO.CODE>
+    ARR.START.DATE = R.ARRANGEMENT<AA.ARR.START.DATE>
+    ARR.ACC.NUMBER = R.ARRANGEMENT<AA.ARR.LINKED.APPL.ID>
+    ARR.CUSTOMER  = R.ARRANGEMENT<AA.ARR.CUSTOMER>
+    ARR.PRODUCT  = R.ARRANGEMENT<AA.ARR.PRODUCT,1>
+
+    GOSUB BUILD.SETTLE.AC
+
+    RETURN
+
+****************
+BUILD.SETTLE.AC:
+****************
+
+    GOSUB GET.CASH.POOL
+    GOSUB BUILD.PENALITY.ACC
+
+    RETURN
+
+*******************
+BUILD.PENALITY.ACC:
+*******************
+    ACC.INT = ''
+
+    TOTALPENALTY = ARRANGEMENT.ID:'-PENALTYINT'
+    CALL OPF(FN.AA.INTEREST.ACCRUAL,F.AA.INTEREST.ACCRUAL)
+    CALL F.READ(FN.AA.INTEREST.ACCRUAL,TOTALPENALTY,R.AA.INTEREST.ACCRUAL,F.AA.INTEREST.ACCRUAL,REC.ERR)
+    ACC.INT = R.AA.INTEREST.ACCRUAL<AA.INT.ACC.TOT.ACCR.AMT>-R.AA.INTEREST.ACCRUAL<AA.INT.ACC.TOT.RPY.AMT>
+*    SETTLEMENT.ACC = SETT.ACC
+*    SETTLEMENT.COMPANY = R.AC.ACCOUNT<AC.CO.CODE>
+*    SETTLEMENT.CCY = R.AC.ACCOUNT<AC.CURRENCY>
+
+    EMI = ''
+
+    GOSUB CHECK.GOVERNMENT.INST
+
+    IF ACC.INT GT 0 AND STOP.HUNTING.FLAG THEN
+        IF SETTLEMENT.ACC NE '' THEN
+            EMI = SETTLEMENT.ACC :',': SETTLEMENT.COMPANY :',': SETTLEMENT.CCY :',': ACC.INT :',': ACC.INT :',': ',' :',PENALTYINT,' : ARR.ACC.NUMBER :',': ARR.FWD.CCY :',':  ARR.COMPANY.ID :',': "ACRP" :',': ARR.CUSTOMER :',': ARR.PRODUCT
+        END
+        GOSUB STORE.PENALTY.REPORT
+    END
+
+    RETURN
+**********************
+CHECK.GOVERNMENT.INST:
+**********************
+
+    CALL F.READ(FN.CAB.GOVER.PRD,'SYSTEM',R.CAB.GOVER.PRD,F.CAB.GOVER.PRD, R.ERR.MSG)
+    PRODUCT.VALUE = R.CAB.GOVER.PRD<CAB.AA.PROD.EXCLUDE>
+
+    IF ARR.PRODUCT MATCHES PRODUCT.VALUE THEN
+        STOP.HUNTING.FLAG = '0'
+    END
+
+* Customer level restriction has introduct to stop hunting
+
+    CALL F.READ(FN.CAB.CUSTOMER,ARR.CUSTOMER,R.CUSTOMER,F.CAB.CUSTOMER,ERR.CAB)
+
+    CUS.RES = R.CUSTOMER<EB.CUS.POSTING.RESTRICT>
+    CUS.RES.LIST = R.CAB.GOVER.PRD<CAB.CUST.EXCLUDE>
+
+    IF CUS.RES NE '' THEN
+        IF CUS.RES MATCHES CUS.RES.LIST THEN
+            STOP.HUNTING.FLAG = '0'
+        END
+
+    END
+
+    RETURN
+*********************
+STORE.PENALTY.REPORT:
+*********************
+* In order to process the FT  for Penalty first the penalty data written to a seperate file
+
+    IF EMI THEN
+        GOSUB GET.ID.VALUE
+        KEY.ID = ''
+        KEY.ID = YR.UNIQUE:'.': C$PORT.NO
+        CALL F.WRITE(FN.AUTO.HUNT.CONCAT,KEY.ID,EMI)
+    END
+
+    RETURN
+
+******************
+STORE.BILL.REPORT:
+******************
+
+* In order to process the FT for Due second the Due data written to a seperate file
+
+    IF EMI.BILL THEN
+        GOSUB GET.ID.VALUE
+        KEY.ID = ''
+        KEY.ID = YR.UNIQUE:'.': C$PORT.NO
+        CALL F.WRITE(FN.AUTO.HUNT.CONCAT,KEY.ID,EMI.BILL)
+    END
+
+    RETURN
+
+*************
+GET.ID.VALUE:
+*************
+
+    YR.UNIQUE = ''
+    CALL ALLOCATE.UNIQUE.TIME(YR.UNIQUE)
+    CONVERT '.' TO '' IN YR.UNIQUE
+
+    RETURN
+
+END

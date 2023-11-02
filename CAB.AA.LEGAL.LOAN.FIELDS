@@ -1,0 +1,106 @@
+    SUBROUTINE CAB.AA.LEGAL.LOAN.FIELDS
+*-----------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S (ITSS)
+* Development Id   : This template will used to maintain AA Legal Loan Accounts.
+*
+* Date             : 27th Sep 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Template Routine
+* Attached to      : CAB.AA.LEGAL.LOAN
+*
+* Attached As      : Template Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This template will used to maintain AA Legal Loan Accounts.
+*
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : N/A
+* ARGS -(Output)   : N/A
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+*----------------------------------------------------------------------------------------------
+*** <region name = Inserts>
+*** <desc> File inserts and common variables in the subroutine </desc>
+*-----------------------------------------------------------------------------
+* Modification History :
+*
+*** <desc>Inserts and control logic</desc>
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_DataTypes
+
+*** </region>
+*-----------------------------------------------------------------------------
+
+*   CALL Table.defineId("TABLE.NAME.ID", T24_String) ;* Define Table id
+
+    ID.F = "ARRANGEMENT.ID"
+    ID.N = "17.1"
+    ID.T = "ARR"
+
+    fieldName = "LEGAL.DATE"
+    fieldLength = '11'
+    fieldType = 'D'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = "COMM.SUSPENSE.ACCT"
+    fieldLength = '19'
+    fieldType = 'POSANT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = "COMM.TXN.ID"
+    fieldLength = '19'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = "XX<COMM.BALANCE.TYPE"
+    fieldLength = '20'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = "XX>COMM.AMOUNT"
+    fieldLength = '19'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = "INT.SUSPENSE.ACCT"
+    fieldLength = '19'
+    fieldType = 'POSANT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = "INT.TXN.ID"
+    fieldLength = '19'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = "XX<INT.BALANCE.TYPE"
+    fieldLength = '20'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = "XX>INT.AMOUNT"
+    fieldLength = '19'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+*-----------------------------------------------------------------------------
+    CALL Table.setAuditPosition         ;* Poputale audit information
+*-----------------------------------------------------------------------------
+    RETURN
+*-----------------------------------------------------------------------------
+END

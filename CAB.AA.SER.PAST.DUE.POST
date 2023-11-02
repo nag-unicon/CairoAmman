@@ -1,0 +1,102 @@
+    SUBROUTINE CAB.AA.SER.PAST.DUE.POST
+* Author - Gokul J
+* Date   - 18/06/2014
+* Desc  - This POST routine update the files in AA.DUE.BP with file generation time appended
+*         The following files will be written to AA.DUE.BP
+*         DUE-<<File generation date and time>>, PENALTY-<<File generation date and time>> ,PASTDUE-<<File generation date and time>>
+
+* Incoming Arguments
+* ------------------
+
+* Outgoing Arguments
+* ------------------
+*
+
+*Modification History
+************************
+* Author          :
+* Reference       :
+* Description     :
+
+**********************************************************************************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.LOCKING
+
+
+
+*   GOSUB INITIALISE
+*   GOSUB PROCESS
+
+    RETURN
+
+***********
+INITIALISE:
+***********
+    F.AA.PASTDUE.DIR = ""
+    F.AA.DUE.DIR = ""
+    F.AA.PEN.DIR = ""
+    F.PASTDUE.DIR = ""
+    F.DUE.DIR = ""
+    F.PEN.DIR = ""
+    R.PASTDUE = ""
+    R.DUE =""
+    R.PENALTY = ""
+*
+    FN.LOCKING ="F.LOCKING"
+    F.LOCKING = ""
+    CALL OPF(FN.LOCKING,F.LOCKING)
+*
+    FN.AA.DUE.BP = "AA.DUE.BP"
+    F.AA.DUE.BP =""
+    OPEN FN.AA.DUE.BP TO F.AA.DUE.BP ELSE
+        EXECUTE "CREATE.FILE F.AA.DUE.BP TYPE=UD"
+    END
+*
+    FN.AA.REP.BP = "AA.REP.BP"
+    F.AA.REP.BP = ""
+    OPEN FN.AA.REP.BP TO F.AA.REP.BP ELSE
+        PRINT "UNABLE TO OPEN AA.REP.BP"
+    END
+
+    RETURN
+
+********
+PROCESS:
+********
+    LOCK.ID = "PASTDUE"
+    CURR.SYS.TIME=TRIM(TIMEDATE()[1,5],':','A')
+    Y.DATE.TIME =TODAY:CURR.SYS.TIME
+    PASTDUE.ID = "PASTDUE-PENALTY-":Y.DATE.TIME:".csv"
+    DUE.ID = "DUE-":Y.DATE.TIME
+    PENALTY.ID = "PENALTY-":Y.DATE.TIME
+    R.LOCKING<EB.LOK.CONTENT,1> =Y.DATE.TIME
+    R.LOCKING<EB.LOK.REMARK,1> = Y.DATE.TIME
+    WRITE R.LOCKING TO F.LOCKING,LOCK.ID
+    HDR.DATA = " Settlement Account,Settlement Company,Settlement Currency,Bill Amount,Due Amount,Repaid Amount,Bill Due Date,Payment Type,Loan Account,Loan Currency,Branch,Transaction Type"
+
+    READ R.PASTDUE FROM F.AA.REP.BP,"PASTDUE.csv" THEN      ;*
+        IF R.PASTDUE THEN
+            INS HDR.DATA BEFORE   R.PASTDUE<1>
+            WRITE R.PASTDUE TO F.AA.DUE.BP, PASTDUE.ID ON ERROR
+            END
+        END
+    END
+    READ R.DUE FROM F.AA.REP.BP,"DUE" THEN
+        IF R.DUE THEN
+            INS HDR.DATA BEFORE   R.DUE<1>
+            WRITE R.DUE TO F.AA.DUE.BP, DUE.ID ON ERROR
+            END
+        END
+    END
+    READ R.PENALTY FROM F.AA.REP.BP,"PENALTY" THEN
+        IF R.PENALTY THEN
+            INS HDR.DATA BEFORE   R.PENALTY <1>
+            WRITE R.PENALTY TO F.AA.DUE.BP, PENALTY.ID ON ERROR
+            END
+        END
+    END
+    EXECUTE "CLEAR.FILE ":FN.AA.REP.BP
+
+    RETURN
+END

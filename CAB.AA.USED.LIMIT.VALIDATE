@@ -1,0 +1,179 @@
+    SUBROUTINE CAB.AA.USED.LIMIT.VALIDATE
+***********************************************************
+***********************************************************
+*** Used Limit is cross verify with the limit unused amount available under
+*** Limit application
+*** Api need to attached TERM.AMOUNT property increase action
+***
+*** Modification:
+*** 28-02-2016 On Top Up system need to consider curaccount
+***
+***********************************************************
+***********************************************************
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_AA.APP.COMMON
+    $INCLUDE T24.BP I_AA.ACTION.CONTEXT
+    $INCLUDE T24.BP I_F.LIMIT
+    $INCLUDE T24.BP I_F.AA.TERM.AMOUNT
+    $INCLUDE T24.BP I_F.AA.LIMIT
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT
+    $INCLUDE T24.BP I_F.EB.CONTRACT.BALANCES
+    $INCLUDE T24.BP I_F.AA.ACCOUNT
+
+    GOSUB SET.ACTIVITY.DETAILS
+    GOSUB PROCESS.ACTION
+
+    RETURN
+************
+INITIALISED:
+************
+
+    FN.CUS.LIMIT ='F.LIMIT'
+    F.CUS.LIMIT =''
+
+    CALL OPF(FN.CUS.LIMIT,F.CUS.LIMIT)
+
+    BALANCE.TYPE ='CURACCOUNT'
+    EFFECTIVE.DATE = TODAY
+
+    RETURN
+
+*********************
+SET.ACTIVITY.DETAILS:
+*********************
+** This section initialises Arrangement Activity related information
+
+    R.ACTIVITY.STATUS = c_arrActivityStatus["-",1,1]
+    ARR.ACTIVITY.ID = c_arrActivityId
+    R.ACTIVITY = c_arrActivityRec
+    ACTIVITY.ACTION = AA$CURR.ACTION
+    EFFECTIVE.DATE = AA$ACTIVITY.EFF.DATE
+    ARRANGEMENT.ID = AA$ARR.ID
+    ACTIVITY.ID = AA$CURR.ACTIVITY
+
+    RETURN
+
+***************
+GET.READ.LIMIT:
+***************
+*** Get Limit Record to find the grant amount is exceed or not
+
+    CALL AA.GET.PROPERTY.RECORD('', ARRANGEMENT.ID, 'LIMIT', EFFECTIVE.DATE, 'LIMIT', '', R.LIMIT.ARR, R.ERR)
+    CALL AA.GET.PROPERTY.RECORD('', ARRANGEMENT.ID, 'ACCOUNT', EFFECTIVE.DATE, 'ACCOUNT', '', R.ACC.REC, R.ERR)
+
+
+    REASON.POS =''
+    APPL.ARR      = 'AA.PRD.DES.TERM.AMOUNT'
+    FIELDNAME.ARR = 'EXCESS.LIMIT'
+    POS.ARR       = ''
+    RATE.POS = ''
+    REASON.POS = ''
+    CALL MULTI.GET.LOC.REF(APPL.ARR,FIELDNAME.ARR,POS.ARR)
+    REASON.POS = POS.ARR<1,1>
+
+    IF R.LIMIT.ARR<AA.LIM.LIMIT.REFERENCE> THEN
+        GOSUB BUILD.LIMIT.ID
+    END
+
+    RETURN
+
+***************
+BUILD.LIMIT.ID:
+***************
+
+    CURRENT.ACCOUNT ='0'
+    DB.ACC.ID = R.ACC.REC<AA.AC.ACCOUNT.REFERENCE>
+    CALL AA.GET.ARRANGEMENT(ARRANGEMENT.ID,R.ARRANGEMENT,ER.ARR)
+    CUST.CODE = R.ARRANGEMENT<AA.ARR.CUSTOMER>
+    CHILD.LIMIT = R.LIMIT.ARR<AA.LIM.LIMIT.REFERENCE>
+
+    CHILD.LIMIT.CNT = LEN(CHILD.LIMIT)
+
+*** Build the Limit ID
+
+    BEGIN CASE
+    CASE CHILD.LIMIT.CNT EQ '6'
+        LIMIT.ID =  CUST.CODE : ".0000" : CHILD.LIMIT
+    CASE CHILD.LIMIT.CNT EQ '7'
+        LIMIT.ID =  CUST.CODE : ".000" : CHILD.LIMIT
+    CASE CHILD.LIMIT.CNT EQ '8'
+        LIMIT.ID =  CUST.CODE : ".00" : CHILD.LIMIT
+    END CASE
+
+    CALL F.READ(FN.CUS.LIMIT,LIMIT.ID,R.CUS.LIMIT,F.CUS.LIMIT,ERR.LIMT)
+
+    CALL AA.GET.ECB.BALANCE.AMOUNT(DB.ACC.ID, BALANCE.TYPE, EFFECTIVE.DATE, BALANCE.AMOUNT,RET.ERR1)
+    CURRENT.ACCOUNT = ABS(BALANCE.AMOUNT)
+
+    IF AA$NEW.ARRANGEMENT THEN
+        LOAN.AMOUNT = R.NEW(AA.AMT.AMOUNT)
+    END ELSE
+        LOAN.AMOUNT = R.NEW(AA.AMT.CHANGE.AMOUNT) ;* Increase amount
+    END
+
+    LOAN.AMOUNT = LOAN.AMOUNT + CURRENT.ACCOUNT
+
+    IF LOAN.AMOUNT GT R.CUS.LIMIT<LI.ONLINE.LIMIT> THEN
+        TEXT = 'AA.LIMIT.EXCESS.INFO' : FM : ABS(R.CUS.LIMIT<LI.ONLINE.LIMIT> - LOAN.AMOUNT)
+        IF NOT(R.NEW(AA.AMT.LOCAL.REF)<1,REASON.POS>) THEN
+            AF = AA.AMT.AMOUNT
+            ETEXT = 'AA-LIMIT.EXCESS.INTERNAL'
+            CALL STORE.END.ERROR
+        END
+        CURR.NO ='1'
+        CALL STORE.OVERRIDE(CURR.NO)
+    END
+
+    IF R.CUS.LIMIT<LI.EXPIRY.DATE> LT TODAY THEN
+        IF NOT(R.NEW(AA.AMT.LOCAL.REF)<1,REASON.POS>) THEN
+            AF = AA.AMT.AMOUNT
+            ETEXT = 'AA-LIMIT.EXPIRED'
+            CALL STORE.END.ERROR
+        END ELSE
+            CURR.NO =1
+            TEXT = 'AA-LIMIT.EXPIRED'
+            CALL STORE.OVERRIDE(CURR.NO)
+        END
+    END
+
+    RETURN
+
+***************
+PROCESS.ACTION:
+***************
+** This section sets up different processing modules for the action routine
+
+    GOSUB INITIALISED
+
+    BEGIN CASE
+    CASE R.ACTIVITY.STATUS = "UNAUTH"
+        GOSUB PROCESS.INPUT.ACTION      ;* Update processing
+    CASE R.ACTIVITY.STATUS = 'DELETE'
+    CASE R.ACTIVITY.STATUS = 'AUTH'
+    CASE R.ACTIVITY.STATUS = 'REVERSE'
+***  GOSUB REVERSAL.PROCESS
+    END CASE
+
+    RETURN
+
+*****************
+REVERSAL.PROCESS:
+*****************
+
+    FINDSTR 'AA.LIMIT.EXCESS.INFO' IN R.NEW(AA.AMT.OVERRIDE) SETTING POS THEN
+        ETEXT ='Reversal is not allowed'
+        CALL STORE.END.ERROR
+    END
+
+
+    RETURN
+
+*********************
+PROCESS.INPUT.ACTION:
+*********************
+
+    GOSUB GET.READ.LIMIT
+
+    RETURN

@@ -1,0 +1,55 @@
+    SUBROUTINE CAB.AA.DEFAULT.PEN.REPORT.LOAD
+*************************************************************************************
+*************************************************************************************
+*** CAB Jordan Defaulter report
+*** For Salary system
+***
+***
+*************************************************************************************
+*************************************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_AA.APP.COMMON
+    $INCLUDE AN.BP I_CAB.SAL.COMMON
+
+    GOSUB INIT
+
+    RETURN
+
+*****
+INIT:
+*****
+
+    ARRANGEMENT.ID = ''
+
+    FN.AA.INTEREST.ACCRUAL = 'F.AA.INTEREST.ACCRUALS'
+    F.AA.INTEREST.ACCRUAL = ''
+    CALL OPF(FN.AA.INTEREST.ACCRUAL, F.AA.INTEREST.ACCRUAL)
+
+    FN.AA.BILL.DETAILS = "F.AA.BILL.DETAILS"
+    F.AA.BILL.DETAILS = ""
+    CALL OPF(FN.AA.BILL.DETAILS, F.AA.BILL.DETAILS)
+
+    F.AC.CASH.POOL = ''
+    FN.AC.CASH.POOL = 'F.AC.CASH.POOL'
+    CALL OPF(FN.AC.CASH.POOL, F.AC.CASH.POOL)
+
+    FN.SETT.ACC ='F.ACCOUNT'
+    F.SETT.ACC = ''
+    CALL OPF (FN.SETT.ACC,F.SETT.ACC)
+
+    FN.SAVED.LISTS ='&SAVEDLISTS&'
+    F.SAVEDLISTS = ''
+    CALL OPF(FN.SAVED.LISTS,F.SAVEDLISTS)
+
+    FN.AA.ARR='F.AA.ARRANGEMENT'
+    F.AA.ARR=''
+    CALL OPF(FN.AA.ARR,F.AA.ARR)
+
+    CALL GET.LOC.REF('AA.ARR.ACCOUNT','SETTLE.ACCOUNT',SETT.POS)
+
+    FN.CAB.SAL ='F.CAB.SALARY.REPORT.LIST'
+    F.CAB.SAL =''
+    CALL OPF(FN.CAB.SAL,F.CAB.SAL)
+
+    RETURN

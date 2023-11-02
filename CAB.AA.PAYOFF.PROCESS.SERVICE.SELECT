@@ -1,0 +1,57 @@
+*-----------------------------------------------------------------------------
+* <Rating>0</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE  CAB.AA.PAYOFF.PROCESS.SERVICE.SELECT
+*----------------------------------------------------------------------------------------------------------------
+*
+* Description           : Select Routine for the Batch job CAB.AA.PAYOFF.PROCESS.SERVICE
+*
+* Developed By          : ITSS - Nabeel
+*
+* Development Reference : Automatic payoff for loan
+*
+* Attached To           : Attached To the Batch Job BNK/CAB.AA.PAYOFF.PROCESS.SERVICE
+*
+* Attached As           : .SELECT Routine
+*-----------------------------------------------------------------------------------------------------------------
+* Input Parameter:
+* ---------------*
+* Argument#1 : N/A
+* Argument#2 : N/A
+* Argument#3 : N/A
+*
+*-----------------*
+* Output Parameter:
+* ----------------*
+* Argument#4 : N/A
+* Argument#5 : N/A
+* Argument#6 : N/A
+*-----------------------------------------------------------------------------------------------------------------
+*  M O D I F I C A T I O N S
+* ***************************
+*-----------------------------------------------------------------------------------------------------------------
+* Defect Reference       Modified By                    Date of Change        Change Details
+*-----------------------------------------------------------------------------------------------------------------
+*
+*-----------------------------------------------------------------------------------------------------------------
+* Include files
+*-----------------------------------------------------------------------------------------------------------------
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_BATCH.FILES
+    $INCLUDE CAB.BP I_CAB.AA.PAYOFF.PROCESS.SERVICE.COMMON
+
+    PROCESS.DATE = ''
+    PROCESS.DATE = TODAY
+    R.CAB.AUTO.PAYOFF.DETAILS = ''
+    CALL F.READ(FN.CAB.AUTO.PAYOFF.DETAILS,PROCESS.DATE,R.CAB.AUTO.PAYOFF.DETAILS,F.CAB.AUTO.PAYOFF.DETAILS,CON.ERR)
+
+    SEL.CMD = "SELECT ": FN.CAB.PAYOFF
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+
+    FILTER.FLAG = ''
+    CALL BATCH.BUILD.LIST(FILTER.FLAG, SEL.LIST)
+
+    RETURN
+END

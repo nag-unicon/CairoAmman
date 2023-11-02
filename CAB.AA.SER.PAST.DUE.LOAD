@@ -1,0 +1,121 @@
+    SUBROUTINE CAB.AA.SER.PAST.DUE.LOAD
+
+* Author - Gokul J
+* Date   - 12/06/2014
+* Desc  - The required files and variables required for PAST Dues Loan amount are initialised
+
+* Incoming Arguments
+* ------------------
+
+* Outgoing Arguments
+* ------------------
+*
+
+* Modification History
+************************
+* Author          :
+* Reference       :
+* Description     :
+*
+*
+**********************************************************************************************************************************
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_AA.APP.COMMON
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT
+    $INCLUDE T24.BP I_F.AA.BILL.DETAILS
+    $INCLUDE T24.BP I_F.ACCT.ACTIVITY
+    $INCLUDE T24.BP I_AA.ID.COMPONENT
+    $INCLUDE T24.BP I_AA.CONTRACT.DETAILS
+    $INCLUDE T24.BP I_F.AA.ACCOUNT.DETAILS
+    $INCLUDE T24.BP I_F.AA.TERM.AMOUNT
+    $INCLUDE T24.BP I_F.AA.INTEREST.ACCRUALS
+    $INCLUDE T24.BP I_F.AC.CASH.POOL
+    $INCLUDE T24.BP I_F.ACCOUNT
+    $INCLUDE TT.BP I_CAB.AA.SER.PAST.DUE.COMMON
+    $INCLUDE T24.BP I_F.LOCKING
+
+
+    GOSUB OPEN.FILES
+    GOSUB OPEN.SEQ.FILES
+
+    RETURN
+*********
+OPEN.FILES:
+***********
+
+
+    FN.AA.INTEREST.ACCRUAL = 'F.AA.INTEREST.ACCRUALS'
+    F.AA.INTEREST.ACCRUAL = ''
+    CALL OPF(FN.AA.INTEREST.ACCRUAL, F.AA.INTEREST.ACCRUAL)
+*
+    FN.AA.BILL.DETAILS = "F.AA.BILL.DETAILS"
+    F.AA.BILL.DETAILS = ""
+    CALL OPF(FN.AA.BILL.DETAILS, F.AA.BILL.DETAILS)
+*
+    F.AC.CASH.POOL = ''
+    FN.AC.CASH.POOL = 'F.AC.CASH.POOL'
+    CALL OPF (FN.AC.CASH.POOL,F.AC.CASH.POOL)
+*
+    FN.SETT.ACC ='F.ACCOUNT'
+    F.SETT.ACC = ''
+    CALL OPF (FN.SETT.ACC,F.SETT.ACC)
+*
+
+    FN.ALT.ACCOUNT ='F.ALTERNATE.ACCOUNT'
+    F.ALT.ACCOUNT = ''
+    CALL OPF (FN.ALT.ACCOUNT,F.ALT.ACCOUNT)
+*
+
+    FN.AA.REPBP = 'AA.REP.BP'
+    F.AA.REPBP = ''
+
+*
+    FN.CAB.CUSTOMER = 'F.CUSTOMER'
+    F.CAB.CUSTOMER = ''
+    CALL OPF(FN.CAB.CUSTOMER,F.CAB.CUSTOMER)
+
+*
+    FN.CAB.GOVER.PRD = 'F.CAB.GOVERNMENT.PRODUCT'
+    F.CAB.GOVER.PRD = ''
+    CALL OPF(FN.CAB.GOVER.PRD,F.CAB.GOVER.PRD)
+*
+
+    FN.AUTO.HUNT.CONCAT = 'F.AUTO.HUNT.CONCAT'
+    F.AUTO.HUNT.CONCAT = ''
+    CALL OPF(FN.AUTO.HUNT.CONCAT,F.AUTO.HUNT.CONCAT)
+
+*
+
+*
+*    FN.LOCKING ="F.LOCKING"
+*    F.LOCKING = ''
+*    CALL OPF(FN.LOCKING,F.LOCKING)
+*    R.LOCKING = "" ; LOCK.ERR = ""
+*
+    OPEN FN.AA.REPBP TO F.AA.REPBP ELSE
+        ETEXT = "CANNOT CREATE SEQUENTIAL FILE"
+        CRT ETEXT
+    END
+
+*
+    RETURN
+***************
+OPEN.SEQ.FILES:
+***************
+
+*    F.DUE.DIR = ''
+*    OPENSEQ FN.AA.REPBP,"DUE" TO F.DUE.DIR THEN
+*    END
+*
+*    F.TEMP.DIR = ''
+*    OPENSEQ FN.AA.REPBP,"PASTDUE.csv" TO F.TEMP.DIR THEN
+*    END
+*
+*    F.PEN.DIR = ''
+*    OPENSEQ FN.AA.REPBP,"PENALTY" TO F.PEN.DIR THEN
+*    END
+
+    RETURN
+END

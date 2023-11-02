@@ -1,0 +1,35 @@
+    SUBROUTINE CAB.AA.SUSPEND.PARAM.FIELDS
+*-----------------------------------------------------------------------------
+* Modification History :
+*
+*
+*-----------------------------------------------------------------------------
+
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT T24.BP I_DataTypes
+
+*-----------------------------------------------------------------------------
+
+    ID.F = 'CAB.AA.ID' ; ID.N = '35'
+    ID.T = ''
+    ID.T<1>="" ; ID.T<2>="SYSTEM"       ;* ID defined as SYSTEM
+    ID.CHECKFILE = "" ; ID.CONCATFILE = ""
+
+*-----------------------------------------------------------------------------
+
+    CALL Table.addField("XX.AA.SUP.ACCRUAL", T24_String, "", "")
+    CALL Field.setCheckFile("AA.PRODUCT")
+    CALL Table.addField("AA.DISCOUNTING", T24_String, "", "")
+    CALL Field.setCheckFile("ACCOUNT")
+    CALL Table.addField("AA.DISCOUNTING1", T24_String, "", "")
+    CALL Field.setCheckFile("ACCOUNT")
+    CALL Table.addField("AA.FLATINTEREST", T24_String, "", "")
+    CALL Field.setCheckFile("ACCOUNT")
+
+*-----------------------------------------------------------------------------
+    CALL Table.setAuditPosition         ;* Populate audit information
+*-----------------------------------------------------------------------------
+    RETURN
+*-----------------------------------------------------------------------------
+END

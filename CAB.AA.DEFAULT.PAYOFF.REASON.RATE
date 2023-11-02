@@ -1,0 +1,62 @@
+*-----------------------------------------------------------------------------
+* <Rating>-12</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AA.DEFAULT.PAYOFF.REASON.RATE
+* ==========================================================
+* Company Name  : ITSS
+* Developed By  : ITSS-offshore
+* ==========================================================
+* Program Name  : CAB.AA.DEFAULT.PAYOFF.REASON.RATE
+* Author        : ITSS - nabeel
+* Date          : 14-09-2015
+* ----------------------------------------------------------
+* Description   : API to update
+*                 PAYOFF.REASON and PAYOFF.CHG.RATE
+* Type          : AA Activity Activity Subroutine
+* Linked With   : LENDING-AUTO-PAYOFF
+* In Parameter  : N/A
+* Out Parameter : N/A
+* ----------------------------------------------------------
+* Modification History :
+* ---------------------------------------------------------------
+*----------------------------------------------------------------
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_AA.LOCAL.COMMON
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT.ACTIVITY
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT
+    $INCLUDE T24.BP I_F.AA.CHARGE
+*----------------------------------------------------------------
+    BEGIN CASE
+    CASE V$FUNCTION EQ "I" AND V$FUNCTION NE "S"
+*c_aalocActivityStatus MATCHES 'UNAUTH':VM:'UNAUTH-CHG'
+        GOSUB GET.LOC.REF.POS
+        IF R.NEW(AA.CHG.LOCAL.REF)<1,REASON.POS> EQ '' THEN
+            R.NEW(AA.CHG.LOCAL.REF)<1,REASON.POS> = "NEW LOAN"
+        END
+
+*IF R.NEW(AA.CHG.LOCAL.REF)<1,RATE.POS> = '' THEN
+*R.NEW(AA.CHG.LOCAL.REF)<1,RATE.POS> = "0.00"
+*END
+
+    CASE c_aalocActivityStatus EQ 'AUTH'
+* Future use
+    CASE c_aalocActivityStatus EQ 'AUTH-REV'
+* Future use
+    END CASE
+
+    RETURN
+*----------------------------------------------------------------
+GET.LOC.REF.POS:
+*---------------
+    APPL.ARR      = 'AA.PRD.DES.CHARGE'
+    FIELDNAME.ARR = 'PAYOFF.REASON':VM:'PAYOFF.CHG.RATE'
+    POS.ARR       = ''
+    RATE.POS = ''
+    REASON.POS = ''
+    CALL MULTI.GET.LOC.REF(APPL.ARR,FIELDNAME.ARR,POS.ARR)
+    REASON.POS = POS.ARR<1,1>
+    RATE.POS   = POS.ARR<1,2>
+    RETURN
+*----------------------------------------------------------------
+END

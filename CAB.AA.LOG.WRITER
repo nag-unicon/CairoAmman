@@ -1,0 +1,269 @@
+    SUBROUTINE CAB.AA.LOG.WRITER
+**********************************************************************************
+**********************************************************************************
+*** This API Written for monitoring the activity done by users
+*** During the Authorise of AAA activity api will capture the record.
+*** API should attached under AAA version using by all user
+***
+*=====================
+* Date         Modified by        Descriptin
+* 13-01-2019    Nuha Tuhul        set EFFECTIVE.DATE = TODAY ,IF EFFECTIVE.DATE LE TODAY
+* 17-06-2019    Muthu             Failed to update the activity details for DELETE-REV status.
+**********************************************************************************
+**********************************************************************************
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.AA.ARRANGEMENT
+    $INSERT I_F.AA.ARRANGEMENT.ACTIVITY
+    $INSERT I_F.AA.ACTIVITY.HISTORY
+    $INSERT I_AA.APP.COMMON
+    $INSERT I_AA.LOCAL.COMMON
+    $INSERT I_AA.ACTION.CONTEXT
+    $INSERT I_F.FUNDS.TRANSFER
+    $INSERT I_F.CUSTOMER
+    $INSERT TT.BP I_F.CAB.AAA.LOG.DETAILS
+
+    INITIATION.TYPE = R.NEW(AA.ARR.ACT.INITIATION.TYPE)
+
+    IF R.NEW(AA.ARR.ACT.MASTER.AAA) EQ ID.NEW AND (INITIATION.TYPE EQ 'USER' OR INITIATION.TYPE EQ 'TRANSACTION') THEN
+
+        GOSUB INIT
+        GOSUB PROCESS
+
+    END
+
+    RETURN
+
+*****
+INIT:
+*****
+*** Initalised common variables
+
+    FN.CAB.LOG ='F.CAB.AAA.LOG.DETAILS'
+    F.CAB.LOG =''
+
+    FN.AA.ACTIVITY.HIS ='F.AA.ACTIVITY.HISTORY'
+    F.AA.ACTIVITY.HIS =''
+
+    FN.CAB.AAA ='F.AA.ARRANGEMENT.ACTIVITY'
+    F.CAB.AAA =''
+
+    FN.CAB.AA ='F.AA.ARRANGEMENT'
+    F.CAB.AA =''
+
+    FN.FUND.TRAN ='F.FUNDS.TRANSFER'
+    F.FUND.TRAN=''
+
+    FN.CAB.CUS ='F.CUSTOMER'
+    F.CAB.CUS =''
+
+    CALL OPF(FN.CAB.AA,F.CAB.AA)
+    CALL OPF(FN.CAB.CUS,F.CAB.CUS)
+    CALL OPF(FN.CAB.AAA,F.CAB.AAA)
+    CALL OPF(FN.CAB.LOG,F.CAB.LOG)
+    CALL OPF(FN.FUND.TRAN,F.FUND.TRAN)
+    CALL OPF(FN.AA.ACTIVITY.HIS,F.AA.ACTIVITY.HIS)
+
+    ARR.ID = AA$ARR.ID
+    AAA.ID = c_arrActivityId
+    AAA.MAST.RECORD = AA$MASTER.ACTIVITY
+    EFFECTIVE.DATE = AA$ACTIVITY.EFF.DATE
+    R.ACTIVITY.STATUS = c_arrActivityStatus["-",1,1]
+
+    CALL AA.GET.ARRANGEMENT(ARR.ID, R.ARR, RET.ERROR)
+
+    CUST.ID = R.NEW(AA.ARR.ACT.CUSTOMER)
+
+    R.CUS.DET = ""
+    ER.CU = ""
+    CALL F.READ(FN.CAB.CUS,CUST.ID,R.CUS.DET,F.CAB.CUS,ER.CU)
+
+    R.CAB.LOG = ""
+    ERR.CAB.LOG = ""
+    CALL F.READ(FN.CAB.LOG,AAA.ID,R.CAB.LOG,F.CAB.LOG,ERR.CAB.LOG)
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    BEGIN CASE
+
+    CASE c_arrActivityStatus EQ "DELETE-REV"
+        R.CAB.LOG<AAA.STATUS> = 'AUTH'  ;* Restore the STATUS value as AUTH. Reversed activity deleted (Get back to LIVE).
+        R.CAB.LOG<AAA.REV.ACTIVITY> = ''
+        CALL F.WRITE(FN.CAB.LOG,AAA.ID,R.CAB.LOG)
+
+    CASE R.ACTIVITY.STATUS = "UNAUTH"
+        GOSUB PROCESS.INAU
+        GOSUB WRITE.LOG
+
+    CASE R.ACTIVITY.STATUS = "AUTH"
+        GOSUB PROCESS.AUTH
+        GOSUB WRITE.LOG
+
+    CASE R.ACTIVITY.STATUS = "DELETE"
+        GOSUB PROCESS.DEL
+
+    CASE R.ACTIVITY.STATUS = "REVERSE"
+        GOSUB PROCESS.REV
+        GOSUB WRITE.LOG
+    END CASE
+
+    RETURN
+
+************
+PROCESS.DEL:
+************
+*** Delete the activity from the log files.
+
+    CALL F.DELETE(FN.CAB.LOG,AAA.ID)
+
+    RETURN
+*************
+PROCESS.REV:
+*************
+
+    R.CAB.LOG<AAA.ARRANGEMENT.ID> = R.NEW(AA.ARR.ACT.ARRANGEMENT)
+    R.CAB.LOG<AAA.CUSTOMER>       = R.NEW(AA.ARR.ACT.CUSTOMER)
+    R.CAB.LOG<AAA.CUS.NAME>       = R.CUS.DET<EB.CUS.SHORT.NAME,1>
+    R.CAB.LOG<AAA.LOANACCOUNT>    = R.ARR<AA.ARR.LINKED.APPL.ID,1>
+    R.CAB.LOG<AAA.ACTIVITY>       = R.NEW(AA.ARR.ACT.ACTIVITY)
+    R.CAB.LOG<AAA.PRODUCT>        = R.NEW(AA.ARR.ACT.PRODUCT)
+    R.CAB.LOG<AAA.REV.ACTIVITY>   = OPERATOR
+    R.CAB.LOG<AAA.EFF.DATE>       = R.NEW(AA.ARR.ACT.EFFECTIVE.DATE)
+    R.CAB.LOG<AAA.CURRENCY>       = R.NEW(AA.ARR.ACT.CURRENCY)
+    R.CAB.LOG<AAA.COMPANY>        = ID.COMPANY
+    R.CAB.LOG<AAA.STATUS>         = 'REVERSE'
+
+    RETURN
+
+*************
+PROCESS.INAU:
+*************
+
+    R.CAB.LOG<AAA.ARRANGEMENT.ID> = R.NEW(AA.ARR.ACT.ARRANGEMENT)
+    R.CAB.LOG<AAA.CUSTOMER>       = R.NEW(AA.ARR.ACT.CUSTOMER)
+    R.CAB.LOG<AAA.CUS.NAME>       = R.CUS.DET<EB.CUS.SHORT.NAME,1>
+    R.CAB.LOG<AAA.LOANACCOUNT>    = R.ARR<AA.ARR.LINKED.APPL.ID,1>
+    R.CAB.LOG<AAA.ACTIVITY>       = R.NEW(AA.ARR.ACT.ACTIVITY)
+    R.CAB.LOG<AAA.PRODUCT>        = R.NEW(AA.ARR.ACT.PRODUCT)
+    R.CAB.LOG<AAA.INPUTTER>       = OPERATOR
+    R.CAB.LOG<AAA.REV.ACTIVITY>   = ''
+    R.CAB.LOG<AAA.EFF.DATE>       = R.NEW(AA.ARR.ACT.EFFECTIVE.DATE)
+    R.CAB.LOG<AAA.CURRENCY>       = R.NEW(AA.ARR.ACT.CURRENCY)
+    R.CAB.LOG<AAA.COMPANY>        = ID.COMPANY
+    R.CAB.LOG<AAA.STATUS>         = 'UNAUTH'
+
+    RETURN
+
+*************
+PROCESS.AUTH:
+*************
+    IF R.NEW(AA.ARR.ACT.EFFECTIVE.DATE) LT TODAY THEN       ;* Update the Effective Date field value as processing T24 date instead of Activity eff date during Auth stage.
+        R.CAB.LOG<AAA.EFF.DATE> = TODAY
+    END
+
+    R.CAB.LOG<AAA.STATUS>      ='AUTH'
+    R.CAB.LOG<AAA.AUTHORISER>  = OPERATOR
+    R.CAB.LOG<AAA.COMPANY>     = R.ARR<AA.ARR.CO.CODE>
+    R.CAB.LOG<AAA.LOANACCOUNT> = R.ARR<AA.ARR.LINKED.APPL.ID,1>
+    R.CAB.LOG<AAA.CUS.NAME>    = R.CUS.DET<EB.CUS.SHORT.NAME,1>
+
+    IF R.NEW(AA.ARR.ACT.REV.MASTER.AAA) NE '' THEN
+        R.CAB.LOG<AAA.STATUS>  = 'AUTH-REV'
+    END
+
+    RETURN
+
+************************
+GET.TRANSACTION.DETAILS:
+************************
+*** For Transaction log we need to include the below fields
+
+    FT.ID = R.NEW(AA.ARR.ACT.TXN.CONTRACT.ID)<1>
+    CALL F.READ(FN.FUND.TRAN,FT.ID,R.FN.FUND.TRAN,F.FUND.TRAN,ERR.FUND.TRAN)
+
+    R.CAB.LOG<AAA.DR.ACCOUNT> = R.FN.FUND.TRAN<FT.DEBIT.ACCT.NO>
+    R.CAB.LOG<AAA.CR.ACCOUNT> = R.FN.FUND.TRAN<FT.CREDIT.ACCT.NO>
+    R.CAB.LOG<AAA.TRANS.CODE> = R.FN.FUND.TRAN<FT.TRANSACTION.TYPE>
+    R.CAB.LOG<AAA.TRANS.TYPE> = R.NEW(AA.ARR.ACT.TXN.CONTRACT.ID)
+    R.CAB.LOG<AAA.TRANS.AMT>  = R.NEW(AA.ARR.ACT.TXN.AMOUNT)
+    R.CAB.LOG<AAA.CUS.NAME>   = R.CUS.DET<EB.CUS.SHORT.NAME,1>
+
+    RETURN
+
+**********
+WRITE.LOG:
+**********
+*** Need to write only user triggered activity.
+
+    BEGIN CASE
+
+    CASE R.NEW(AA.ARR.ACT.INITIATION.TYPE) EQ 'USER'
+*   GOSUB AUTO.ACTIVITY
+        CALL F.WRITE(FN.CAB.LOG,AAA.ID,R.CAB.LOG)
+
+    CASE R.NEW(AA.ARR.ACT.INITIATION.TYPE) EQ 'TRANSACTION'
+*   GOSUB AUTO.ACTIVITY
+        GOSUB GET.TRANSACTION.DETAILS
+        CALL F.WRITE(FN.CAB.LOG,AAA.ID,R.CAB.LOG)
+
+    END CASE
+
+    RETURN
+
+**************
+AUTO.ACTIVITY:
+**************
+***System triggering activity need to include Inputer and Authoriser
+
+    BEGIN CASE
+
+    CASE R.NEW(AA.ARR.ACT.ACTIVITY) EQ 'LENDING-DISBURSE-COMMITMENT'
+        FIND.AAA='LENDING-NEW-ARRANGEMENT'
+        GOSUB READ.UPDATE.VAL
+
+    CASE R.NEW(AA.ARR.ACT.ACTIVITY) EQ 'LENDING-ISSUE-PAYOFF'
+        FIND.AAA='LENDING-AUTO-PAYOFF'
+        GOSUB READ.UPDATE.VAL
+
+    CASE R.NEW(AA.ARR.ACT.ACTIVITY) EQ 'LENDING-CALC-CHARGE'
+
+        FIND.AAA='LENDING-NEW-ARRANGEMENT'
+        GOSUB READ.UPDATE.VAL
+
+    END CASE
+
+    RETURN
+
+****************
+READ.UPDATE.VAL:
+****************
+
+    ID.ACT = ARR.ID
+    CALL F.READ(FN.AA.ACTIVITY.HIS,ID.ACT,R.AA.ACTIVITY.HIS,F.AA.ACTIVITY.HIS,ER.ACT.HIS)
+
+    AH.ACTIVITY = R.AA.ACTIVITY.HIS<AA.AH.ACTIVITY>
+    AH.ACTIVITY.REF = R.AA.ACTIVITY.HIS<AA.AH.ACTIVITY.REF>
+    AH.STATUS = R.AA.ACTIVITY.HIS<AA.AH.ACT.STATUS>
+
+    CONVERT @SM TO @VM IN AH.ACTIVITY
+    CONVERT @SM TO @VM IN AH.ACTIVITY.REF
+    CONVERT @SM TO @VM IN AH.STATUS
+
+    CONVERT @VM TO @FM IN AH.ACTIVITY
+    CONVERT @VM TO @FM IN AH.ACTIVITY.REF
+    CONVERT @VM TO @FM IN AH.STATUS
+
+    LOCATE FIND.AAA IN AH.ACTIVITY SETTING POS THEN
+        FIND.AAA = AH.ACTIVITY.REF<POS>
+        CALL F.READ(FN.CAB.LOG,FIND.AAA,R.CAB,F.CAB.LOG,ERR.CAB.LOG)
+        R.CAB.LOG<AAA.AUTHORISER> = R.CAB<AAA.AUTHORISER>
+        R.CAB.LOG<AAA.INPUTTER> =  R.CAB<AAA.INPUTTER>
+        R.CAB.LOG<AAA.REV.ACTIVITY> =  R.CAB<AAA.REV.ACTIVITY>
+    END
+
+    RETURN

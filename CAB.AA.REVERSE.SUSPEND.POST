@@ -1,0 +1,67 @@
+    SUBROUTINE CAB.AA.REVERSE.SUSPEND.POST
+*************************************************************************
+*************************************************************************
+* Montly report for refund the suspend
+*
+*
+*************************************************************************
+*************************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT
+    $INCLUDE T24.BP I_F.EB.ACCRUAL
+    $INCLUDE T24.BP I_F.AA.ACCOUNT.DETAILS
+    $INCLUDE TT.BP I_CAB.AA.ACCRUAL.COMMON
+    $INCLUDE TT.BP I_F.CAB.AA.SUSPEND.PARAM
+
+    GOSUB INIT
+    GOSUB PROCESS
+    GOSUB WRITE.LIST
+
+    RETURN
+
+*****
+INIT:
+*****
+
+    REP.DATE = TODAY
+    REP.DATE = LEFT(REP.DATE,6)
+    CALL GET.LAST.DOM(REP.DATE,LAST.DATE,LAST.DAY,MONTH.NAME)
+    REP.END.DATE = LAST.DATE
+
+    FN.CAB.SUS.LIST ='F.AA.SUS.LIST'
+    F.CAB.SUS.LIST =''
+    CALL OPF(FN.CAB.SUS.LIST,F.CAB.SUS.LIST)
+
+    SEL.CMD =''
+    SEL.LIST =''
+    SEL.CNT =''
+    SEL.ERR =''
+
+    R.RECORD<-1>="Cairo Amman Bank Amortisation Report for Suspended Loans as on " : REP.END.DATE
+    R.RECORD<-1>="ID,Arrangement ID,Account No,Customer ID,Branch,Amortised Property,Currency,Interest Amount,PL Category,Amort Start Date,Amort End Date,Amort Days,"
+    R.RECORD :="Daily accrual amount,Loan Suspension Date,Suspension Days,Total Suspended Accrual,Suspended Accrual Reversed,Suspend Accrual for this month,Month"
+    RETURN
+
+********
+PROCESS:
+********
+
+    SEL.CMD = "SELECT ": FN.CAB.SUS.LIST
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+
+    FOR I=1 TO SEL.CNT
+        CALL F.READ(FN.CAB.SUS.LIST,SEL.LIST<I>,R.CAB.SUS.LIST,F.CAB.SUS.LIST,ERR.CAB.SUS)
+        R.RECORD<-1> = R.CAB.SUS.LIST
+    NEXT I
+
+    RETURN
+
+***********
+WRITE.LIST:
+***********
+
+    KEY.LIST ='CAB.AA.AMORT.SUSPEND.ACCRUAL.csv'
+    WRITELIST R.RECORD TO KEY.LIST
+
+    RETURN
