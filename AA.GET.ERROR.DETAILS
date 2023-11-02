@@ -1,0 +1,121 @@
+*-----------------------------------------------------------------------------
+* <Rating>75</Rating>
+*-----------------------------------------------------------------------------
+
+    SUBROUTINE AA.GET.ERROR.DETAILS(OFS.RESPONSE, MESSAGE.TYPE, ERROR.SOURCE, ERROR.MESSAGE, ERR.ID.DETAILS)
+
+*** <region name= Description>
+*** <desc>Sub routine to fetch the error details from the OFS response</desc>
+* Program Description
+*
+* This routine will parse the OFS reponse and isolate the error details
+* which will return Error source and error message in the OFS format, can append this data in the OFS message in order to process hold request.
+*
+*-----------------------------------------------------------------------------
+* @package retaillending.AA
+* @stereotype subroutine
+* @author shyamjith@temenos.com
+*-----------------------------------------------------------------------------
+
+* Parameters:
+* IN     -      OFS.RESPONSE  -  OFS response of the failed transaction, which will have /-1 in the failed message.
+*               RETURN.TYPE   -  If set to OFS, then error source and error message would be return in the form of OFS message.
+*                                If nothing specified, simply will return in the array format.
+*
+* OUT    -      ERROR.SOURCE   -  Property in which the error was raised.
+*               ERROR.MESSAGE  -  detailed description of the error message.
+*               ERR.ID.DETAILS -  ID's of the failed messages.
+*
+*** </region>
+
+*-----------------------------------------------------------------------------
+*** <region name= Modification history>
+***
+*
+**  28/08/14 - Enhancement - 1052773
+**             Task : 1077591
+**             Process OFS response of the failed transaction.
+*
+*** </region>
+*-----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_AA.APP.COMMON
+    $INSERT I_EB.TRANS.COMMON
+
+*-----------------------------------------------------------------------------
+
+*** <region name= Main Process>
+
+    GOSUB INITIALISE
+    GOSUB PROCESS
+
+    RETURN
+
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Initialise>
+***
+INITIALISE:
+
+    NO.MSGS = ''
+    ERROR.SOURCE = '' ; ERROR.MESSAGE = '' ; ERR.ID.DETAILS = '' ; ERR.CNT = 1
+    HEADER.DET = ''
+    OFS.MESSAGE = OFS.RESPONSE          ;* Process with this variable
+
+    RETURN
+
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= Processing Logic>
+***
+PROCESS:
+
+* Change '</request><request>' to FMs
+    CHANGE cTxn_REQUEST_TAG_C : cTxn_REQUEST_TAG TO FM IN OFS.MESSAGE
+
+* Remove '<requests><request>'
+    CHANGE cTxn_REQUESTS_TAG : cTxn_REQUEST_TAG TO '' IN OFS.MESSAGE
+
+* Remove '</request></requests>'
+    CHANGE cTxn_REQUEST_TAG_C : cTxn_REQUESTS_TAG_C TO '' IN OFS.MESSAGE
+
+    NO.MSGS = DCOUNT(OFS.MESSAGE,FM)
+
+    FOR RCNT = 1 TO NO.MSGS
+
+        HEADER.DET = FIELD(OFS.MESSAGE<RCNT>,',',1,1)
+
+        RESP.TAG = FIELD(HEADER.DET,'/',3,1)
+
+        IF RESP.TAG = -1 THEN
+
+            ID.DETAILS = FIELD(HEADER.DET,'/',1,1)
+            ERR.PROPERTY = FIELD(ID.DETAILS,AA$SEP,2,1)
+
+            IF NOT(ERR.PROPERTY) THEN
+                ERR.PROPERTY = ID.DETAILS
+            END
+
+            LOCATE ID.DETAILS IN ERR.ID.DETAILS<1,1> SETTING EPOS ELSE          ;* Any subsequent errors could be the result of a previous error. Dont confuse users
+                IF MESSAGE.TYPE EQ "OFS" THEN
+                    ERROR.SOURCE = ERROR.SOURCE:"ERROR.SOURCE:1:":ERR.CNT:"=":'"':ERR.PROPERTY:'"':","
+                    ERROR.MESSAGE = ERROR.MESSAGE:"ERROR.MESSAGE:1:":ERR.CNT:"=":'"':FIELD(OFS.MESSAGE<RCNT>,',',2,99):'"':","
+                    ERR.CNT += 1
+                END ELSE
+                    ERROR.SOURCE<1,-1> = ERR.PROPERTY
+                    ERROR.MESSAGE<1,-1> = FIELD(OFS.MESSAGE<RCNT>,',',2,99)
+                END
+                ERR.ID.DETAILS<1,-1> = ID.DETAILS
+            END
+
+        END
+
+    NEXT RCNT
+
+    RETURN
+*** </region>
+
+*-----------------------------------------------------------------------------
+END

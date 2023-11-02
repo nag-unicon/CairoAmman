@@ -1,0 +1,59 @@
+    SUBROUTINE AA.LOAN.BALOON.PAYMENT.SELECT
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 03rd Jul 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Batch Routine
+* Attached to      : BNK/AA.LOAN.BALOON.PAYMENT
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This routine used to get the last two payment amount for AA Loan
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT TT.BP I_AA.LOAN.BALOON.PAYMENT.COMMON
+
+*** </region>
+*** <region name= Main Body>
+
+    EXECUTE 'CLEAR.FILE ' : FN.AA.BALOON.PAYMENT.LIST
+
+    GOSUB SELECT.STATEMENT
+
+*** </region>
+
+    RETURN
+
+*** </region>
+*** <region name= Select Statment>
+
+SELECT.STATEMENT:
+
+    SEL.LIST = ""
+    SEL.CNT  = ""
+    SEL.ERR  = ""
+
+    SEL.CMD  = "SELECT ":FN.AA.ARRANGEMENT :" WITH PRODUCT.LINE EQ LENDING AND (ARR.STATUS EQ CURRENT OR ARR.STATUS EQ EXPIRED)"
+
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+    CALL BATCH.BUILD.LIST("",SEL.LIST)
+
+    RETURN
+
+END

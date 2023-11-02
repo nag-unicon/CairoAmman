@@ -1,0 +1,40 @@
+    SUBROUTINE AA.EASY.INSTALL.REPORT.LOAD
+*******************************************************************************
+*** Batch job is used for generating EASYINSTALMENT Loan Report
+***
+***
+*******************************************************************************
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE TT.BP I_EASY.INSTAL.COMMON
+
+    FN.AA.ARRANGEMENT ='F.AA.ARRANGEMENT'
+    F.AA.ARRANGEMENT =''
+    CALL OPF(FN.AA.ARRANGEMENT,F.AA.ARRANGEMENT)
+
+    FN.AA.ACCOUNT.DETAILS ='F.AA.ACCOUNT.DETAILS'
+    F.AA.ACCOUNT.DETAILS =''
+    CALL OPF(FN.AA.ACCOUNT.DETAILS,F.AA.ACCOUNT.DETAILS)
+
+    FN.EASY = 'F.CAB.AA.EASY.INST.LOAN'
+    F.EASY =''
+    CALL OPF(FN.EASY,F.EASY)
+
+    FN.CAB.MER='F.CAB.MERCHANT'
+    F.CAB.MER=''
+    CALL OPF(FN.CAB.MER,F.CAB.MER)
+
+    FN.CUSTOM='F.CUSTOMER'
+    F.CUSTOM =''
+    CALL OPF(FN.CUSTOM,F.CUSTOM)
+
+    FN.CUST.COMP= 'F.COMPANY'
+    F.CUST.COMP =''
+    CALL OPF(FN.CUST.COMP,F.CUST.COMP)
+
+    FN.ACT.HIST='F.AA.ACTIVITY.HISTORY'
+    F.ACT.HIST=''
+    CALL OPF(FN.ACT.HIST,F.ACT.HIST)
+
+    RETURN

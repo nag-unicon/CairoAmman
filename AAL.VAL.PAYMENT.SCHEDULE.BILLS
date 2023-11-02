@@ -1,0 +1,239 @@
+    SUBROUTINE AAL.VAL.PAYMENT.SCHEDULE.BILLS
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 20th Aug 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Validation routine
+* Attached to      :     Activity Class  : LENDING-NEW-ARRANGEMENT
+*                        Property Class  : PAYMENT.SCHEDULE
+*                        Action          : UPDATE
+* Attached As      : Activity API - Validation Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Routine is used to validate the PAYMENT.TYPE based on no bills inputted for Discounted Bills products.
+*                    System should expand the payment type, Start date and actual Amount fields based on no of bills inputted by users
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.AA.PAYMENT.SCHEDULE
+    $INSERT I_F.AA.TERM.AMOUNT
+    $INSERT I_AA.LOCAL.COMMON
+
+*** </region>
+*** <region name= Main Body>
+
+    IF c_aalocActivityStatus["-",1,1] EQ 'UNAUTH' THEN
+
+        GOSUB GET.LOCAL.REF.FIELDS
+        GOSUB PROCESS.INPUT.ACTION
+
+    END
+
+    RETURN
+
+*** </region>
+
+*** <region name= GET.LOCAL.REF.FIELDS>
+
+GET.LOCAL.REF.FIELDS:
+
+    APPLN.NAME = ''
+    FIELD.NAME = ''
+    LOCAL.POS = ''
+
+    APPLN.NAME = 'AA.PRD.DES.PAYMENT.SCHEDULE'
+    FIELD.NAME = 'BILL.NO' :VM: 'BILL.ISSUE.DATE' :VM: 'DEBTOR.ID' :VM: 'DEBTOR.NAME' :VM: 'BILL.GUAR.ID' :VM: 'BILL.GUAR.NAME' :VM: 'BILL.GUAR.ID1' :VM: 'BILL.GUAR.NAME1' :VM: 'BILL.REMARKS' :VM: 'BILL.DUE.DATE' :VM: 'BILL.AMOUNT'
+    CALL MULTI.GET.LOC.REF(APPLN.NAME,FIELD.NAME,LOCAL.POS)
+
+    BILL.NO.POS         = LOCAL.POS<1,1>
+    BILL.ISSUE.DATE.POS = LOCAL.POS<1,2>
+    DEBTOR.ID.POS       = LOCAL.POS<1,3>
+    DEBTOR.NAME.POS     = LOCAL.POS<1,4>
+    BILL.GUAR.ID.POS    = LOCAL.POS<1,5>
+    BILL.GUAR.NAME.POS  = LOCAL.POS<1,6>
+    BILL.GUAR.ID1.POS   = LOCAL.POS<1,7>
+    BILL.GUAR.NAME1.POS = LOCAL.POS<1,8>
+    BILL.REMARKS.POS    = LOCAL.POS<1,9>
+    BILL.DUE.DATE.POS   = LOCAL.POS<1,10>
+    BILL.AMOUNT.POS     = LOCAL.POS<1,11>
+
+    RETURN
+
+*** </region>
+
+*** <region name= PROCESS.INPUT.ACTION>
+
+PROCESS.INPUT.ACTION:
+
+    IF c_aalocCurrActivity EQ 'LENDING-NEW-ARRANGEMENT' THEN
+
+        ARR.ID      = c_aalocArrId
+        TOTAL.BILLS = DCOUNT(R.NEW(AA.PS.LOCAL.REF)<1,BILL.NO.POS>, SM)
+        TOTAL.PAYMENT.TYPES = DCOUNT(R.NEW(AA.PS.PAYMENT.TYPE), VM)
+
+        GOSUB DEFAULT.BILL.DETAILS
+        IF NOT(RETURN.ERROR) THEN
+            GOSUB DEFAULT.PAYMENT.TYPES
+            GOSUB GET.ARRANGEMENT.CONDITIONS
+
+            PAYMENT.AMOUNT = 0
+            PAYMENT.AMOUNT = SUM(R.NEW(AA.PS.ACTUAL.AMT))
+
+            IF PAYMENT.AMOUNT NE COMMITMENT.AMOUNT THEN
+                AF = AA.PS.ACTUAL.AMT
+                AV = 1
+                ETEXT = 'AA-BILL.AMT.AND.TERM.AMT.MISMATCH'
+                CALL STORE.END.ERROR
+            END
+
+            TOTAL.PAYMENT.TYPES = DCOUNT(R.NEW(AA.PS.PAYMENT.TYPE), VM)
+            IF TOTAL.BILLS NE TOTAL.PAYMENT.TYPES THEN
+                AF = AA.PS.PAYMENT.TYPE
+                AV = 1
+                ETEXT = 'AA-BILLS.AND.PAYMENT.TYPE.MISMATCH'
+                CALL STORE.END.ERROR
+            END
+        END
+
+    END
+
+    RETURN
+
+*** </region>
+*** <region name= GET.ARRANGEMENT.CONDITIONS>
+
+GET.ARRANGEMENT.CONDITIONS:
+
+    returnConditions = ''
+    idPropertyClass = 'TERM.AMOUNT'
+    idProperty = ''
+    effectiveDate = c_aalocActivityEffDate
+    returnIds = ''
+    returnError = ''
+    CALL AA.GET.ARRANGEMENT.CONDITIONS(ARR.ID, idPropertyClass, idProperty, effectiveDate, returnIds, returnConditions, returnError)
+    R.AA.TERM.AMOUNT = ''
+    R.AA.TERM.AMOUNT = RAISE(returnConditions)
+    COMMITMENT.AMOUNT = R.AA.TERM.AMOUNT<AA.AMT.AMOUNT>
+
+    RETURN
+
+*** </region>
+
+*** <region name= DEFAULT.PAYMENT.TYPES>
+
+DEFAULT.PAYMENT.TYPES:
+
+    PAY.TYPE.COUNT = 1
+
+    R.NEW(AA.PS.PAYMENT.TYPE)  = ""
+    R.NEW(AA.PS.PROPERTY)      = ""
+    R.NEW(AA.PS.PAYMENT.METHOD)= ""
+    R.NEW(AA.PS.ACTUAL.AMT)    = ""
+    R.NEW(AA.PS.START.DATE)    = ""
+
+    LOOP
+    WHILE PAY.TYPE.COUNT LE TOTAL.BILLS
+
+        R.NEW(AA.PS.PAYMENT.TYPE)<1,PAY.TYPE.COUNT>  = 'LINEAR'
+        R.NEW(AA.PS.PROPERTY)<1,PAY.TYPE.COUNT>      = ''
+        R.NEW(AA.PS.PROPERTY)<1,PAY.TYPE.COUNT>      = 'ACCOUNT'
+        R.NEW(AA.PS.PAYMENT.METHOD)<1,PAY.TYPE.COUNT>= 'DUE'
+        R.NEW(AA.PS.ACTUAL.AMT)<1,PAY.TYPE.COUNT>    = R.NEW(AA.PS.LOCAL.REF)<1,BILL.AMOUNT.POS,PAY.TYPE.COUNT>
+        R.NEW(AA.PS.START.DATE)<1,PAY.TYPE.COUNT>    = ''
+        R.NEW(AA.PS.START.DATE)<1,PAY.TYPE.COUNT,1>  = R.NEW(AA.PS.LOCAL.REF)<1,BILL.DUE.DATE.POS,PAY.TYPE.COUNT>
+
+        PAY.TYPE.COUNT + =1
+    REPEAT
+
+    RETURN
+
+*** </region>
+
+*** <region name= DEFAULT.BILL.DETAILS>
+
+DEFAULT.BILL.DETAILS:
+
+    BILL.COUNT = 1
+    RETURN.ERROR = ""
+
+    LOOP
+    WHILE BILL.COUNT LE TOTAL.BILLS
+
+        BILL.DUE.DATE = R.NEW(AA.PS.LOCAL.REF)<1, BILL.DUE.DATE.POS, BILL.COUNT>
+        BILL.AMOUNT   = R.NEW(AA.PS.LOCAL.REF)<1,BILL.AMOUNT.POS, BILL.COUNT>
+
+        IF BILL.DUE.DATE EQ '' THEN
+            RETURN.ERROR = 1
+            AF = AA.PS.LOCAL.REF
+            AV = BILL.DUE.DATE.POS
+            AS = BILL.COUNT
+            ETEXT = "EB-INPUT.MISSING"
+            CALL STORE.END.ERROR
+        END
+
+        IF BILL.AMOUNT EQ '' THEN
+            RETURN.ERROR = 1
+            AF = AA.PS.LOCAL.REF
+            AV = BILL.AMOUNT.POS
+            AS = BILL.COUNT
+            ETEXT = "EB-INPUT.MISSING"
+            CALL STORE.END.ERROR
+        END
+
+        IF BILL.COUNT NE 1 THEN
+            IF R.NEW(AA.PS.LOCAL.REF)<1, BILL.NO.POS, 1> NE '' AND R.NEW(AA.PS.LOCAL.REF)<1, BILL.NO.POS, BILL.COUNT> EQ '' THEN
+                R.NEW(AA.PS.LOCAL.REF)<1, BILL.NO.POS, BILL.COUNT> = R.NEW(AA.PS.LOCAL.REF)<1, BILL.NO.POS, 1>
+            END
+
+            IF R.NEW(AA.PS.LOCAL.REF)<1, BILL.ISSUE.DATE.POS, 1> NE '' AND R.NEW(AA.PS.LOCAL.REF)<1, BILL.ISSUE.DATE.POS, BILL.COUNT> EQ '' THEN
+                R.NEW(AA.PS.LOCAL.REF)<1, BILL.ISSUE.DATE.POS, BILL.COUNT> = R.NEW(AA.PS.LOCAL.REF)<1, BILL.ISSUE.DATE.POS, 1>
+            END
+
+            IF R.NEW(AA.PS.LOCAL.REF)<1, DEBTOR.ID.POS, 1> NE '' AND R.NEW(AA.PS.LOCAL.REF)<1, DEBTOR.ID.POS, BILL.COUNT> EQ '' THEN
+                R.NEW(AA.PS.LOCAL.REF)<1, DEBTOR.ID.POS, BILL.COUNT> = R.NEW(AA.PS.LOCAL.REF)<1, DEBTOR.ID.POS, 1>
+            END
+
+            IF R.NEW(AA.PS.LOCAL.REF)<1, DEBTOR.NAME.POS, 1> NE '' AND R.NEW(AA.PS.LOCAL.REF)<1, DEBTOR.NAME.POS, BILL.COUNT> EQ '' THEN
+                R.NEW(AA.PS.LOCAL.REF)<1, DEBTOR.NAME.POS, BILL.COUNT> = R.NEW(AA.PS.LOCAL.REF)<1, DEBTOR.NAME.POS, 1>
+            END
+
+            IF R.NEW(AA.PS.LOCAL.REF)<1, BILL.GUAR.ID.POS, 1> NE '' AND R.NEW(AA.PS.LOCAL.REF)<1, BILL.GUAR.ID.POS, BILL.COUNT> EQ '' THEN
+                R.NEW(AA.PS.LOCAL.REF)<1, BILL.GUAR.ID.POS, BILL.COUNT> = R.NEW(AA.PS.LOCAL.REF)<1, BILL.GUAR.ID.POS, 1>
+            END
+
+            IF R.NEW(AA.PS.LOCAL.REF)<1, BILL.GUAR.NAME.POS, 1> NE '' AND R.NEW(AA.PS.LOCAL.REF)<1, BILL.GUAR.NAME.POS, BILL.COUNT> EQ '' THEN
+                R.NEW(AA.PS.LOCAL.REF)<1, BILL.GUAR.NAME.POS, BILL.COUNT> = R.NEW(AA.PS.LOCAL.REF)<1, BILL.GUAR.NAME.POS, 1>
+            END
+
+            IF R.NEW(AA.PS.LOCAL.REF)<1, BILL.GUAR.ID1.POS, 1> NE '' AND R.NEW(AA.PS.LOCAL.REF)<1, BILL.GUAR.ID1.POS,  BILL.COUNT> EQ '' THEN
+                R.NEW(AA.PS.LOCAL.REF)<1, BILL.GUAR.ID1.POS,  BILL.COUNT> = R.NEW(AA.PS.LOCAL.REF)<1, BILL.GUAR.ID1.POS, 1>
+            END
+
+            IF R.NEW(AA.PS.LOCAL.REF)<1, BILL.GUAR.NAME1.POS, 1> NE '' AND R.NEW(AA.PS.LOCAL.REF)<1, BILL.GUAR.NAME1.POS, BILL.COUNT> EQ '' THEN
+                R.NEW(AA.PS.LOCAL.REF)<1, BILL.GUAR.NAME1.POS, BILL.COUNT> = R.NEW(AA.PS.LOCAL.REF)<1, BILL.GUAR.NAME1.POS, 1>
+            END
+
+            IF R.NEW(AA.PS.LOCAL.REF)<1, BILL.REMARKS.POS, 1> NE '' AND R.NEW(AA.PS.LOCAL.REF)<1, BILL.REMARKS.POS, BILL.COUNT> EQ '' THEN
+                R.NEW(AA.PS.LOCAL.REF)<1, BILL.REMARKS.POS, BILL.COUNT> = R.NEW(AA.PS.LOCAL.REF)<1, BILL.REMARKS.POS, 1>
+            END
+        END
+        BILL.COUNT + = 1
+    REPEAT
+
+    RETURN
+
+*** </region>
+END

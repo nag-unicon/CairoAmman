@@ -1,0 +1,93 @@
+    SUBROUTINE AA.LOAN.BALOON.PAYMENT.POST
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 03rd Jul 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Batch Routine
+* Attached to      : BNK/AA.LOAN.BALOON.PAYMENT
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This routine used to get the last two payment amount for AA Loan
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB OPEN.FILES
+    GOSUB SELECT.STATEMENT
+    GOSUB PROCESS
+
+*** </region>
+
+    RETURN
+
+*** </region>
+*** <region name= Open Files>
+
+OPEN.FILES:
+
+    FN.AA.BALOON.PAYMENT.LIST = "F.AA.BALOON.PAYMENT.LIST"
+    F.AA.BALOON.PAYMENT.LIST = ""
+    CALL OPF(FN.AA.BALOON.PAYMENT.LIST, F.AA.BALOON.PAYMENT.LIST)
+
+    KEY.FORMAT    = "AA.LOAN.BALOON.PAYMENT_":TODAY:".csv"
+    OUT.DIRECTORY = "&SAVEDLISTS&"
+    OPENSEQ OUT.DIRECTORY, KEY.FORMAT TO F.OUT.PATH ELSE NULL
+
+    RETURN
+
+*** </region>
+*** <region name= Select Statment>
+
+SELECT.STATEMENT:
+
+    SEL.LIST = ""
+    SEL.CNT  = ""
+    SEL.ERR  = ""
+
+    SEL.CMD  = "SELECT ":FN.AA.BALOON.PAYMENT.LIST
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+
+    RETURN
+
+*** </region>
+*** <region name= Process>
+
+PROCESS:
+
+    LOOP
+        REMOVE ARR.ID FROM SEL.LIST SETTING ARR.POS
+    WHILE ARR.ID : ARR.POS
+
+        R.AA.BALOON.PAYMENT.LIST = ""
+        ERR.AA.BALOON.PAYMENT.LIST = ""
+
+        CALL F.READ(FN.AA.BALOON.PAYMENT.LIST, ARR.ID, R.AA.BALOON.PAYMENT.LIST, F.AA.BALOON.PAYMENT.LIST, ERR.AA.BALOON.PAYMENT.LIST)
+
+        WRITESEQ R.AA.BALOON.PAYMENT.LIST APPEND TO F.OUT.PATH ELSE
+            WRITELIST R.AA.BALOON.PAYMENT.LIST TO F.OUT.PATH
+        END
+
+    REPEAT
+
+    RETURN
+
+END

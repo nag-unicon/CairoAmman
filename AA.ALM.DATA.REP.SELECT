@@ -1,0 +1,51 @@
+    SUBROUTINE AA.ALM.DATA.REP.SELECT
+******************************************************************
+*** ALM Development for reports
+***
+*** Fixed Instruments
+***
+*** Author : Arun K
+***
+*** 17/02/2016  : ALM Report Development
+******************************************************************
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.DATES
+    $INSERT TT.BP I_AA.ALM.COMMON
+
+    GOSUB CLEAR.FILE
+    GOSUB PROCESS
+
+    RETURN
+
+CLEAR.FILE:
+
+*** Clear the pervious month file
+
+    EXECUTE 'CLEAR.FILE ' : FN.AA.ALM.FIX
+    EXECUTE 'CLEAR.FILE ' : FN.AA.ALM.FEE
+    EXECUTE 'CLEAR.FILE ' : FN.AA.SCH.ALM
+    EXECUTE 'CLEAR.FILE ' : FN.AA.AMT.ALM
+
+    RETURN
+
+PROCESS:
+
+    SEL.CMD = ""
+    SEL.LIST = ""
+    SEL.CNT = ""
+    SEL.ERR = ""
+
+    LAST.WORKING.DAY = R.DATES(EB.DAT.LAST.WORKING.DAY)
+    IF LAST.WORKING.DAY[5,2] NE TODAY[5,2] THEN
+
+        SEL.CMD ='SELECT ': FN.AA.ARR :' WITH PRODUCT.LINE EQ LENDING AND (ARR.STATUS EQ CURRENT OR ARR.STATUS EQ EXPIRED)'
+        CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+
+    END
+
+    CALL BATCH.BUILD.LIST('', SEL.LIST)
+
+    RETURN
+
+END

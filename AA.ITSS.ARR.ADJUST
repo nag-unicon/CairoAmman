@@ -1,0 +1,243 @@
+    SUBROUTINE AA.ITSS.ARR.ADJUST(REC.UPLOAD.DATA)
+************************************************************************************
+***  This routine will triggered adjust balance activity
+***
+***  @author : ArunKabalieswaran@itssglobal.com
+***
+***
+************************************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.ACCOUNT
+    $INCLUDE T24.BP I_F.ALTERNATE.ACCOUNT
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT.ACTIVITY
+    $INCLUDE T24.BP I_F.AA.BALANCE.MAINTENANCE
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT
+    $INCLUDE T24.BP I_F.AA.PRODUCT.DESIGNER
+    $INCLUDE T24.BP I_F.AA.INTEREST.ACCRUALS
+    $INCLUDE T24.BP I_F.ACCT.ACTIVITY
+    $INCLUDE T24.BP I_AA.CONTRACT.DETAILS
+    $INCLUDE T24.BP I_AA.APP.COMMON
+    $INCLUDE T24.BP I_AA.ACTION.CONTEXT
+    $INCLUDE T24.BP I_AA.STANDARD.FIELDS
+    $INCLUDE T24.BP I_F.OFS.SOURCE
+    $INCLUDE T24.BP I_GTS.COMMON
+    $INCLUDE T24.BP I_ACCOUNTING.HANDOFF
+    $INCLUDE DW.BP I_ITSS.DM.TOOL.COMMON
+
+
+
+    GOSUB BUILD.COMM.INIT
+    GOSUB BUILD.DEFAULT
+    GOSUB GEN.LOCAL.MESSAGE
+    GOSUB GEN.OFS.MESSAGE
+
+    RETURN
+
+************
+FIND.ARR.ID:
+************
+
+    CALL F.READ(FN.ALT.ACCOUNT,TRIM(AAA.DATA<3>),R.ALT.ACCOUNT,F.ALT.ACCOUNT,RE.ERR)
+
+    ALT.ID= R.ALT.ACCOUNT<AAC.GLOBUS.ACCT.NUMBER>
+    IF R.ALT.ACCOUNT EQ '' THEN
+        ALT.ID = AAA.DATA<3>
+    END
+
+    CALL F.READ(FN.ACCOUNT,ALT.ID,R.ACCOUNT,F.ACCOUNT,RE.ERR)
+    AAA.ID = R.ACCOUNT<AC.ARRANGEMENT.ID>
+
+    IF NOT(AAA.ID) THEN
+        REC.ERR="Arrangement id is not found... Kindly check before start... "
+    END
+
+
+    RETURN
+
+**************
+BUILD.DEFAULT:
+**************
+
+*** For Adjust balance activity, system will default field from the template level
+*** based on the position need to input value
+
+    ARRANGEMENT.ID =AAA.ID
+    READ R.ARRANGEMENT FROM F.AA.ARRANGEMENT, ARRANGEMENT.ID THEN
+    END
+
+    ACCOUNT.ID = R.ARRANGEMENT<AA.ARR.LINKED.APPL.ID>
+
+    V$FUNCTION = 'I'
+    AA$ACTIVITY.ID<AA$ACT.ACTIVITY> = 'ADJUST.BALANCE'
+
+    CALL AA.GET.ARRANGEMENT(ARRANGEMENT.ID, R.AA.ARRANGEMENT, RET.ERROR)
+
+    AA$LINKED.ACCOUNT = R.AA.ARRANGEMENT<AA.ARR.LINKED.APPL.ID>
+    AA$ACTIVITY.EFF.DATE = AAA.DATA<2>
+    AA$STD.FIRST.FIELD = 3
+    AA$STD.LAST.FIELD = 45
+    AA$ARR.ID = ARRANGEMENT.ID
+    AA$ACTIVITY.ID<AA$ACT.PRODUCT.LINE> = 'LENDING'
+    AA$PRODUCT.RECORD<AA.PRD.PROPERTY> = RAISE(R.AA.ARRANGEMENT<AA.ARR.PROPERTY,1>)
+    ACTIVITY.EFF.DATE = AAA.DATA<2>
+    BAL.MAINT.REC = ""
+
+    MATPARSE R.NEW FROM BAL.MAINT.REC
+
+    CALL AA.BALANCE.MAINTENANCE.DEFAULT
+
+    MATBUILD BAL.MAINT.REC FROM R.NEW
+
+*** Build 3 array to store value
+*** Raise the SM, VM TO FM Level
+
+    LOC.PROPERTY = R.NEW(AA.BM.ADJUST.PROP)
+    LOC.BAL.TYPE = R.NEW(AA.BM.ADJ.BAL.TYPE)
+
+    ADJUST.REC = REC.UPLOAD.DATA
+
+    PROP.ADJUST.REQ = FIELD(REC.UPLOAD.DATA,'#',2)
+    PR = DCOUNT(PROP.ADJUST.REQ,',')
+    OFS.PROP="PROPERTY:1:1=BALANCE.MAINTENANCE,"
+
+    K =1
+    FOR I = 3 TO PR
+        PROP = FIELD(PROP.ADJUST.REQ,',',I)
+        LOCATE PROP IN LOC.PROPERTY<1,1> SETTING PROP.POS THEN
+
+        END
+        I +=1
+        PROP.VAL = FIELD(PROP.ADJUST.REQ,',',I)
+
+        LOC.BAL.TYPE = R.NEW(AA.BM.ADJ.BAL.TYPE)<1,PROP.POS>
+        CONVERT @SM TO @VM IN LOC.BAL.TYPE
+        LOCATE PROP.VAL IN LOC.BAL.TYPE<1,1> SETTING BAL.POS THEN
+
+        END
+        I += 1
+
+        FVAL = FIELD(PROP.ADJUST.REQ,',',I)
+        IF PROP.VAL THEN
+            OFS.PROP:= "FIELD.NAME:1:": K :"=NEW.BAL.AMT:":PROP.POS:":":BAL.POS:" ,FIELD.VALUE:1:" : K :"=": FVAL :","
+        END
+        K + =1
+    NEXT I
+
+* OFS.PROP="PROPERTY:1:1=BALANCE.MAINTENANCE,FIELD.NAME:1:1=NEW.BAL.AMT:":PROP.POS:":":BAL.POS:" ,FIELD.VALUE:1:1=0,"
+* OFS.PROP="PROPERTY:1:1=BALANCE.MAINTENANCE,FIELD.NAME:1:4=NEW.BAL.AMT,FIELD.VALUE:1:4=0,"
+
+    RETURN
+****************
+BUILD.COMM.INIT:
+****************
+    AAA.DATA = FIELD(REC.UPLOAD.DATA,'#',1)
+    CONVERT ',' TO @FM IN AAA.DATA
+
+    AAA.REQUEST = ""
+    options = ""
+    COMP.ID = AAA.DATA<5>
+    CALL LOAD.COMPANY(COMP.ID)
+    GOSUB FIND.ARR.ID
+    AAA.REQUEST<AA.ARR.ACT.ARRANGEMENT> = AAA.ID
+    AAA.REQUEST<AA.ARR.ACT.ACTIVITY> = "LENDING-ADJUST.BALANCE-BALANCE.MAINTENANCE"
+    AAA.REQUEST<AA.ARR.ACT.EFFECTIVE.DATE> = AAA.DATA<2>
+    AAA.REQUEST<AA.ARR.ACT.PRODUCT> = AAA.DATA<1>
+    AAA.REQUEST<AA.ARR.ACT.CUSTOMER> = R.ACCOUNT<AC.CUSTOMER>
+    AAA.REQUEST<AA.ARR.ACT.INITIATION.TYPE,1> = "USER"
+    AAA.REQUEST<AA.ARR.ACT.CURRENCY> = AAA.DATA<4>
+
+
+*** For Multiple change in different property is looped
+*** Based on changed property ofs message will generate
+
+
+
+    TEMP.APP.HEAD=REC.UPLOAD.HEADER
+    TEMP.APP.DATA=REC.UPLOAD.DATA
+
+    PROP.COUNT =DCOUNT(TEMP.APP.HEAD,'#')
+    FOR J =2 TO PROP.COUNT - 1
+        TEMP.FIELD.HEAD = FIELD(TEMP.APP.HEAD,'#',J)
+        TEMP.FIELD.DATA = FIELD(TEMP.APP.DATA,'#',J)
+*** Build core field
+* GOSUB BUILD.PROPERTY.FIELD
+*** Build Local Ref field
+* GOSUB BUILD.LOCAL.FIELD
+
+    NEXT J
+
+    RETURN
+
+*********************
+BUILD.PROPERTY.FIELD:
+*********************
+*** Build based Header of field and its respective value for core fields
+
+    TEMP.HEAD.FIELD = FIELD(TEMP.FIELD.HEAD,'*',1)
+    TEMP.DATA.FIELD = FIELD(TEMP.FIELD.DATA,'*',1)
+    CONVERT ',' TO @FM IN TEMP.HEAD.FIELD
+    CONVERT ',' TO @FM IN TEMP.DATA.FIELD
+    DEL TEMP.HEAD.FIELD<1>
+    DEL TEMP.DATA.FIELD<1>
+*** Based on the count infomation is append with the OFS.PROP
+    PRO.CNT =DCOUNT(TEMP.HEAD.FIELD,@FM)
+    OFS.PROP := "PROPERTY:": J-1 : "=":TEMP.DATA.FIELD<1> :","
+
+    FOR Q = 2 TO PRO.CNT
+        IF TEMP.DATA.FIELD<Q> NE "" THEN
+            OFS.PROP := "FIELD.NAME:": J-1 :":": Q -1 :"=" :TEMP.HEAD.FIELD<Q> :","
+            OFS.PROP := "FIELD.VALUE:": J-1 :":": Q-1 :"=":TEMP.DATA.FIELD<Q> :","
+        END
+    NEXT Q
+    RETURN
+
+******************
+BUILD.LOCAL.FIELD:
+******************
+
+*** Build based Header of field and its respective value for local ref fields
+
+    TEMP.LOC.HEAD.FIELD = FIELD(TEMP.FIELD.HEAD,'*',2,1)
+    TEMP.LOC.DATA.FIELD = FIELD(TEMP.FIELD.DATA,'*',2,1)
+
+    CONVERT ',' TO @FM IN TEMP.LOC.HEAD.FIELD
+    CONVERT ',' TO @FM IN TEMP.LOC.DATA.FIELD
+    LO.PRO.CNT =DCOUNT(TEMP.LOC.HEAD.FIELD,@FM)
+*** Based on the count infomation is append with the OFS.PROP
+    FOR Z = 1 TO LO.PRO.CNT
+        IF TEMP.LOC.HEAD.FIELD<Z> NE "" THEN
+            OFS.PROP:= TEMP.LOC.HEAD.FIELD<Z> :"="
+            OFS.PROP:= TEMP.LOC.DATA.FIELD<Z> :","
+        END
+    NEXT Z
+    RETURN
+
+******************
+GEN.LOCAL.MESSAGE:
+******************
+
+    APP.NAME = "AA.ARRANGEMENT.ACTIVITY"
+    OFS.RECORD = ''
+    OFSVERSION = APP.NAME:","
+    NO.OF.AUTH = "0"
+
+    CALL OFS.BUILD.RECORD(APP.NAME, FUNCT, "PROCESS", OFSVERSION, "", NO.OF.AUTH, ARR.ACTIVITY.ID, AAA.REQUEST, OFS.RECORD)
+    OFS.REQ = OFS.RECORD:OFS.PROP
+
+    RETURN
+****************
+GEN.OFS.MESSAGE:
+****************
+
+    theResponse = ""
+    txnCommitted = ""
+    options = ''
+    options<1> = "AA.COB"
+    options<4> = "HLD"
+
+
+    CALL OFS.CALL.BULK.MANAGER(options,OFS.REQ,theResponse,txnCommitted)
+    RES = theResponse
+
+    RETURN

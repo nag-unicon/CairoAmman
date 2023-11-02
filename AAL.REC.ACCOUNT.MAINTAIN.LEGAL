@@ -1,0 +1,79 @@
+    SUBROUTINE AAL.REC.ACCOUNT.MAINTAIN.LEGAL
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 26th Sep 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Record routine
+
+* Attached to      : Activity Class  : LENDING-CHANGE.PRODUCT-ARRANGEMENT
+*                    Property Class  : ACCOUNT
+*                    Action          : MAINTAIN
+*                    Routine         : AAL.REC.ACCOUNT.MAINTAIN.LEGAL
+
+* Attached As      : Record Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Routine is used to default the Legal Category, Legal Date and Settlement Account
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.AA.ACCOUNT
+    $INSERT I_F.AA.ARRANGEMENT
+    $INSERT I_AA.APP.COMMON
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB GET.LOCAL.REF.FIELDS
+    GOSUB PROCESS
+
+    RETURN
+
+*** </region>
+
+*** <region name= GET.LOCAL.REF.FIELDS>
+
+GET.LOCAL.REF.FIELDS:
+
+    APPLN.NAME = ''
+    FIELD.NAME = ''
+    LOCAL.POS = ''
+
+    APPLN.NAME = 'AA.PRD.DES.ACCOUNT'
+    FIELD.NAME = 'SETTLE.ACCOUNT' :VM: 'LIFEPROP.EXP'
+    CALL MULTI.GET.LOC.REF(APPLN.NAME, FIELD.NAME, LOCAL.POS)
+
+    SETTLE.ACCOUNT.POS = LOCAL.POS<1,1>
+    LEGAL.DATE.POS     = LOCAL.POS<1,2>
+
+    RETURN
+
+*** </region>
+
+*** <region name= Process>
+
+PROCESS:
+
+    R.NEW(AA.AC.CATEGORY) = "1053"
+    R.NEW(AA.AC.LOCAL.REF)<1, LEGAL.DATE.POS>     = AA$ACTIVITY.EFF.DATE
+    R.NEW(AA.AC.LOCAL.REF)<1, SETTLE.ACCOUNT.POS> = AA$R.ARRANGEMENT<AA.ARR.LINKED.APPL.ID, 1>
+
+    RETURN
+
+*** </region>
+
+END

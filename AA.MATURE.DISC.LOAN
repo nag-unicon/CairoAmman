@@ -1,0 +1,139 @@
+*-----------------------------------------------------------------------------
+* <Rating>140</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE AA.MATURE.DISC.LOAN(ARR.ID)
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 07th Sep 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Batch Routine
+* Attached to      : BNK/AA.MATURE.DISC.LOAN
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This routine is used to recalculate the term to change the maturity for the arrangements which is settled except amort charge.
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.AA.ARRANGEMENT
+    $INSERT I_F.AA.PAYMENT.SCHEDULE
+    $INSERT I_F.AA.TERM.AMOUNT
+    $INSERT I_F.AA.ARRANGEMENT.ACTIVITY
+
+*** </region>
+*** <region name= Main Body>
+
+    ARR.ID = TRIM(ARR.ID)
+    PROCESS.FLAG = ""
+    FIELD.CNT = 0
+    GOSUB GET.ARRANGEMENT.COMPANY
+
+    R.AA.ARRANGEMENT.ACTIVITY = ""
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ARRANGEMENT>    = ARR.ID
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ACTIVITY>       = "LENDING-CHANGE.TERM-COMMITMENT"
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.EFFECTIVE.DATE> = TODAY
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.PROPERTY,1>     = "COMMITMENT"
+
+    idPropertyClass = "TERM.AMOUNT"
+    idProperty = ""
+    effectiveDate = ""
+    returnIds = ""
+    returnConditions = ""
+
+    CALL AA.GET.ARRANGEMENT.CONDITIONS(ARR.ID, idPropertyClass, idProperty, effectiveDate, returnIds, returnConditions, returnError)
+    R.AA.TERM.AMOUNT = RAISE(returnConditions)
+
+    APPLS   = 'AA.PRD.DES.TERM.AMOUNT'
+    FLD.VALS = 'DISBURSE.REASON' :VM: 'AGREEMENT.CODE'
+    FLD.POS  = ''
+
+    CALL MULTI.GET.LOC.REF(APPLS,FLD.VALS,FLD.POS)
+    DISBURSE.REASON.POS = FLD.POS<1,1>
+    AGREEMENT.CODE.POS  = FLD.POS<1,2>
+
+    FIELD.CNT + =1
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,FIELD.CNT>  = "MATURITY.DATE:1:1"
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,FIELD.CNT> = TODAY
+
+    FIELD.CNT + =1
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,FIELD.CNT>  = "AMOUNT:1:1"
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,FIELD.CNT> = R.AA.TERM.AMOUNT<AA.AMT.AMOUNT>
+
+    IF R.AA.TERM.AMOUNT<AA.AMT.LOCAL.REF, DISBURSE.REASON.POS> THEN
+        FIELD.CNT + =1
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,FIELD.CNT>  = "DISBURSE.REASON:1:1"
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,FIELD.CNT> = R.AA.TERM.AMOUNT<AA.AMT.LOCAL.REF, DISBURSE.REASON.POS>
+    END
+
+    IF R.AA.TERM.AMOUNT<AA.AMT.LOCAL.REF, AGREEMENT.CODE.POS> THEN
+        FIELD.CNT + =1
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,FIELD.CNT>  = "AGREEMENT.CODE:1:1"
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,FIELD.CNT> = R.AA.TERM.AMOUNT<AA.AMT.LOCAL.REF, AGREEMENT.CODE.POS>
+    END
+
+    FIELD.CNT + =1
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,FIELD.CNT>  = "TERM:1:1"
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,FIELD.CNT> = R.AA.TERM.AMOUNT<AA.AMT.TERM>
+
+    GOSUB PROCESS.OFS.MESSAGE
+
+    RETURN
+
+*** </region>
+
+GET.ARRANGEMENT.COMPANY:
+
+    CALL AA.GET.ARRANGEMENT(ARR.ID, R.AA.ARRANGEMENT, RET.ERROR)
+    ARR.COMPANY = R.AA.ARRANGEMENT<AA.ARR.CO.CODE>
+
+    RETURN
+
+PROCESS.OFS.MESSAGE:
+
+    APP.NAME = "AA.ARRANGEMENT.ACTIVITY"
+    OFS.RECORD = ''
+    OFSVERSION = APP.NAME:","
+    NO.OF.AUTH = "0"
+    GTS.MODE = 1
+    TRANSACTION.ID = ""
+    FUNCT = "I"
+
+    SAVE.ID.COMPANY = ID.COMPANY
+    ID.COMPANY = ARR.COMPANY
+
+    CALL OFS.BUILD.RECORD(APP.NAME, FUNCT, "PROCESS", OFSVERSION, GTS.MODE, NO.OF.AUTH, TRANSACTION.ID, R.AA.ARRANGEMENT.ACTIVITY, OFS.RECORD)
+
+    theResponse    = ""
+    txnCommitted   = ""
+    options        = ""
+    options<1>     = "AA.CHARGE"
+    options<4>     = "HLD"
+
+    CALL OFS.CALL.BULK.MANAGER(options,OFS.RECORD,theResponse,txnCommitted)
+
+    MESSAGE.TYPE = ""
+    ERROR.SOURCE = ""
+    ERROR.MESSAGE = ""
+    ERR.ID.DETAILS = ""
+    CALL AA.GET.ERROR.DETAILS(theResponse, MESSAGE.TYPE, ERROR.SOURCE, ERROR.MESSAGE, ERR.ID.DETAILS)
+
+    ID.COMPANY = SAVE.ID.COMPANY
+
+    RETURN
+
+END

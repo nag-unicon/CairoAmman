@@ -1,0 +1,43 @@
+*-----------------------------------------------------------------------------
+* <Rating>-1</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE AA.FUTURE.LIST.NEW.FIELDS
+*-----------------------------------------------------------------------------
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT T24.BP I_DataTypes
+
+*-----------------------------------------------------------------------------
+    dataType = ''
+    dataType<2> = '100.1'
+    dataType<3> = 'A'
+    CALL Table.defineId("AA.ID", dataType)        ;* Define Table id
+*-----------------------------------------------------------------------------
+
+    CALL Table.addField('BRANCH.NAME', T24_String, "", "")
+    CALL Table.addField('PRODUCT.NAME', T24_String, "", "")
+    CALL Table.addField('CATEGORY', T24_String, "", "")
+    CALL Table.addField('OFFICER', T24_String, "", "")
+    CALL Table.addField('ARRANGEMENT.ID', T24_String, "", "")
+    CALL Table.addField('LOAN.ACCT.NO', T24_String, "", "")
+    CALL Table.addField('CURRENCY', T24_String, "", "")
+    CALL Table.addField('CUSTOMER.ID', T24_String, "", "")
+    CALL Table.addField('CUSTOMER.NAME', T24_String, "", "")
+    CALL Table.addField('SETTLE.ACCT', T24_String, "", "")
+    CALL Table.addField('CUST.STATUS', T24_String, "", "")
+    CALL Table.addField('ACC.STATUS', T24_String, "", "")
+    CALL Table.addField('LOAN.STATUS', T24_String, "", "")
+    CALL Table.addField('LEGAL.STATUS', T24_String, "", "")
+    CALL Table.addField('DUE.DATE', T24_String, "", "")
+    CALL Table.addField('BILL.TYPE', T24_String, "", "")
+    CALL Table.addField('BILL.AMT', T24_String, "", "")
+    CALL Table.addField('ACCOUNT', T24_String, "", "")
+    CALL Table.addField('INTEREST', T24_String, "", "")
+    CALL Table.addField('CHARGE', T24_String, "", "")
+    CALL Table.addField('SUBSIDY', T24_String, "", "")
+    CALL Table.addField('UNCACCOUNT', T24_String, "", "")
+
+*-----------------------------------------------------------------------------
+    RETURN
+*-----------------------------------------------------------------------------
+END

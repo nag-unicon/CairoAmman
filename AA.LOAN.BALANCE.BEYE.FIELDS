@@ -1,0 +1,702 @@
+    SUBROUTINE AA.LOAN.BALANCE.BEYE.FIELDS
+*-----------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S (ITSS)
+* Development Id   : AA Loan Balance Details
+* Date             : 18th June 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Template Routine
+* Attached to      : AA.LOAN.BALANCE.DETAILS
+*
+* Attached As      : Template Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This is a file will contains the details of each loan
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : N/A
+* ARGS -(Output)   : N/A
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+*----------------------------------------------------------------------------------------------
+*** <region name = Inserts>
+*** <desc> File inserts and common variables in the subroutine </desc>
+*-----------------------------------------------------------------------------
+* Modification History :
+*
+*** <desc>Inserts and control logic</desc>
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_DataTypes
+
+*** </region>
+*-----------------------------------------------------------------------------
+
+*   CALL Table.defineId("TABLE.NAME.ID", T24_String) ;* Define Table id
+    ID.F = "ARRANGEMENT.ID"   ;* Arrangement Number in the format AA/jjjjj/sssss
+    ID.N = '30.1'
+    ID.T = "ARR"
+
+    fieldName = 'CUSTOMER'
+    fieldLength = '10'
+    fieldType = 'CUS'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("CUSTOMER") ;* Use DEFAULT.ENRICH from SS or just field 1
+
+    fieldName = 'XX.LL.CUSTOMER.NAME'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'ARRANGEMENT'
+    fieldLength = '17'
+    fieldType = 'ARR'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("AA.ARRANGEMENT")     ;* Use DEFAULT.ENRICH from SS or just field 1
+
+
+    fieldName = 'LOAN.ACCT.NO'
+    fieldLength = '19'
+    fieldType = 'POSANT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("ACCOUNT")  ;* Use DEFAULT.ENRICH from SS or just field 1
+
+    fieldName = 'CURRENCY'
+    fieldLength = '3'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("CURRENCY") ;* Use DEFAULT.ENRICH from SS or just field 1
+
+    fieldName = 'PRODUCT'
+    fieldLength = '30'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("AA.PRODUCT")         ;* Use DEFAULT.ENRICH from SS or just field 1
+
+    fieldName = 'CURRENT.PRINCIPAL'
+    fieldLength = '22'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'TOTAL.DUE.BAL'
+    fieldLength = '22'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'ACC.PRINCIPAL.BAL'
+    fieldLength = '22'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'ACC.PENALTY.BAL'
+    fieldLength = '22'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'UNC.AMOUNT'
+    fieldLength = '22'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'ACCRUAL.STATUS'
+    fieldLength = '10'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'OVERDUE.STATUS'
+    fieldLength = '3'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    OVERDUE.STATUS = "AA.OVERDUE.STATUS"
+    CALL EB.LOOKUP.LIST(OVERDUE.STATUS)
+
+    fieldName = 'TOTAL.COMMITMENT'
+    fieldLength = '22'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'CUR.COMMITMENT.BAL'
+    fieldLength = '22'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'DISBURSEMENT.DATE'
+    fieldLength = '11'
+    fieldType = 'D'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour) ;* Add a new field
+
+    fieldName = 'MATURITY.DATE'
+    fieldLength = '11'
+    fieldType = 'D'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour) ;* Add a new field
+
+    fieldName = 'XX.LL.BRANCH.NAME'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'CUSTOMER.STATUS'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("CUSTOMER.STATUS")    ;* Use DEFAULT.ENRICH from SS or just field 1
+
+    fieldName = 'CATEGORY'
+    fieldLength = '6'
+    fieldType = 'CAT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("CATEGORY") ;* Use DEFAULT.ENRICH from SS or just field 1
+
+    fieldName = 'OFFICER'
+    fieldLength = '4'
+    fieldType = 'DAO'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("DEPT.ACCT.OFFICER")  ;* Use DEFAULT.ENRICH from SS or just field 1
+
+    fieldName = 'LEGAL.STATUS'
+    fieldLength = '3'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'SETTLEMENT.ACCOUNT'
+    fieldLength = '19'
+    fieldType = 'POSANT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'PURPOSE.FACILITY'
+    fieldLength = '6'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("CAB.PURPOSE.FACILITY")
+
+    fieldName = 'PRINCIPAL.INT.RATE'
+    fieldLength = '10'
+    fieldType = 'R'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'PRINCIPAL.MIN.RATE'
+    fieldLength = '10'
+    fieldType = 'R'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'PRINCIPAL.MAX.RATE'
+    fieldLength = '10'
+    fieldType = 'R'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'PENALTY.INT.RATE'
+    fieldLength = '10'
+    fieldType = 'R'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'PENALTY.MIN.RATE'
+    fieldLength = '10'
+    fieldType = 'R'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'PENALTY.MAX.RATE'
+    fieldLength = '10'
+    fieldType = 'R'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'STAFF.INCENTIVE'
+    fieldLength = '10'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("AC.CABEMP")
+
+    fieldName = 'TARGET.SECTOR'
+    fieldLength = '10'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("AA.TARGETSECTOR")
+
+    fieldName = 'LOAN.AUTHORITY'
+    fieldLength = '10'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("AA.LOAN.AUTHORITY")
+
+    fieldName = 'NATIONALITY'
+    fieldLength = '2'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("COUNTRY")
+
+    fieldName = 'SMS'
+    fieldLength = '12'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'SECTOR'
+    fieldLength = '12'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("SECTOR")
+
+    fieldName = 'DISBURSE.REASON'
+    fieldLength = '50'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("AA.DISBURSE.REASON")
+
+    fieldName = 'AGREEMENT.CODE'
+    fieldLength = '50'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("AA.AGREEMENT.CODE")
+
+    fieldName = 'LIMIT.REF'
+    fieldLength = '10'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'PRINCIPAL.INDEX'
+    fieldLength = '3'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'PRINCIPAL.RATE'
+    fieldLength = '10'
+    fieldType = 'R'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'PENALTY.INDEX'
+    fieldLength = '3'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'PENALTY.RATE'
+    fieldLength = '10'
+    fieldType = 'R'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'NEXT.PAYMENT.DATE'
+    fieldLength = '11'
+    fieldType = 'D'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'NEXT.PAYMENT.AMT'
+    fieldLength = '22'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'DISC.INT.RATE1'
+    fieldLength = '10'
+    fieldType = 'R'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'DISC.INT.RATE2'
+    fieldLength = '10'
+    fieldType = 'R'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'LEVEL1.AMOUNT'
+    fieldLength = '22'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'LEVEL2.AMOUNT'
+    fieldLength = '22'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'OLDEST.BILL.DATE'
+    fieldLength = '11'
+    fieldType = 'D'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'OLDEST.BILL.AMOUNT'
+    fieldLength = '22'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'TOTAL.DUE.DAYS'
+    fieldLength = '6'
+    fieldType = ''
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'TOTAL.DUE.BILLS'
+    fieldLength = '6'
+    fieldType = ''
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'TOTAL.FUTURE.BILLS'
+    fieldLength = '6'
+    fieldType = ''
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'SUSPEND.COMMISSION'
+    fieldLength = '22'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'SUSPEND.PENALTY'
+    fieldLength = '22'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'TOTAL.SUSPEND.INT'
+    fieldLength = '22'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'ACCRAUL.ANNUALCOMM'
+    fieldLength = '22'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'ACCRAUL.EASYINSTAL'
+    fieldLength = '22'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'ACCRAUL.DISCOUNT'
+    fieldLength = '22'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'ACCRAUL.DISCOUNT1'
+    fieldLength = '22'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'ANNUALCOMM.PERC'
+    fieldLength = '10'
+    fieldType = 'R'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'ANNUALCOMM.TYPE'
+    fieldLength = '10'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'IND.NATIONAL.ID'
+    fieldLength = '10'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'NEXT.RATE.CHANGE'
+    fieldLength = '11'
+    fieldType = 'D'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'PAYMENT.FREQUENCY'
+    fieldLength = '30'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'ITEM.TYPE'
+    fieldLength = '15'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'ITEM.SUPPLIER'
+    fieldLength = '15'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'SUPERVISOR.CODE'
+    fieldLength = '6'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("AC.CABEMP")
+
+    fieldName = 'SCORING'
+    fieldLength = '19'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'LOAN.GUAR.RATIO'
+    fieldLength = '10'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'LOAN.GUAR.COMPANY'
+    fieldLength = '2'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'LOAN.INS.TYPE'
+    fieldLength = '2'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'LOAN.INS.COMPANY'
+    fieldLength = '2'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'INS.INSTALL.AMT'
+    fieldLength = '19'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'REAL.ESTATE.COMP'
+    fieldLength = '2'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'LEGAL.DATE'
+    fieldLength = '11'
+    fieldType = 'D'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'MIS.DATE'
+    fieldLength = '11'
+    fieldType = 'D'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'OVERDUE.PRINCIPAL'
+    fieldLength = '19'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'OVERDUE.INTEREST'
+    fieldLength = '19'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'AGEINGFEE.BAL'
+    fieldLength = '19'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'COMPANY'
+    fieldLength = '11'
+    fieldType = 'COM'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("COMPANY")
+
+    fieldName = 'XX<GUARANTOR.ID'
+    fieldLength = '19'
+    fieldType = ''
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("CAB.GUARANTOR")
+
+    fieldName = 'XX>GUARANTOR.NAME'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'ENDORSEMENT.COMP'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'GENDER'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'LAST.PAYMENT.AMT'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'ARR.STATUS'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'JOB.TITLE'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'EMPLOYMENT.STATUS'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'SALARY.ASSIGNED'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'MONTHLY.PAYMENT'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'FLAT.INT.PERC'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'PERIODIC.PERIOD'
+    fieldLength = '5'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'PERIODIC.RESET'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'XX.LL.ARR.CUSTOMER.NAME'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'PRIN.MARGIN.RATE'
+    fieldLength = '10'
+    fieldType = 'R'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'PENAL.MARGIN.RATE'
+    fieldLength = '10'
+    fieldType = 'R'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'SUPERVISOR.1'
+    fieldLength = '15'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'PROGRAM.TYPE'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'NEXT.PYT.INT'
+    fieldLength = '18'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'NEXT.PYT.PRNC'
+    fieldLength = '18'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'LOAN.OUTSTAND.BAL'
+    fieldLength = '18'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'PAYOFF.REASON'
+    fieldLength = '3'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'PAYOFF.BUYOUT'
+    fieldLength = '12'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+
+*-----------------------------------------------------------------------------
+    CALL Table.setAuditPosition         ;* Poputale audit information
+*-----------------------------------------------------------------------------
+    RETURN
+*-----------------------------------------------------------------------------
+END

@@ -1,0 +1,76 @@
+*-----------------------------------------------------------------------------
+* <Rating>-2</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE  AA.PAYOFF.PARAM.FIELDS
+*----------------------------------------------------------------------------------------------------------------
+*
+* Description           : Parameter file to store auto payoff reason and charge rate
+*
+* Developed By          : ITSS - Nabeel
+*
+* Development Reference : CAB - Automatioc payoff for loan
+*
+* Attached To           : Template Rotuine
+*
+* Attached As           : Template Rotuine
+*-----------------------------------------------------------------------------------------------------------------
+* Input Parameter:
+* ---------------*
+* Argument#1 : N/A
+* Argument#2 : N/A
+* Argument#3 : N/A
+*
+*-----------------*
+* Output Parameter:
+* ----------------*
+* Argument#4 : N/A
+* Argument#5 : N/A
+* Argument#6 : N/A
+*-----------------------------------------------------------------------------------------------------------------
+*  M O D I F I C A T I O N S
+* ***************************
+*   Date            Modified BY       Development              Reason
+*-----------------------------------------------------------------------------------------------------------------
+* N/A
+*-----------------------------------------------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_DataTypes
+*-----------------------------------------------------------------------------
+    CALL Table.defineId("@ID", T24_String)        ;* Define Table id
+
+    ID.N = '30.1'
+    ID.CHECKFILE='AA.PRODUCT.GROUP'
+
+    fieldName = 'XX.LL.DESCRIPTION'
+    CALL Table.addField(fieldName, T24_String, "", "")
+
+    neighbour = ''
+    fieldName = 'XX<PAYOFF.REASON'
+    virtualTableName = 'AA.PAYOFF'
+    CALL Table.addFieldWithEbLookup(fieldName,virtualTableName,neighbour)
+
+    fieldName = 'XX>PAYOFF.CHARGE.RATE'
+    fieldLength = '6'
+    fieldType = 'R'
+    neighbour=''
+    CALL Table.addFieldDefinition(fieldName,fieldLength, fieldType, neighbour)
+
+    CALL Table.addField("RESERVED.10", T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.9", T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.8", T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.7", T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.6", T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.5", T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.4", T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.3", T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.2", T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.1", T24_String, Field_NoInput,"")
+
+*------------------------------------------------------------------------------
+    CALL Table.setAuditPosition         ;* Poputale audit information
+*-----------------------------------------------------------------------------
+
+    RETURN
+END

@@ -1,0 +1,43 @@
+*-----------------------------------------------------------------------------
+* <Rating>140</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE AA.MATURE.DISC.LOAN.SELECT
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 07th Sep 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Batch Routine
+* Attached to      : BNK/AA.MATURE.DISC.LOAN
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This routine used to recalculate the Term to change the maturity for all the settled arrangements except amort charge.
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+
+    FN.SAVEDLISTS = '&SAVEDLISTS&'
+    F.SAVEDLISTS = ''
+    CALL OPF(FN.SAVEDLISTS,F.SAVEDLISTS)
+
+    LIST.NAME = "DISCOUNTED.LOAN"
+    CALL F.READ(FN.SAVEDLISTS, LIST.NAME, SEL.LIST, F.SAVEDLISTS, RET.ERR)
+
+    CALL BATCH.BUILD.LIST("",SEL.LIST)
+
+    RETURN
+
+END

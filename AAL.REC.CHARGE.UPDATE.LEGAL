@@ -1,0 +1,83 @@
+    SUBROUTINE AAL.REC.CHARGE.UPDATE.LEGAL
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 26th Sep 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Record routine
+
+* Attached to      : Activity Class  : LENDING-CHANGE.PRODUCT-ARRANGEMENT
+*                    Property Class  : CHARGE
+*                    Action          : UPDATE
+*                    Routine         : AAL.REC.CHARGE.UPDATE.LEGAL
+
+* Attached As      : Record Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Routine is used to default the AGEINGFEE value as 0.
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.AA.CHARGE
+    $INSERT I_AA.APP.COMMON
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB PROCESS
+
+    RETURN
+
+*** </region>
+*** <region name= Process>
+
+PROCESS:
+
+    BEGIN CASE
+
+    CASE AA$PROPERTY.ID EQ "AGEINGFEE"
+        R.NEW(AA.CHG.FIXED.AMOUNT) = 0
+
+    CASE AA$PROPERTY.ID EQ "ANNUALCOMM"
+        GOSUB GET.LOCAL.REF.FIELDS
+        R.NEW(AA.CHG.LOCAL.REF)<1,ANNUALCOMM.PER.POS> = 0
+
+    END CASE
+
+    RETURN
+
+*** </region>
+
+*** <region name= GET.LOCAL.REF.FIELDS>
+
+GET.LOCAL.REF.FIELDS:
+
+    APPLN.NAME = ''
+    FIELD.NAME = ''
+    LOCAL.POS = ''
+
+    APPLN.NAME = 'AA.PRD.DES.CHARGE'
+    FIELD.NAME = 'ANNUALCOMM.PER'
+    CALL MULTI.GET.LOC.REF(APPLN.NAME,FIELD.NAME,LOCAL.POS)
+
+    ANNUALCOMM.PER.POS = LOCAL.POS<1,1>
+
+    RETURN
+
+*** </region>
+
+END

@@ -1,0 +1,46 @@
+*-----------------------------------------------------------------------------
+* <Rating>-2</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE AA.REPAY.SETTLE.LIST.FIELDS
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_DataTypes
+
+*-----------------------------------------------------------------------------
+    dataType = ''
+    dataType<2> = '40.1'
+    dataType<3> = 'A'
+    CALL Table.defineId("AAA.ID", dataType)         ;* Define Table id
+*-----------------------------------------------------------------------------
+    CALL Table.addField('CUSTOMER.ID', T24_String, "", "")
+    CALL Table.addField('CUSTOMER.NAME', T24_String, "", "")
+    CALL Table.addField('ARRANGEMENT.ID', T24_String, "", "")
+    CALL Table.addField('LOAN.ACCT.NO', T24_String, "", "")
+    CALL Table.addField('BRANCH.NAME', T24_String, "", "")
+    CALL Table.addField('CURRENCY', T24_String, "", "")
+    CALL Table.addField('PRODUCT.NAME', T24_String, "", "")
+    CALL Table.addField('PAYMENT.DATE', T24_String, "", "")
+    CALL Table.addField('PAYMENT.AMT', T24_String, "", "")
+    CALL Table.addField('DISBURSE.DATE', T24_String, "", "")
+    CALL Table.addField('CURACCOUNT', T24_String, "", "")
+    CALL Table.addField('TOTALDUE', T24_String, "", "")
+    CALL Table.addField('TOT.COMMIT', T24_String, "", "")
+    CALL Table.addField('PURPOSE.FAC', T24_String, "", "")
+    CALL Table.addField('INTEREST.RATE', T24_String, "", "")
+    CALL Table.addField('COMM.RATE', T24_String, "", "")
+    CALL Table.addField('MATURITY.DATE', T24_String, "", "")
+    CALL Table.addField('EMPLOYER.NAME', T24_String, "", "")
+    CALL Table.addField('CUST.STATUS', T24_String, "", "")
+    CALL Table.addField('ACCUAL.STATUS', T24_String, "", "")
+    CALL Table.addField('OVERDUE', T24_String, "", "")
+    CALL Table.addField('LEGAL.STATUS', T24_String, "", "")
+    CALL Table.addField('CATEGORY', T24_String, "", "")
+    CALL Table.addField('OFFICER', T24_String, "", "")
+    CALL Table.addField('SETTLE.ACCT', T24_String, "", "")
+
+
+*-----------------------------------------------------------------------------
+    RETURN
+*-----------------------------------------------------------------------------
+END

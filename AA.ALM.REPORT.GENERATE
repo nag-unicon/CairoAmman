@@ -1,0 +1,96 @@
+    SUBROUTINE AA.ALM.REPORT.GENERATE
+*************************************************************
+*** AA AML Report generate for fixed,floating and periodic
+***
+***
+*** Author : Arun K
+***
+*** 17/02/2016  : ALM Report Development
+*************************************************************
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INSERT I_F.DATES
+    $INCLUDE TT.BP I_AA.AML.COMMON
+
+    LAST.WORKING.DAY = R.DATES(EB.DAT.LAST.WORKING.DAY)
+    IF LAST.WORKING.DAY[5,2] NE TODAY[5,2] THEN
+
+        GOSUB INIT
+        GOSUB PROCESS
+        GOSUB WRITE.REPORT
+    END
+
+    RETURN
+
+*****
+INIT:
+*****
+
+    FN.AA.ALM.FIX = 'F.AA.ALM.REP'
+    F.AA.ALM.FIX = ''
+
+    CALL OPF(FN.AA.ALM.FIX,F.AA.ALM.FIX)
+
+    FIXED.REPORT =''
+    FLOATING.REPORT=''
+
+*    FIXED.REPORT<-1>='Arrangement Id,Customer Id,Account,Product,Loan Creation Date,Loan Maturity date,Original Loan Amount,CurAccount,Currency,Interest Rate,Interest Day Basis,Payment Frequency,Next Instalment Date,Grace Period end date,Payment Type'
+*    FLOATING.REPORT<-1>='Arrangement Id,Customer Id,Account,Product,Loan Creation Date,Loan Maturity date,Original Loan Amount,CurAccount,Currency,Interest Rate,Interest Day Basis,Payment Frequency,Next Instalment Date,Grace Period end date,Payment Type,Next Periodic Interest reset date,Periodic Reset Frequency'
+
+    FIXED.REPORT<-1>='CreationDate;PositionID;DataSource;PlanningAccountName;Description;TradeDate;StartDate;PurchaseDate;EndDate;DirForDateGeneration;PrincipalAmount;PrincipalOutstanding;PrincipalOutstanding_Date;MarketValue;MarketValue_CleanDirty;BookValue;IssuePrice;PurchasePrice;AccruedInterest;Currency_Original;Currency_Reporting;Currency_AmountsDeliveredIn;AssetLiability;PositionType;EarlyTerminationType;EarlyTerminationDate;EarlyTerminationPayment;EarlyTerminationAdjustment;Limit_Amount;Limit_Category;DiscountCreditSpreadCurve;DiscountCreditSpreadValue;Coupon_Rate;Coupon_DayCountConv;Coupon_AccrualConvention;Coupon_PaymentFreq;Coupon_PaymentFreqTimeBase;Coupon_PaymentTiming;Coupon_CompoundFreq;Coupon_CompoundFreqTimeBase;Coupon_CapitalizeOnPrincipal;Coupon_PaymentAnchorDate;Coupon_NextPaymentDate;Coupon_NextAccruedPayDate;Coupon_CompoundAnchorDate;Coupon_NextCompoundDate;Coupon_EndDateInitialGracePer;Coupon_BusinessDayConv;Coupon_AdjustForHolidays;Coupon_HolidayCalendar;StepupFlag;DiscountRateCurveName;DisbursementFlag;Disb_InterestFreePer;Disb_InterestFreePerTimeBase;Disb_CommitmentInterestRate;Amort_Type;Amort_PaymentBehavior;Amort_PaymentAmount;Amort_Rate;Amort_PaymentFreq;Amort_PaymentFreqTimeBase;Amort_CompoundFreq;Amort_AnchorDate;Amort_NextPaymentDate;Amort_NextAccruedPayDate;Amort_Timing;Amort_ResidualAmount;Amort_AnnuityCouponRate;Amort_AnnuityDayCountConv;Amort_PrincipalAsInitialCF;Amort_GrowthType;Amort_GrowthRate;Amort_GrowthFreq;Amort_EndDateInitialGracePer;Amort_BusinessDayConv;Amort_HolidayCalendar;CallableFlag;Redemption_PriceType;Call_MeanReversionConstant;Call_Volatility;Call_NumberTimeSteps;FeeFlag;Costs_InternalCost;Costs_InternalPremium;Costs_ExternalCost;Costs_ExternalPremium;ReportingAttributes;CarryAt;DepreciationMethod;IncomeCalculationMethod;AccountingCategory'
+    FLOATING.REPORT<-1>='CreationDate;PositionID;DataSource;PlanningAccountName;Description;TradeDate;StartDate;PurchaseDate;EndDate;DirForDateGeneration;PrincipalAmount;PrincipalOutstanding;PrincipalOutstanding_Date;MarketValue;MarketValue_CleanDirty;BookValue;IssuePrice;PurchasePrice;AccruedInterest;Currency_Original;Currency_Reporting;Currency_AmountsDeliveredIn;AssetLiability;PositionType;EarlyTerminationType;EarlyTerminationDate;EarlyTerminationPayment;EarlyTerminationAdjustment;Limit_Amount;Limit_Category;DiscountCreditSpreadCurve;DiscountCreditSpreadValue;Coupon_Rate;Coupon_DayCountConv;Coupon_AccrualConvention;Coupon_PaymentFreq;Coupon_PaymentFreqTimeBase;Coupon_PaymentTiming;Coupon_CompoundFreq;Coupon_CompoundFreqTimeBase;Coupon_CapitalizeOnPrincipal;Coupon_PaymentAnchorDate;Coupon_NextPaymentDate;Coupon_NextAccruedPayDate;Coupon_CompoundAnchorDate;Coupon_NextCompoundDate;Coupon_EndDateInitialGracePer;Coupon_BusinessDayConv;Coupon_AdjustForHolidays;Coupon_HolidayCalendar;Coupon_Type;Coupon_IsCompounding;Repricing_RateCurveName;Repricing_MarginType;Repricing_Margin;Repricing_Freq;Repricing_FreqTimeBase;Repricing_AnchorDate;Repricing_NextRepricingDate;Repricing_LastRepricingDate;Repricing_MovingAverage;Repricing_Gridpoint;Repricing_RateMultiplType;Repricing_RateMultiplier;Repricing_Cap;Repricing_CapVolatility;Repricing_Floor;Repricing_FloorVolatility;Repricing_Timing;Repricing_FwdRateVolatility;Repricing_FXVolatility;Repricing_IR_FX_Correlation;Repricing_Lag;Repricing_LagTimeBase;Repricing_BusinessDayConv;Repricing_HolidayCalendar;Repricing_ReprBasedOn;DiscountRateCurveName;DisbursementFlag;Disb_InterestFreePer;Disb_InterestFreePerTimeBase;Disb_CommitmentInterestRate;Amort_Type;Amort_PaymentBehavior;Amort_PaymentAmount;Amort_Rate;Amort_PaymentFreq;Amort_PaymentFreqTimeBase;Amort_CompoundFreq;Amort_AnchorDate;Amort_NextPaymentDate;Amort_NextAccruedPayDate;Amort_Timing;Amort_ResidualAmount;Amort_AnnuityCouponRate;Amort_AnnuityDayCountConv;Amort_AdjustAnnuityPayment;Amort_PrincipalAsInitialCF;Amort_GrowthType;Amort_GrowthRate;Amort_GrowthFreq;Amort_EndDateInitialGracePer;Amort_BusinessDayConv;Amort_HolidayCalendar;CallableFlag;Redemption_PriceType;Call_MeanReversionConstant;Call_Volatility;Call_NumberTimeSteps;FeeFlag;Costs_InternalCost;Costs_InternalPremium;Costs_ExternalCost;Costs_ExternalPremium;ReportingAttributes;CarryAt;DepreciationMethod;IncomeCalculationMethod;AccountingCategory'
+
+    NONPERFORMING.REPORT<-1>='CreationDate;PositionID;DataSource;PlanningAccountName;Description;DirForDateGeneration;PrincipalAmount;BookValue;AccruedInterest;Currency_Original;Currency_Reporting;Currency_AmountsDeliveredIn;AssetLiability;PositionType;Limit_Amount;Limit_Category;Coupon_Rate;Coupon_DayCountConv;Coupon_AccrualConvention;Coupon_PaymentFreq;Coupon_PaymentFreqTimeBase;Coupon_CompoundFreq;Coupon_PaymentAnchorDate;Coupon_NextPaymentDate;Coupon_NextAccruedPayDate;Coupon_BusinessDayConv;Coupon_AdjustForHolidays;Coupon_HolidayCalendar;DiscountRateCurveName;FeeFlag;Costs_InternalCost;Costs_InternalPremium;Costs_ExternalCost;Costs_ExternalPremium;ReportingAttributes;CarryAt;DepreciationMethod;IncomeCalculationMethod;AccountingCategory;CreditSpreadRateCurveName;CreditSpread'
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    SELECT.CMD= ''
+    SELECT.CMD = "SELECT " : FN.AA.ALM.FIX : " WITH @ID LIKE ...FIXED..."
+    CALL EB.READLIST(SELECT.CMD,SEL.LIST,LIST.NAME,KEY.LIST,SEL.ERR)
+
+    FOR I = 1 TO KEY.LIST
+        REC.ID = SEL.LIST <I>
+        CALL F.READ(FN.AA.ALM.FIX,REC.ID,R.AA.ALM.FIX,F.AA.ALM.FIX,ERR.ALM)
+        FIXED.REPORT<-1> = R.AA.ALM.FIX
+    NEXT I
+
+    SEL.LIST =''; LIST.NAME=''; KEY.LIST=''; SEL.ERR='';
+
+    SELECT.CMD = "SELECT " : FN.AA.ALM.FIX : " WITH @ID LIKE ...FLOAT..."
+    CALL EB.READLIST(SELECT.CMD,SEL.LIST,LIST.NAME,KEY.LIST,SEL.ERR)
+
+    FOR I = 1 TO KEY.LIST
+        REC.ID = SEL.LIST <I>
+        CALL F.READ(FN.AA.ALM.FIX,REC.ID,R.AA.ALM.FIX,F.AA.ALM.FIX,ERR.ALM)
+        FLOATING.REPORT<-1> = R.AA.ALM.FIX
+    NEXT I
+
+    SEL.LIST =''; LIST.NAME=''; KEY.LIST=''; SEL.ERR='';
+
+    SELECT.CMD = "SELECT " : FN.AA.ALM.FIX : " WITH @ID LIKE ...NONMATURE..."
+    CALL EB.READLIST(SELECT.CMD,SEL.LIST,LIST.NAME,KEY.LIST,SEL.ERR)
+
+    FOR I = 1 TO KEY.LIST
+        REC.ID = SEL.LIST <I>
+        CALL F.READ(FN.AA.ALM.FIX,REC.ID,R.AA.ALM.FIX,F.AA.ALM.FIX,ERR.ALM)
+        NONPERFORMING.REPORT<-1> = R.AA.ALM.FIX
+    NEXT I
+
+    RETURN
+
+*************
+WRITE.REPORT:
+*************
+
+    WRITELIST FIXED.REPORT TO 'FixedInstruments.txt'
+    WRITELIST FLOATING.REPORT TO 'FloatingInstruments.txt'
+    WRITELIST NONPERFORMING.REPORT TO 'NonMaturingInstruments.txt'
+
+    CALL JOURNAL.UPDATE('')
+
+    RETURN

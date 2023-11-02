@@ -1,0 +1,158 @@
+    SUBROUTINE AAL.PRE.CHARGE.AMT.CALCULATE
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 20th Aug 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Pre routine
+* Attached to      :     Activity Class  : LENDING-NEW-ARRANGEMENT
+*                        Property Class  : PAYMENT.SCHEDULE
+*                        Action          : UPDATE
+* Attached As      : Activity API - Pre Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Routine is used to Calculate the Discounted Interest (Charge) amount and commission amount by bills
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.AA.PAYMENT.SCHEDULE
+    $INSERT I_F.AA.CHARGE
+    $INSERT I_AA.LOCAL.COMMON
+    $INSERT I_F.AA.ARRANGEMENT.ACTIVITY
+
+*** </region>
+*** <region name= Main Body>
+
+    IF c_aalocCurrActivity EQ 'LENDING-NEW-ARRANGEMENT' AND c_aalocActivityStatus["-",1,1] EQ 'UNAUTH' THEN
+
+        GOSUB GET.LOCAL.REF.FIELDS
+        GOSUB GET.REQUIRED.INFO
+        GOSUB CALCULATE.INTEREST.AND.CHARGE.AMT
+    END
+
+    RETURN
+
+*** </region>
+
+*** <region name= GET.LOCAL.REF.FIELDS>
+
+GET.LOCAL.REF.FIELDS:
+
+    APPLN.NAME = ''
+    FIELD.NAME = ''
+    LOCAL.POS = ''
+
+    APPLN.NAME = 'AA.PRD.DES.PAYMENT.SCHEDULE' :FM: 'AA.PRD.DES.CHARGE'
+    FIELD.NAME = 'DAYS' :VM: 'BILL.INT.AMT' :VM: 'BILL.COMM.AMT' :VM: 'BILL.DUE.DATE' :VM: 'BILL.AMOUNT' :VM: 'TOTAL.INTEREST' :VM: 'TOTAL.COMM' :FM: 'ANNUALCOMM.PER'
+    CALL MULTI.GET.LOC.REF(APPLN.NAME,FIELD.NAME,LOCAL.POS)
+
+    DAYS.POS         = LOCAL.POS<1,1>
+    BILL.INT.AMT.POS = LOCAL.POS<1,2>
+    BILL.COMM.AMT.POS= LOCAL.POS<1,3>
+    BILL.DUE.DATE.POS= LOCAL.POS<1,4>
+    BILL.AMOUNT.POS  = LOCAL.POS<1,5>
+    TOTAL.INTEREST.POS=LOCAL.POS<1,6>
+    TOTAL.COMM.POS    = LOCAL.POS<1,7>
+
+    ANNUALCOMM.PER.POS= LOCAL.POS<2,1>
+
+    RETURN
+
+*** </region>
+
+*** <region name= GET.REQUIRED.INFO>
+
+GET.REQUIRED.INFO:
+
+    ARR.ID             = c_aalocArrId
+    ARR.EFFECTIVE.DATE = c_aalocActivityEffDate
+    TOTAL.PAYMENT.TYPES= DCOUNT(R.NEW(AA.PS.PAYMENT.TYPE), VM)
+    effectiveDate      = c_aalocActivityEffDate
+
+    RETURN
+
+*** </region>
+
+*** <region name= CALCULATE.INTEREST.AND.CHARGE.AMT>
+
+CALCULATE.INTEREST.AND.CHARGE.AMT:
+
+    property = 'DISCOUNTINT'
+    GOSUB GET.ARRANGEMENT.CONDITIONS
+    DISCOUNTINT.RATE = R.AA.CHARGE<AA.CHG.LOCAL.REF, ANNUALCOMM.PER.POS>
+
+    property = 'ANNUALCOMM'
+    GOSUB GET.ARRANGEMENT.CONDITIONS
+    COMMISSION.RATE = R.AA.CHARGE<AA.CHG.LOCAL.REF, ANNUALCOMM.PER.POS>
+
+    PAY.TYPE.COUNT = 1
+
+    LOOP
+    WHILE PAY.TYPE.COUNT LE TOTAL.PAYMENT.TYPES
+
+        BILL.DUE.DATE = R.NEW(AA.PS.LOCAL.REF)<1, BILL.DUE.DATE.POS, PAY.TYPE.COUNT>
+        BILL.AMOUNT   = R.NEW(AA.PS.LOCAL.REF)<1,BILL.AMOUNT.POS, PAY.TYPE.COUNT>
+
+        GOSUB GET.NO.OF.DAYS
+
+        DISCOUNTED.INTEREST.AMOUNT = BILL.AMOUNT * DISCOUNTINT.RATE /100 * DEFAULTS.DAYS /360
+        COMMISSION.AMOUNT          = BILL.AMOUNT * COMMISSION.RATE /100 * DEFAULTS.DAYS /360
+
+        CURRENCY.ID = LCCY
+        CALL EB.ROUND.AMOUNT(CURRENCY.ID, DISCOUNTED.INTEREST.AMOUNT, '','')
+        CALL EB.ROUND.AMOUNT(CURRENCY.ID, COMMISSION.AMOUNT, '','')
+
+        R.NEW(AA.PS.LOCAL.REF)<1, DAYS.POS, PAY.TYPE.COUNT>          = DEFAULTS.DAYS
+        R.NEW(AA.PS.LOCAL.REF)<1, BILL.INT.AMT.POS, PAY.TYPE.COUNT>  = DISCOUNTED.INTEREST.AMOUNT
+        R.NEW(AA.PS.LOCAL.REF)<1, BILL.COMM.AMT.POS, PAY.TYPE.COUNT> = COMMISSION.AMOUNT
+
+        PAY.TYPE.COUNT + =1
+    REPEAT
+
+    R.NEW(AA.PS.LOCAL.REF)<1, TOTAL.INTEREST.POS> = SUM(R.NEW(AA.PS.LOCAL.REF)<1, BILL.INT.AMT.POS>)
+    R.NEW(AA.PS.LOCAL.REF)<1, TOTAL.COMM.POS>     = SUM(R.NEW(AA.PS.LOCAL.REF)<1, BILL.COMM.AMT.POS>)
+
+    RETURN
+
+*** </region>
+
+*** <region name= GET.NO.OF.DAYS>
+
+GET.NO.OF.DAYS:
+
+    IF ARR.EFFECTIVE.DATE AND BILL.DUE.DATE THEN
+        DEFAULTS.DAYS = 'C'
+        CALL CDD('',ARR.EFFECTIVE.DATE, BILL.DUE.DATE, DEFAULTS.DAYS)
+    END
+
+    RETURN
+
+*** </region>
+
+*** <region name= GET.ARRANGEMENT.CONDITIONS>
+
+GET.ARRANGEMENT.CONDITIONS:
+
+    returnConditions = ''
+    PROPERTY.CLASS = "CHARGE"
+    R.AA.CHARGE = ""
+    CALL AA.GET.ARRANGEMENT.CONDITIONS(ARR.ID, PROPERTY.CLASS, property, effectiveDate, '', returnConditions, '')
+    R.AA.CHARGE = RAISE(returnConditions)
+
+    RETURN
+
+*** </region>
+
+END

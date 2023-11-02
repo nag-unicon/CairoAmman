@@ -1,0 +1,97 @@
+    SUBROUTINE AT.CALC.AVAIL.BALANCE(R.ACCT,WRK.BAL,AVAIL.BAL)
+
+*/rtn to calculate the available balance to return
+*/AVAIL.BAL = WORK.BAL - LOCKED.AMT
+
+*----------------------------------------------------------------
+* BU001     KARTHIKEYAN   14-JAN-2008   If the Bal in the account is equal to the lockamt
+*                                       then this rtn returns zero as the avail.bal.Hence the
+*                                       the current lock amt is reduced from the balance that
+*                                       is returned.
+*
+* BU002     SRINI         19-JUN-2008   If the FROM.DATE > TODAY then don't set the ULOCK.AMT. LIVE-17216
+*-------------------------------------------------------------------------------------------
+
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.ACCOUNT.CLASS
+    $INSERT I_F.CURRENCY
+
+    GOSUB INITIALISE
+    GOSUB PROCESS
+    RETURN
+
+
+*
+INITIALISE:
+*--------*
+    FN.ACCOUNT.CLASS = 'F.ACCOUNT.CLASS'
+    CALL OPF(FN.ACCOUNT.CLASS,F.ACCOUNT.CLASS)
+
+    RETURN
+
+*
+PROCESS:
+*____________*
+
+    IF R.ACCT<AC.FROM.DATE> THEN
+        U.LOCK.AMT =0
+        U.CTR = DCOUNT(R.ACCT<AC.FROM.DATE>, @VM)
+* (S) BM001
+        PROCESSED.FLAG = 0
+        IF U.CTR EQ 1 THEN
+            IF R.ACCT<AC.FROM.DATE,U.I> LE TODAY THEN
+                U.LOCK.AMT = R.ACCT<AC.LOCKED.AMOUNT,1>
+            END
+            PROCESSED.FLAG = 1
+        END
+        IF NOT(PROCESSED.FLAG) THEN
+            FOR U.I = 1 TO U.CTR
+                IF R.ACCT<AC.FROM.DATE,U.I> LT TODAY THEN
+
+                    U.LOCK.AMT = R.ACCT<AC.LOCKED.AMOUNT,U.I>
+
+                END ELSE
+
+                    IF R.ACCT<AC.FROM.DATE,U.I> EQ TODAY THEN
+                        U.LOCK.AMT = R.ACCT<AC.LOCKED.AMOUNT,U.I>
+                        PROCESSED.FLG = 1 ;EXIT
+
+                    END
+                    IF R.ACCT<AC.FROM.DATE,U.I> GT TODAY THEN
+*BU002-S
+*                        U.LOCK.AMT = R.ACCT<AC.LOCKED.AMOUNT,U.I-1>
+*BU002-E
+                        PROCESSED.FLG = 1 ;EXIT
+                    END
+
+
+
+                END
+
+**            IF TODAY GE R.ACCT<AC.FROM.DATE, U.I> THEN
+
+**                U.LOCK.AMT += R.ACCT<AC.LOCKED.AMOUNT,U.I>
+**            END
+
+            NEXT U.I
+        END
+* (E) BU001
+        IF WRK.BAL LT 0 THEN
+            AVAIL.BAL = ABS(WRK.BAL) + U.LOCK.AMT
+            AVAIL.BAL = AVAIL.BAL * -1
+        END ELSE
+            AVAIL.BAL = WRK.BAL - U.LOCK.AMT
+        END
+    END ELSE
+
+        AVAIL.BAL = WRK.BAL
+
+    END
+
+    RETURN
+
+END
+

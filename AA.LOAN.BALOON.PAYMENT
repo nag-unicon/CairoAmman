@@ -1,0 +1,111 @@
+    SUBROUTINE AA.LOAN.BALOON.PAYMENT(ARR.ID)
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 03rd Jul 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Batch Routine
+* Attached to      : BNK/AA.LOAN.BALOON.PAYMENT
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This routine used to get the last two payment amount for AA Loan
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT TT.BP I_AA.LOAN.BALOON.PAYMENT.COMMON
+    $INSERT I_F.AA.ARRANGEMENT
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB PROCESS
+
+    IF BILL.PAY.DATE<2> AND BILL.PAY.DATE<1> THEN
+        GOSUB PROCESS.REPORT.ARRAY
+    END
+
+*** </region>
+
+    RETURN
+
+*** </region>
+*** <region name= Process>
+
+PROCESS:
+
+    SCHEDULE.INFO<1> = ARR.ID
+    SCHEDULE.INFO<2> = TODAY
+    SCHEDULE.INFO<3> = "REPAYMENT.SCHEDULE"
+    START.DATE = TODAY
+    DATE.RANGE<1> = TODAY
+
+
+*   CALL AA.BUILD.PAYMENT.SCHEDULE.DATES(SCHEDULE.INFO, START.DATE, END.DATE, NO.CYCLES, TERM.RECALC.DETAILS, PAYMENT.DATES, PAYMENT.ACTUAL.DATES, PAYMENT.FIN.DATES, PAYMENT.TYPES, PAYMENT.METHODS, PAYMENT.AMOUNTS, PAYMENT.PROPERTIES, RET.ERROR)
+*    CALL AA.BUILD.PAYMENT.SCHEDULE.SCHEDULES(SCHEDULE.INFO, REQD.END.DATE, NO.CYCLES, ADJUST.FINAL.AMOUNT, PAYMENT.DATES, PAYMENT.TYPES, PAYMENT.METHODS, PAYMENT.AMOUNTS, PAYMENT.PROPERTIES,  PAYMENT.PROPERTIES.AMT, TAX.DETAILS, OUTSTANDING.AMOUNT, RET.ERROR)
+    CALL AA.SCHEDULE.PROJECTOR(ARR.ID, SIMULATION.REF, NO.RESET, DATE.RANGE, TOT.PAYMENT, PAYMENT.DATES, DUE.TYPES, PAYMENT.METHODS,DUE.TYPE.AMTS, DUE.PROPS, PAYMENT.PROPERTIES.AMT, DUE.OUTS)
+
+    PAYMENT.METHOD.COUNT = DCOUNT(PAYMENT.METHODS, FM)
+    PAYMENT.CNT          = 1
+    TOTAL.PAY.CNT        = 1
+    BILL.PAY.DATE        = ""
+    BILL.PAY.AMOUNT      = ""
+
+    LOOP
+    WHILE PAYMENT.CNT LE PAYMENT.METHOD.COUNT
+        PAY.METHODS = PAYMENT.METHODS<PAYMENT.METHOD.COUNT>
+        CHANGE SM TO VM IN PAY.METHODS
+        IF "DUE" MATCHES PAY.METHODS THEN
+
+            IF TOTAL.PAY.CNT LE 2 THEN
+                TOTAL.PAY.CNT +=1
+
+                IF BILL.PAY.AMOUNT<1> NE SUM(PAYMENT.PROPERTIES.AMT<PAYMENT.METHOD.COUNT,1>) THEN
+                    BILL.PAY.DATE<-1>   = PAYMENT.DATES<PAYMENT.METHOD.COUNT>
+                    BILL.PAY.AMOUNT<-1> = SUM(PAYMENT.PROPERTIES.AMT<PAYMENT.METHOD.COUNT,1>)
+                END
+
+            END ELSE
+                PAYMENT.CNT = PAYMENT.METHOD.COUNT
+            END
+
+        END
+
+        PAYMENT.METHOD.COUNT - =1
+        PAYMENT.CNT + =1
+
+    REPEAT
+
+    RETURN
+
+PROCESS.REPORT.ARRAY:
+
+    R.AA.ARRANGEMENT = ""
+    ERR.AA.ARRANGEMENT = ""
+    CALL F.READ(FN.AA.ARRANGEMENT, ARR.ID, R.AA.ARRANGEMENT, F.AA.ARRANGEMENT, ERR.AA.ARRANGEMENT)
+
+    CUSTOMER.NO   = R.AA.ARRANGEMENT<AA.ARR.CUSTOMER,1>
+    COMPANY.CODE  = R.AA.ARRANGEMENT<AA.ARR.CO.CODE>
+    PRODUCT       = R.AA.ARRANGEMENT<AA.ARR.PRODUCT,1>
+
+    RECORD.ARRAY = ARR.ID :"|": CUSTOMER.NO :"|": COMPANY.CODE :"|": PRODUCT :"|": BILL.PAY.DATE<2> :"|": BILL.PAY.AMOUNT<2> :"|": BILL.PAY.DATE<1> :"|": BILL.PAY.AMOUNT<1>
+
+    CALL F.WRITE(FN.AA.BALOON.PAYMENT.LIST, ARR.ID, RECORD.ARRAY)
+
+    RETURN
+
+END

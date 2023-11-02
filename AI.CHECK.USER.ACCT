@@ -1,0 +1,47 @@
+    SUBROUTINE AI.CHECK.USER.ACCT
+    $INSERT I_EQUATE
+    $INSERT I_COMMON
+    $INSERT I_ENQUIRY.COMMON
+    $INSERT I_F.STMT.ENTRY
+    $INSERT I_F.CUSTOMER.ACCOUNT
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.CUSTOMER.ACCOUNT
+    $INSERT I_EB.EXTERNAL.COMMON
+    GOSUB INITIALISE
+    GOSUB PROCESS
+    RETURN
+
+*-------------------------------------------------------------------------
+INITIALISE:
+*-------------------------------------------------------------------------
+*Open Required files and initialise the variables
+
+    FN.CUSTOMER.ACCOUNT = 'F.CUSTOMER.ACCOUNT'
+    FV.CUSTOMER.ACCOUNT = ''
+    CALL OPF(FN.CUSTOMER.ACCOUNT,FV.CUSTOMER.ACCOUNT)
+    CUST.ACC=COMI
+    CURR.NO = DCOUNT(R.NEW(V-9),@VM)
+
+    RETURN
+*-------------------------------------------------------------------------
+PROCESS:
+*-------------------------------------------------------------------------
+    CUSTOMER.NUMBER = EB.EXTERNAL$CUSTOMER
+    CALL F.READ(FN.CUSTOMER.ACCOUNT,CUSTOMER.NUMBER,R.CUSTOMER.ACCOUNT,FV.CUSTOMER.ACCOUNT,ERR.ACC)
+
+    IF (R.CUSTOMER.ACCOUNT) THEN
+        LOCATE CUST.ACC IN R.CUSTOMER.ACCOUNT SETTING AC.POS1 ELSE AC.POS1=''
+        IF NOT(AC.POS1) THEN
+            TEXT="NON.CUST.ACCOUNT"
+            CURR.NO = CURR.NO+1
+            CALL STORE.OVERRIDE(CURR.NO)
+        END
+    END ELSE
+        TEXT="NON.CUST.ACCOUNT"
+        CURR.NO = CURR.NO+1
+        CALL STORE.OVERRIDE(CURR.NO)
+    END
+
+    RETURN
+
+END

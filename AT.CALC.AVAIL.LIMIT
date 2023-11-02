@@ -1,0 +1,107 @@
+*BM001   15-APR-2008   SRINI    Utilised amount should be subtracted from the available limit. - COMUAT1086
+
+    SUBROUTINE AT.CALC.AVAIL.LIMIT(MAT MLIM.REC,YACC.AMT)
+
+*------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.LIMIT
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.COMPANY
+    $INSERT I_F.MNEMONIC.COMPANY
+*------------------------------------------------------Dimension matrices
+    DIM MLIM.REC(LI.AUDIT.DATE.TIME)
+    DIM MACC.REC(AC.AUDIT.DATE.TIME) ; MAT MACC.REC = ""
+*----------------------------------------------------Initialise variables
+
+    YWORK.OS.CCY = "" ; YWORK.OS.AMT = "" ; YACC.AMT = ""
+    PLIM.CCY = MLIM.REC(LI.LIMIT.CURRENCY)
+    YTHIS.ACC.MNEMONIC = ""
+*BM001-S
+    IF MLIM.REC(LI.EXPIRY.DATE) LT TODAY OR MLIM.REC(LI.AVAILABLE.MARKER) NE 'Y' THEN
+        YACC.AMT = MLIM.REC(LI.AVAIL.AMT)
+        RETURN
+    END
+*BM001-E
+*--------------------------------------------------------Main processing
+    IF MLIM.REC(LI.ACCOUNT) THEN
+        YCOUNT = COUNT(MLIM.REC(LI.ACCOUNT),VM)+1 ; YPREV.FILE = ""
+        FOR YAV = 1 TO YCOUNT
+            YACC.CCY = ""
+            IF YTHIS.ACC.MNEMONIC = MLIM.REC(LI.ACC.COMPANY)<1,YAV> THEN
+                YACC.CCY = PACC.CCY
+            END ELSE
+                YTHIS.ACC.MNEMONIC = MLIM.REC(LI.ACC.COMPANY)<1,YAV>
+*Handle MULTIBOOK
+                IF C$MULTI.BOOK THEN
+                    FN.MNEMONIC.COMPANY = 'F.MNEMONIC.COMPANY'
+                    F.MNEMONIC.COMPANY = ''
+                    CALL OPF(FN.MNEMONIC.COMPANY,F.MNEMONIC.COMPANY)
+*
+                    FN.COMPANY = 'F.COMPANY'
+                    F.COMPANY = ''
+                    CALL OPF(FN.COMPANY,F.COMPANY)
+*
+                    R.MNEMONIC.COMPANY = ''
+                    MNE.ERR = ''
+                    CALL F.READ(FN.MNEMONIC.COMPANY,MLIM.REC(LI.ACC.COMPANY)<1,YAV>,R.MNEMONIC.COMPANY,F.MNEMONIC.COMPANY,MNE.ERR)
+                    COMPANY.ID = R.MNEMONIC.COMPANY<AC.MCO.COMPANY>
+                    R.COMPANY.REC = ''
+                    COMP.ERR = ''
+                    CALL F.READ(FN.COMPANY,COMPANY.ID,R.COMPANY.REC,F.COMPANY,COMP.ERR)
+                    COMP.MNE = R.COMPANY.REC<EB.COM.DEFAULT.CUST.MNE>
+                    Y.ACCOUNT.FILE = "F":COMP.MNE:".ACCOUNT"
+*Handle MULTIBOOK
+                END ELSE
+                    Y.ACCOUNT.FILE = "F":MLIM.REC(LI.ACC.COMPANY)<1,YAV>:".ACCOUNT"
+                END
+                F.ACCOUNT = "" ; YPREV.FILE = Y.ACCOUNT.FILE
+                CALL OPF(Y.ACCOUNT.FILE, F.ACCOUNT)
+            END
+            YKEY = MLIM.REC(LI.ACCOUNT)<1,YAV>
+*            CALL F.MATREAD (Y.ACCOUNT.FILE, YKEY, MAT MACC.REC,AC.AUDIT.DATE.TIME, F.ACCOUNT, ETEXT)
+            MATREAD MACC.REC FROM F.ACCOUNT,YKEY ELSE ETEXT = 'RECORD NOT FOUND'
+            IF ETEXT THEN
+                TEXT = "UNABLE TO READ & &":FM:Y.ACCOUNT.FILE:VM:YKEY
+                GOTO FATAL.ERROR
+            END
+            YACC.CCY = MACC.REC(AC.CURRENCY)
+            PACC.CCY = YACC.CCY
+            YACC.AMT = MACC.REC(AC.WORKING.BALANCE)
+            IF YACC.AMT THEN
+*IF (MLIM.REC(LI.ALLOW.NETTING)[1,1] = "Y" AND MACC.REC(AC.ALLOW.NETTING)[1,1] = 'Y') THEN
+                LOCATE YACC.CCY IN YWORK.OS.CCY<1,1,1> SETTING YACC.POINTER ELSE YACC.POINTER = 0
+                IF YACC.POINTER THEN
+                    YWORK.OS.AMT<1,1,YACC.POINTER> = YWORK.OS.AMT<1,1,YACC.POINTER> + YACC.AMT
+                END ELSE
+                    YWORK.OS.CCY = INSERT(YWORK.OS.CCY,1,1,-1,YACC.CCY)
+                    YWORK.OS.AMT = INSERT(YWORK.OS.AMT,1,1,-1,YACC.AMT)
+                END
+*END
+            END
+        NEXT YAV
+        YACC.AMT = ""
+        IF YWORK.OS.CCY THEN
+            IF YWORK.OS.CCY = PLIM.CCY THEN
+                YACC.AMT = YWORK.OS.AMT
+            END ELSE
+                YACC.AMT = ""
+                CALL LIMIT.REVAL.OS (PLIM.CCY, YWORK.OS.CCY, YWORK.OS.AMT,
+                "", "", "", YACC.AMT)
+            END
+        END
+    END
+*
+    RETURN          ;* end of pgm
+*
+*
+*************************************************************************
+*
+FATAL.ERROR:
+*
+    CALL FATAL.ERROR ("LIMIT.CHECK.STANDARD")
+    RETURN
+*
+*************************************************************************
+
+END

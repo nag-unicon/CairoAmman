@@ -1,0 +1,124 @@
+    SUBROUTINE AAL.PST.CAB.AA.LEGAL.LOAN.UPDATE
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 28th Sep 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Record routine
+
+* Attached to      : Activity Class  : LENDING-CHANGE.PRODUCT-LEGAL.ARRANGEMENT
+*                    Property Class  : CHARGE
+*                    Action          : UPDATE
+*                    Routine         : AAL.PST.CAB.AA.LEGAL.LOAN.UPDATE
+
+* Attached As      : Record Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Routine is used to update the CAB.AA.LEGAL.LOAN file
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_AA.APP.COMMON
+    $INSERT I_AA.ACTION.CONTEXT
+    $INSERT I_F.CAB.AA.LEGAL.LOAN
+    $INSERT I_F.AA.ARRANGEMENT.ACTIVITY
+
+*** </region>
+*** <region name= Main Body>
+
+    IF c_arrActivityStatus["-",1,1] EQ "AUTH" THEN
+
+        GOSUB OPEN.FILES
+        GOSUB PROCESS
+
+    END
+
+    RETURN
+
+*** </region>
+*** <region name= Process>
+
+PROCESS:
+
+    ARR.ID = AA$ARR.ID
+
+    R.CAB.AA.LEGAL.LOAN = ""
+    ERR.CAB.AA.LEGAL.LOAN = ""
+
+    IF ARR.ID THEN
+
+        BEGIN CASE
+
+        CASE c_arrActivityStatus EQ "AUTH"
+
+            GOSUB PROCESS.RESIDUAL.ACTIVITY
+
+            CALL F.READ(FN.CAB.AA.LEGAL.LOAN, ARR.ID, R.CAB.AA.LEGAL.LOAN, F.CAB.AA.LEGAL.LOAN, ERR.CAB.AA.LEGAL.LOAN)
+
+            R.CAB.AA.LEGAL.LOAN<CAB.AA.LEGAL.LEGAL.DATE> = AA$ACTIVITY.EFF.DATE
+            CALL F.WRITE(FN.CAB.AA.LEGAL.LOAN, ARR.ID, R.CAB.AA.LEGAL.LOAN)
+
+        CASE c_arrActivityStatus EQ "AUTH-REV"
+            CALL F.DELETE(FN.CAB.AA.LEGAL.LOAN, ARR.ID)
+
+        END CASE
+    END
+
+    RETURN
+
+*** </region>
+
+*** <region name= OPEN.FILES>
+
+OPEN.FILES:
+
+    FN.CAB.AA.LEGAL.LOAN = "F.CAB.AA.LEGAL.LOAN"
+    F.CAB.AA.LEGAL.LOAN = ""
+    CALL OPF(FN.CAB.AA.LEGAL.LOAN, F.CAB.AA.LEGAL.LOAN)
+
+    RETURN
+
+*** </region>
+
+PROCESS.RESIDUAL.ACTIVITY:
+
+    APP.NAME     = 'AA.ARRANGEMENT.ACTIVITY'
+    PROCESS      = 'PROCESS'
+    OFS.VERSION  = "AA.ARRANGEMENT.ACTIVITY,INP"
+    OFS.FUNCTION = 'I'
+    GTS.MODE     = ''
+    NO.OF.AUTH   = '0'
+    TRANSACTION.ID = ''
+    OFS.RECORD = ""
+    OFS.SOURCE.ID  = 'AA.ONLINE'
+
+    R.AA.ARRANGEMENT.ACTIVITY = ""
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ARRANGEMENT> = ARR.ID
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ACTIVITY> = "LENDING-RESIDUAL-ACCOUNT"
+
+    CALL OFS.BUILD.RECORD(APP.NAME,OFS.FUNCTION, PROCESS, OFS.VERSION, GTS.MODE, NO.OF.AUTH, TRANSACTION.ID, R.AA.ARRANGEMENT.ACTIVITY, OFS.RECORD)
+
+    theResponse    = ""
+    txnCommitted   = ""
+    options        = ""
+    options<1>     = "AA.ONLINE"
+    options<4>     = "HLD"
+
+    CALL OFS.POST.MESSAGE(OFS.RECORD,'', OFS.SOURCE.ID, '')
+
+    RETURN
+
+END

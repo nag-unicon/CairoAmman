@@ -1,0 +1,138 @@
+*-----------------------------------------------------------------------------
+* <Rating>-98</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE AL.PST.INCREASE.TERM.AMT.UPDATE
+* ----------------------------------------------------------------------------
+* Description           : Routine to update the live file AAL.INCREASE.TERM.AMOUNT which is used to generate the online report
+*
+* Developed By          : Muthukaruppan
+*
+* Development Reference : Report to generate the Increase commitment details
+*
+* Attached To           : Activity API Product Condition for Staff Housing Loan products
+
+*                              Activity Class : LENDING-INCREASE-TERM.AMOUNT
+*                              Property Class : TERM.AMOUNT
+*                              ACTION         : INCREASE
+*
+* Attached As           : Post Routine
+*-----------------------------------------------------------------------------
+* Input Parameter:
+* ---------------*
+* Argument#1 : -NA-
+*
+*-----------------*
+* Output Parameter:
+* ----------------*
+* Argument#4 : -NA-
+*-----------------------------------------------------------------------------
+*  M O D I F I C A T I O N S
+* ***************************
+*-----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_AA.LOCAL.COMMON
+    $INSERT I_F.AA.TERM.AMOUNT
+    $INSERT I_F.AA.ARRANGEMENT
+    $INSERT TT.BP I_F.AAL.INCREASE.TERM.AMOUNT
+
+    GOSUB OPEN.FILES
+    GOSUB SET.ACTIVITY.DETAILS
+    GOSUB GET.AAL.INCREASE.TERM.AMOUNT
+
+    BEGIN CASE
+
+    CASE c_aalocActivityStatus EQ 'AUTH'
+        GOSUB PROCESS.INPUT.ACTION
+
+    CASE c_aalocActivityStatus EQ "AUTH-REV"
+        GOSUB PROCESS.REVERSE.ACTION
+
+    END CASE
+
+    RETURN
+
+SET.ACTIVITY.DETAILS:
+
+    ARR.ID                  = c_aalocArrId
+    CustomerNo              = c_aalocArrangementRec<AA.ARR.CUSTOMER>
+    ArrangementStatus       = c_aalocArrangementRec<AA.ARR.ARR.STATUS>
+    LinkedAccount           = c_aalocLinkedAccount
+    ProductID               = c_aalocArrProductId
+    ActivityDate            = c_aalocActivityEffDate
+    IncreaseAmount          = R.NEW(AA.AMT.CHANGE.AMOUNT)
+    ActivityReference       = c_aalocTxnReference
+
+    RETURN
+
+OPEN.FILES:
+
+    FN.AAL.INCREASE.TERM.AMOUNT = "F.AAL.INCREASE.TERM.AMOUNT"
+    F.AAL.INCREASE.TERM.AMOUNT = ""
+    CALL OPF(FN.AAL.INCREASE.TERM.AMOUNT, F.AAL.INCREASE.TERM.AMOUNT)
+
+    RETURN
+
+GET.AAL.INCREASE.TERM.AMOUNT:
+
+    R.AAL.INCREASE.TERM.AMOUNT = ""
+    ERR.AAL.INCREASE.TERM.AMOUNT = ""
+
+    CALL F.READ(FN.AAL.INCREASE.TERM.AMOUNT, ARR.ID, R.AAL.INCREASE.TERM.AMOUNT, F.AAL.INCREASE.TERM.AMOUNT, ERR.AAL.INCREASE.TERM.AMOUNT)
+
+    ActivityCount = 0
+    ActivityCount = DCOUNT(R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.AAA.REFERENCE>, VM)
+
+    RETURN
+
+PROCESS.INPUT.ACTION:
+
+    R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.AAA.REFERENCE, ActivityCount+1>  = ActivityReference
+    R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.CUSTOMER, ActivityCount+1>        = CustomerNo
+    R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.LINKED.ACCOUNT, ActivityCount+1> = LinkedAccount
+    R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.PRODUCT, ActivityCount+1>        = ProductID
+    R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.EFFECTIVE.DATE, ActivityCount+1> = ActivityDate
+    R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.CHANGE.AMOUNT, ActivityCount+1>  = IncreaseAmount
+
+    GOSUB PROCESS.UPDATE.ACTION
+
+    RETURN
+
+PROCESS.REVERSE.ACTION:
+
+    IF ActivityCount EQ 1 THEN
+        GOSUB PROCESS.DELETE.ACTION     ;* Delete the record
+    END ELSE
+
+        LOCATE ActivityReference IN R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.AAA.REFERENCE,1> SETTING aaa.Pos THEN       ;* Remove the Activity details
+
+            DEL R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.AAA.REFERENCE, aaa.Pos>
+            DEL R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.CUSTOMER, aaa.Pos>
+            DEL R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.LINKED.ACCOUNT, aaa.Pos>
+            DEL R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.PRODUCT, aaa.Pos>
+            DEL R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.EFFECTIVE.DATE, aaa.Pos>
+            DEL R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.CHANGE.AMOUNT, aaa.Pos>
+
+            GOSUB PROCESS.UPDATE.ACTION
+
+        END
+    END
+
+    RETURN
+
+PROCESS.UPDATE.ACTION:
+
+    IF R.AAL.INCREASE.TERM.AMOUNT THEN
+        CALL F.WRITE(FN.AAL.INCREASE.TERM.AMOUNT, ARR.ID, R.AAL.INCREASE.TERM.AMOUNT)
+    END
+
+    RETURN
+
+PROCESS.DELETE.ACTION:
+
+    CALL F.DELETE(FN.AAL.INCREASE.TERM.AMOUNT, ARR.ID)
+
+    RETURN
+
+END

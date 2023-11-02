@@ -1,0 +1,103 @@
+    SUBROUTINE AAL.REC.PAYMENT.SCHEDULE.LEGAL
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 26th Sep 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Record routine
+
+* Attached to      : Activity Class  : LENDING-CHANGE.PRODUCT-ARRANGEMENT
+*                    Property Class  : PAYMENT.SCHEDULE
+*                    Action          : UPDATE
+*                    Routine         : AAL.REC.PAYMENT.SCHEDULE.LEGAL
+
+* Attached As      : Record Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Routine is used to default the Payment END.DATE.
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.AA.PAYMENT.SCHEDULE
+    $INSERT I_AA.APP.COMMON
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB GET.AA.ACCOUNT.DETAILS
+    GOSUB GET.AGEING.BILLS
+    GOSUB PROCESS
+
+    RETURN
+
+*** </region>
+
+*** <region name= Process>
+
+PROCESS:
+
+    PAYMENT.TYPE.CNT = DCOUNT(R.NEW(AA.PS.PAYMENT.TYPE), VM)
+    PAY.CNT = 1
+
+    LOOP
+    WHILE PAY.CNT LE PAYMENT.TYPE.CNT
+
+        R.NEW(AA.PS.END.DATE)<1, PAY.CNT> = PAYMENT.END.DATE
+
+        PAY.CNT + = 1
+    REPEAT
+
+    RETURN
+
+*** </region>
+
+GET.AA.ACCOUNT.DETAILS:
+
+    ARR.ID = AA$ARR.ID
+    PROCESS.TYPE = 'INITIALISE'
+    R.AA.ACCOUNT.DETAILS = ''
+
+    CALL AA.PROCESS.ACCOUNT.DETAILS(ARR.ID, PROCESS.TYPE, UPDATE.TYPE, R.AA.ACCOUNT.DETAILS, RET.ERROR)
+
+    RETURN
+
+*** </region>
+*** <region name= Get all the Ageing payment bills for the arrangement>
+
+GET.AGEING.BILLS:
+
+    LAST.PAYMENT.DATE = AA$ACTIVITY.EFF.DATE
+    BILL.CREATE.DATE = ""
+    BILL.REFERENCES = ""
+    BILL.STATUS = ""
+    BILL.TYPE = "PAYMENT"
+    CALL AA.GET.BILL(ARR.ID, "", LAST.PAYMENT.DATE, BILL.CREATE.DATE, BILL.TYPE, "", BILL.STATUS, "", "", "", "", BILL.REFERENCES, RET.ERROR)
+
+    IF BILL.REFERENCES THEN
+        CUR.DATE = AA$ACTIVITY.EFF.DATE
+        YREGION  = ''
+        YDAYS.ORIG ='+1C'
+        CALL CDT (YREGION,CUR.DATE,YDAYS.ORIG)
+        PAYMENT.END.DATE = CUR.DATE
+    END ELSE
+        PAYMENT.END.DATE = AA$ACTIVITY.EFF.DATE
+    END
+
+    RETURN
+
+*** </region>
+
+END

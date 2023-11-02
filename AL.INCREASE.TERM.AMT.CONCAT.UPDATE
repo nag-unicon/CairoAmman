@@ -1,0 +1,232 @@
+    SUBROUTINE AL.INCREASE.TERM.AMT.CONCAT.UPDATE
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan (ITSS)
+* Development Id   : Increase commitment Report(TopUp Loans)
+* Date             : 24-Oct-2016
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Mainline Routine
+* Attached to      : ENQUIRY>CAB.AA.TOPUP.LOANS.REPORT
+*
+* Attached As      : MainLine Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This routine is used to select all the LENDING-INCREASE-TERM.AMOUNT Acvities and update the details into AAL.INCREASE.TERM.AMOUNT
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+*----------------------------------------------------------------------------------------------
+
+
+*** <region name = Inserts>
+*** <desc> File inserts and common variables in the subroutine </desc>
+
+    $INSERT I_EQUATE
+    $INSERT I_COMMON
+    $INSERT I_F.AA.ARRANGEMENT
+    $INSERT I_F.AA.ARRANGEMENT.ACTIVITY
+    $INSERT I_F.AA.TERM.AMOUNT
+    $INSERT TT.BP I_F.AAL.INCREASE.TERM.AMOUNT
+
+
+* </region>
+
+*** <region name = Process Logic>
+
+    GOSUB OPEN.FILES
+    GOSUB SELECT.AAA.RECORDS
+    GOSUB PROCESS
+
+* </region>
+
+    RETURN
+
+OPEN.FILES:
+
+    FN.AA.ARRANGEMENT.ACTIVITY = "F.AA.ARRANGEMENT.ACTIVITY"
+    F.AA.ARRANGEMENT.ACTIVITY = ""
+    CALL OPF(FN.AA.ARRANGEMENT.ACTIVITY, F.AA.ARRANGEMENT.ACTIVITY)
+
+    FN.AAL.INCREASE.TERM.AMOUNT = "F.AAL.INCREASE.TERM.AMOUNT"
+    F.AAL.INCREASE.TERM.AMOUNT = ""
+    CALL OPF(FN.AAL.INCREASE.TERM.AMOUNT, F.AAL.INCREASE.TERM.AMOUNT)
+
+    FN.AA.ARRANGEMENT = "F.AA.ARRANGEMENT"
+    F.AA.ARRANGEMENT = ""
+    CALL OPF(FN.AA.ARRANGEMENT, F.AA.ARRANGEMENT)
+
+    RETURN
+
+SELECT.AAA.RECORDS:
+
+    PRODUCT.NAME = "STAFF.HOUSE.LN.FLOAT"
+
+    SEL.CMD = "SELECT ":FN.AA.ARRANGEMENT.ACTIVITY : " WITH ACTIVITY.CLASS EQ LENDING-INCREASE-TERM.AMOUNT AND PRODUCT EQ " : PRODUCT.NAME : " BY.DSND EFFECTIVE.DATE"
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',NO.OF.AAA,ERR)
+
+    RETURN
+
+PROCESS:
+
+*** <region name = Process>
+*** <desc> Get the CurAccount Balance</desc>
+
+    LoopCount = 1
+    LOOP
+    WHILE LoopCount LE NO.OF.AAA
+
+        AAA.ID = SEL.LIST<LoopCount>
+
+        R.AA.ARRANGEMENT.ACTIVITY = ""
+        ERR.AA.ARRANGEMENT.ACTIVITY = ""
+
+        CALL F.READ(FN.AA.ARRANGEMENT.ACTIVITY, AAA.ID, R.AA.ARRANGEMENT.ACTIVITY, F.AA.ARRANGEMENT.ACTIVITY, ERR.AA.ARRANGEMENT.ACTIVITY)
+
+        IF R.AA.ARRANGEMENT.ACTIVITY THEN
+
+            ARR.ID = R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ARRANGEMENT>
+
+            GOSUB GET.ARRANGEMENT
+            GOSUB SET.ACTIVITY.DETAILS
+            GOSUB GET.AAL.INCREASE.TERM.AMOUNT
+            GOSUB PROCESS.INPUT.ACTION
+
+        END
+
+        LoopCount + =1
+    REPEAT
+
+
+    RETURN
+
+PROCESS.INPUT.ACTION:
+
+    R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.AAA.REFERENCE, ActivityCount+1>  = ActivityReference
+    R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.CUSTOMER, ActivityCount+1>       = CustomerNo
+    R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.LINKED.ACCOUNT, ActivityCount+1> = LinkedAccount
+    R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.PRODUCT, ActivityCount+1>        = ProductID
+    R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.EFFECTIVE.DATE, ActivityCount+1> = ActivityDate
+    R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.CHANGE.AMOUNT, ActivityCount+1>  = IncreaseAmount
+
+    GOSUB PROCESS.UPDATE.ACTION
+
+    RETURN
+
+PROCESS.UPDATE.ACTION:
+
+    IF R.AAL.INCREASE.TERM.AMOUNT THEN
+        CALL F.WRITE(FN.AAL.INCREASE.TERM.AMOUNT, ARR.ID, R.AAL.INCREASE.TERM.AMOUNT)
+        CALL JOURNAL.UPDATE("")
+    END
+
+    RETURN
+
+GET.ARRANGEMENT:
+
+    R.AA.ARRANGEMENT = ""
+    ERR.AA.ARRANGEMENT = ""
+
+    CALL F.READ(FN.AA.ARRANGEMENT, ARR.ID, R.AA.ARRANGEMENT, F.AA.ARRANGEMENT, ERR.AA.ARRANGEMENT)
+
+    RETURN
+
+SET.ACTIVITY.DETAILS:
+
+    CustomerNo              = R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.CUSTOMER>
+    LinkedAccount           = R.AA.ARRANGEMENT<AA.ARR.LINKED.APPL.ID,1>
+    ProductID               = R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.PRODUCT>
+    ActivityDate            = R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.EFFECTIVE.DATE>
+
+    GOSUB GET.CHANGE.AMOUNT
+
+    ActivityReference       = AAA.ID
+
+    RETURN
+
+GET.CHANGE.AMOUNT:
+
+    idPropertyClass = "TERM.AMOUNT"
+    idProperty = ""
+    effectiveDate = ActivityDate
+    returnIds = ""
+    R.AA.TERM.AMOUNT = ""
+    returnError = ""
+
+    CALL AA.GET.ARRANGEMENT.CONDITIONS(ARR.ID, idPropertyClass, idProperty, effectiveDate, returnIds, R.AA.TERM.AMOUNT, returnError)
+
+    R.AA.TERM.AMOUNT = RAISE(R.AA.TERM.AMOUNT)
+
+    IF R.AA.TERM.AMOUNT<AA.AMT.CHANGE.AMOUNT> THEN
+        IncreaseAmount = R.AA.TERM.AMOUNT<AA.AMT.CHANGE.AMOUNT>
+    END ELSE
+        GOSUB GET.CHANGE.TERM.AMOUNT
+    END
+
+    RETURN
+
+GET.CHANGE.TERM.AMOUNT:
+
+    FN.XREF.FILE = "F.AA.ARRANGEMENT.DATED.XREF"
+    F.XREF.FILE = ""
+    CALL OPF(FN.XREF.FILE, F.XREF.FILE)
+
+    FN.AA.ARR.TERM.AMOUNT = "F.AA.ARR.TERM.AMOUNT"
+    F.AA.ARR.TERM.AMOUNT = ""
+    CALL OPF(FN.AA.ARR.TERM.AMOUNT, F.AA.ARR.TERM.AMOUNT)
+
+    CALL F.READ(FN.XREF.FILE,ARR.ID,R.ARR.REF,F.XREF.FILE,"")         ;* get properties and dates from AA.ARRANGEMENT.DATED.XREF
+
+    PROPERTIES = R.ARR.REF<1> ;* Get property
+
+    LOCATE returnIds IN PROPERTIES<1,1> SETTING PropertyPos THEN
+        RETURN.IDS = R.ARR.REF<2,PropertyPos>
+        CHANGE SM TO FM IN RETURN.IDS
+        TotalActCount = DCOUNT(RETURN.IDS, FM)
+    END
+
+    Txncount = 2
+
+    LOOP
+    WHILE Txncount LE TotalActCount
+
+        IF FIELD(RETURN.IDS<Txncount>, ".", 1) EQ effectiveDate THEN
+
+            R.AA.TERM.AMOUNT = ""
+            ERR.AA.ARR.TERM.AMOUNT = ""
+
+            arrID = ARR.ID :"-": returnIds :"-": RETURN.IDS<Txncount>
+            CALL F.READ(FN.AA.ARR.TERM.AMOUNT, arrID, R.AA.TERM.AMOUNT, F.AA.ARR.TERM.AMOUNT, ERR.AA.ARR.TERM.AMOUNT)
+
+            IF R.AA.TERM.AMOUNT<AA.AMT.CHANGE.AMOUNT> THEN
+                IncreaseAmount = R.AA.TERM.AMOUNT<AA.AMT.CHANGE.AMOUNT>
+                Txncount = TotalActCount
+            END
+
+        END
+
+        Txncount + = 1
+    REPEAT
+
+    RETURN
+
+GET.AAL.INCREASE.TERM.AMOUNT:
+
+    R.AAL.INCREASE.TERM.AMOUNT = ""
+    ERR.AAL.INCREASE.TERM.AMOUNT = ""
+
+    CALL F.READ(FN.AAL.INCREASE.TERM.AMOUNT, ARR.ID, R.AAL.INCREASE.TERM.AMOUNT, F.AAL.INCREASE.TERM.AMOUNT, ERR.AAL.INCREASE.TERM.AMOUNT)
+
+    ActivityCount = 0
+    ActivityCount = DCOUNT(R.AAL.INCREASE.TERM.AMOUNT<AAL.INCREASE.AAA.REFERENCE>, VM)
+
+    RETURN
+
+* </region>
+
+END

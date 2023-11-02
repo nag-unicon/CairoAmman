@@ -1,0 +1,200 @@
+    SUBROUTINE AAL.GET.INTEREST.RATE(ARRANGEMENT.ID,INTEREST.PROPERTY,INTEREST.RATE)
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 13th Nov 2016
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Call API routine
+* Attached to      : BNK/CBJ.RISK.REPORT
+*
+* Attached As      : Generic Call Routine to get the AA Loan Interest Rate
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : Generic Call Routine to get the AA Loan Interest Rate for an Arrangement
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : ARRANGEMENT.ID, INTEREST.PROPERTY
+* ARGS -(Output)   : INTEREST.RATE
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.AA.ARRANGEMENT
+    $INSERT I_F.AA.INTEREST
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB INITIALISE
+    GOSUB PROCESS
+
+    RETURN
+
+*** </region>
+*** <region name= Initialise the variables>
+
+INITIALISE:
+
+    INTEREST.RATE = ''
+    INT.RATE = ''
+
+    RETURN
+
+*** </region>
+*** <region name= Process to the Get the Interest Rate>
+
+PROCESS:
+
+    GOSUB GET.ARRANGEEMNT.CONDITIONS    ;* Get Interest arrangement Conditions Records
+
+    InterestPropertyCount = DCOUNT(INTEREST.PROPERTY, VM)   ;* INTEREST.PROPERTY may have multiple Interest properties
+    IntPropCnt = 1
+
+    LOOP
+    WHILE IntPropCnt LE InterestPropertyCount
+
+        R.AA.INTEREST = RAISE(returnConditions<IntPropCnt>) ;* Process Interest Propety one by one based on given INTEREST.PROPERTY
+
+        MIN.RATE = R.AA.INTEREST<AA.INT.TIER.MIN.RATE,1>
+        MAX.RATE = R.AA.INTEREST<AA.INT.TIER.MAX.RATE,1>
+
+        BEGIN CASE
+
+        CASE R.AA.INTEREST<AA.INT.PERIODIC.INDEX> NE ''     ;* Periodic Interest
+            GOSUB GET.PERIODIC.INTEREST.RATE
+
+        CASE R.AA.INTEREST<AA.INT.FLOATING.INDEX> NE ''     ;* Floating Interest
+            GOSUB GET.FLOATING.INTEREST.RATE
+
+        CASE R.AA.INTEREST<AA.INT.FIXED.RATE> NE ''         ;* Fixed Interest
+            GOSUB GET.FIXED.INTEREST.RATE
+
+        CASE 1
+*           INT.RATE = "Invalid Arrangement/Interest Property"
+            INT.RATE = ''
+
+        END CASE
+
+        IF INT.RATE THEN
+            INT.RATE = INT.RATE/100
+            YVAR.CCY = LCCY
+            CALL EB.ROUND.AMOUNT(YVAR.CCY,INT.RATE,"", "")
+        END
+        INTEREST.RATE<1,IntPropCnt> = INT.RATE
+
+        IntPropCnt + = 1
+    REPEAT
+
+    RETURN
+
+*** </region>
+*** <region name= Get the Interest Conditions Records
+
+GET.ARRANGEEMNT.CONDITIONS:
+
+    PropertyClass = "INTEREST"
+    Property = INTEREST.PROPERTY
+    effectiveDate = TODAY
+    returnError = ""
+    returnConditions = ""
+    CALL AA.GET.ARRANGEMENT.CONDITIONS(ARRANGEMENT.ID, PropertyClass, Property, effectiveDate, returnIds, returnConditions, returnError)
+
+    RETURN
+
+*** </region>
+*** <region name= Get the Periodict Interest Rate>
+
+GET.PERIODIC.INTEREST.RATE:
+
+    INT.RATE = R.AA.INTEREST<AA.INT.EFFECTIVE.RATE>
+    GOSUB GET.MIN.MAX.CHECK
+
+    RETURN
+
+*** </region>
+*** <region name= Get the Fixed Interest Rate>
+
+GET.FIXED.INTEREST.RATE:
+
+    INT.RATE = R.AA.INTEREST<AA.INT.FIXED.RATE>
+    GOSUB GET.MARGIN.CAL
+    GOSUB GET.MIN.MAX.CHECK
+
+    RETURN
+
+*** </region>
+*** <region name= Get the Floating Interest Rate>
+
+GET.FLOATING.INTEREST.RATE:
+
+    CALL AA.GET.ARRANGEMENT(ARRANGEMENT.ID,R.AA.ARRANGEMENT,ERR.AA.ARRANGEMENT)
+
+    INTEREST.RATE.KEY = R.AA.INTEREST<AA.INT.FLOATING.INDEX> : R.AA.ARRANGEMENT<AA.ARR.CURRENCY> : TODAY
+
+    CALL EB.GET.INTEREST.RATE(INTEREST.RATE.KEY, INT.RATE)
+
+    GOSUB GET.MARGIN.CAL
+    GOSUB GET.MIN.MAX.CHECK
+
+    RETURN
+
+*** </region>
+*** <region name= Reassign the Calculated Interest Rate if INT.RATE is Lesser than Min rate or greater than Max Rate>
+
+GET.MIN.MAX.CHECK:
+
+    IF INT.RATE AND MIN.RATE THEN       ;*** Interest rate minimum rate
+        IF INT.RATE < MIN.RATE THEN
+            INT.RATE = MIN.RATE
+        END
+    END
+
+    IF INT.RATE AND MAX.RATE THEN       ;*** Interest rate maximum rate
+        IF INT.RATE > MAX.RATE THEN
+            INT.RATE = MAX.RATE
+        END
+    END
+
+    RETURN
+
+*** </region>
+*** <region name= Interest Rate should consider the Margin Rate (Either ADD/SUB/MULTIPLE)
+*** <AA Loan Interests are defined only with MARGIN.TYPE as SINGLE
+
+GET.MARGIN.CAL:
+
+*** Currently code consider only first margin type, and add/sub
+*** In future it may extend based on the requirement
+
+    IF R.AA.INTEREST<AA.INT.MARGIN.TYPE,1,1> EQ 'SINGLE' THEN
+
+        BEGIN CASE
+
+        CASE R.AA.INTEREST<AA.INT.MARGIN.OPER,1,1> EQ 'ADD'
+            INT.RATE + = R.AA.INTEREST<AA.INT.MARGIN.RATE,1,1>
+
+        CASE R.AA.INTEREST<AA.INT.MARGIN.OPER,1,1> EQ 'SUB'
+            INT.RATE  - = R.AA.INTEREST<AA.INT.MARGIN.RATE,1,1>
+
+        CASE R.AA.INTEREST<AA.INT.MARGIN.OPER,1,1> EQ 'MULTIPLY'
+
+            IF MOD(INT.RATE,R.AA.INTEREST<AA.INT.MARGIN.RATE,1,1>) = 0 THEN
+            END ELSE
+                INT.RATE = (FIELD((INT.RATE / R.AA.INTEREST<AA.INT.MARGIN.RATE,1,1>),'.',1) + 1) * R.AA.INTEREST<AA.INT.MARGIN.RATE,1,1>
+            END
+
+        END CASE
+
+    END
+
+    RETURN
+END

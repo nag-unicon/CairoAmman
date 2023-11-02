@@ -1,0 +1,38 @@
+    SUBROUTINE AA.GET.ENQUIRY.BALANCE.TYPE(RETURN.PROPERTY)
+*--------------------------------------------------------------------------------------------------------------
+* Date - 25-AUG-2014
+* Desc - This routine is to generate the Customer wise report for all Loans.
+* Attached Enquiry -
+* Author - Arun Kabalieswaran
+*
+*
+*
+*----------------------------------------------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_AA.APP.COMMON
+    $INSERT I_F.AC.BALANCE.TYPE
+
+    GOSUB INIT
+    GOSUB PROCESS
+
+    RETURN
+
+INIT:
+    BASE.BALANCE = RETURN.PROPERTY
+    PROPERTY = ''
+    RETURN
+PROCESS:
+
+    R.BALANCE.TYPE = ''
+    BALANCE.TYPE.AMT = ''
+    CALL CACHE.READ("F.AC.BALANCE.TYPE", BASE.BALANCE, R.BALANCE.TYPE, VAL.ERR)
+
+    BASE.BALANCES = R.BALANCE.TYPE<AC.BT.VIRTUAL.BAL>
+    BASE.BAL.COUNT = DCOUNT(BASE.BALANCES, VM)
+    FOR BAL.COUNTER = 1 TO BASE.BAL.COUNT
+        BASE.BALANCE = BASE.BALANCES<1, BAL.COUNTER>
+        PROPERTY<1,-1> = BASE.BALANCE[4,40]
+    NEXT BAL.COUNTER
+    RETURN.PROPERTY = PROPERTY
+    RETURN

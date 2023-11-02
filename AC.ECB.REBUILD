@@ -1,0 +1,548 @@
+*-------------------------------------------------------------------------------------------------------------------*
+* <Rating>490</Rating>
+*-------------------------------------------------------------------------------------------------------------------*
+    SUBROUTINE AC.ECB.REBUILD
+*-------------------------------------------------------------------------------------------------------------------*
+*                                                                                                                   *
+* AUTHOR            :      P.SATSH KUMAR                                                                            *
+* DATE              :      12/11/2014                                                                               *
+* PURPOSE           :      Correction routine to rebuild EB.CONTRACT.BALANCES record, based on ACCOUNT &            *
+*                          ACCT.ENT.TODAY & ACCT.ACTIVITY balances.                                                 *
+* INPUT             :      Account ids passed from savedlists<PROB.AC.ECB.ACCTS>                                    *
+* INPUT FORMAT      :      <ACCOUNT.ID>*<STATIC.CHANGE.FLAG>                                                        *
+* OUTPUT DIRECTORY  :      COMO : ID - AC.ECB.REBUILD-<RUNDATE>                                                  *
+*
+* Note              :      ACCOUNT & ACCT.ACTIVITY balance must be correct prior to rebuilding EB.CONTRACT.BALANCES *
+*                                                                                                                   *
+*-------------------------------------------------------------------------------------------------------------------*
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.EB.CONTRACT.BALANCES
+    $INSERT I_F.STMT.ENTRY
+    $INSERT I_F.DATES
+    $INSERT I_ACCT.COMMON
+    $INSERT I_F.STATIC.CHANGE.TODAY
+    $INSERT I_F.CONSOLIDATE.COND
+
+*-------------------------------------------------------------------------------------------------------------------*
+
+    EXECUTE "COMO ON BM.AC.ECB.REBUILD-":TODAY
+
+    CRT "AC.ECB.REBUILD - EB.CONTRACT.BALANCES rebuild started !!!"
+
+    GOSUB OPEN.FILES
+    GOSUB INITIALISE
+    LOOP
+        REMOVE TEMP.ID FROM SEL.LIST SETTING POS
+    WHILE TEMP.ID:POS
+        GOSUB MAIN.PROCESS
+        IF NOT(SKIP.FLAG) THEN
+            GOSUB CALC.OPEN.ASST.TYPES
+            GOSUB GET.AET.MVMTS
+            GOSUB CHECK.FOR.STATIC.CHANGE
+            GOSUB UPDATE.ECB
+        END
+        IF NOT(UPDATE.FLAG) THEN
+            RELEASE F.ECB, ACC.ID
+        END
+
+    REPEAT
+
+    CRT "AC.ECB.REBUILD - EB.CONTRACT.BALANCES rebuild completed successfully !!!"
+    EXECUTE "COMO OFF BM.AC.ECB.REBUILD-":TODAY
+
+    RETURN
+*-------------------------------------------------------------------------------------------------------------------*
+INITIALISE:
+*---------*
+    CP.CMD = 'COPY FROM MIG.IN TO &SAVEDLISTS& PROB.AC.ECB.ACCTS'
+    EXECUTE CP.CMD
+    SEL.CMD=''; SEL.LIST=''; NO.REC=''; POS=''; RET=''; ACC.ID=''
+    SEL.CMD = 'GET.LIST PROB.AC.ECB.ACCTS'
+    CALL EB.READLIST(SEL.CMD, SEL.LIST, '', NO.REC, RET)
+    E.CNT=0;CNT=0
+    RETURN
+
+*-------------------------------------------------------------------------------------------------------------------*
+OPEN.FILES:
+*---------*
+
+    FN.AC="F.ACCOUNT"
+    F.AC=""
+    CALL OPF(FN.AC, F.AC)
+    MNE.ID=FN.AC[2,3]
+
+    FN.ECB="F.EB.CONTRACT.BALANCES"
+    F.ECB=""
+    CALL OPF(FN.ECB, F.ECB)
+
+    FN.AET="F.ACCT.ENT.TODAY"
+    F.AET=""
+    CALL OPF(FN.AET, F.AET)
+
+    FN.SE="F.STMT.ENTRY"
+    F.SE=""
+    CALL OPF(FN.SE, F.SE)
+
+    FN.SCT="F.STATIC.CHANGE.TODAY"
+    F.SCT=""
+    CALL OPF(FN.SCT, F.SCT)
+
+    FN.CND="F.CONSOLIDATE.COND"
+    F.CND=""
+    CALL OPF(FN.CND,F.CND)
+
+    RETURN
+
+*-------------------------------------------------------------------------------------------------------------------*
+MAIN.PROCESS:
+*-----------*
+
+    ACC.ID = '';STATIC.CHANGE.FLAG=""
+    ACC.ID = FIELD(TEMP.ID,'*',1)
+    STATIC.CHANGE.FLAG=FIELD(TEMP.ID,'*',2)
+
+    CRT "BM.AC.ECB.REBUID - Processing Account - ":ACC.ID
+
+    OPEN.TYPES="";OPEN.BALS="";UPDATE.FLAG="";R.AET=""
+    R.ACC=''; OPEN.BAL=''; CCY=''; CO.CODE=''; PRODUCT.CAT=''; R.ECB=''
+    I=''; Y.COUNT=''; R.AET=''; AET.CNT=''; Y.TYPE=''; ASST.TYPE=''
+    TYPE.DATE=''; CONSOL.KEY=''; OPEN.TYPE=''; J=''; MVMT=''; CHK.TYPE=''
+    CNT=0;E.CNT=0;CURR.TYPE="";CURR.CONT.TYPE="";OPEN.ASST.TYPE="";MVMT=0
+    BOOKING.DATE="";PROCESSING.DATE="";CURRENT.TYPES=""; SKIP.FLAG=0
+
+    READ R.CND FROM F.CND,'ASSET&LIAB' THEN
+        BL.FLAG=R.CND<RE.CON.CONT.SELF.BAL>
+    END
+
+    READ R.AET FROM F.AET, ACC.ID ELSE
+        R.AET=""
+    END
+
+
+    READU R.ECB FROM F.ECB, ACC.ID THEN
+        READ R.ACC FROM F.AC, ACC.ID THEN
+            CONTINGENT.ACT=R.ACC<AC.CONTINGENT.INT>
+            OPEN.BAL=R.ACC<AC.OPEN.ACTUAL.BAL>
+            IF NOT(OPEN.BAL) THEN OPEN.BAL = 0
+            CCY=R.ACC<AC.CURRENCY>
+            CO.CODE=R.ACC<AC.CO.CODE>
+            PRODUCT.CAT=R.ACC<AC.CATEGORY>
+            AET.CNT=DCOUNT(R.AET,FM)
+        END
+    END
+
+    IF NOT(R.ECB) THEN
+        CRT "BM.AC.ECB.REBUILD - Missing EB.CONTRACT.BALANCES record - ":ACC.ID
+        SKIP.FLAG=1
+    END ELSE
+        GOSUB CLEAR.ASST.TYPE
+    END
+    RETURN
+*-------------------------------------------------------------------------------------------------------------------*
+CLEAR.ASST.TYPE:
+*--------------*
+
+    Y.COUNT=DCOUNT(R.ECB<ECB.TYPE.SYSDATE>,VM)
+
+    FOR I =1 TO Y.COUNT
+        Y.TYPE=R.ECB<ECB.CURR.ASSET.TYPE,I>
+        ASST.TYPE = FIELD(R.ECB<ECB.TYPE.SYSDATE,I>,'-',1)
+        ASST.TYPE = ASST.TYPE ;* To ensure we consider 50000SP
+        TYPE.DATE = FIELD(R.ECB<ECB.TYPE.SYSDATE,I>,'-',2)
+        DEL R.ECB<ECB.TYPE.SYSDATE,I>
+        DEL R.ECB<ECB.VALUE.DATE,I>
+        DEL R.ECB<ECB.MAT.DATE,I>
+        DEL R.ECB<ECB.OPEN.BALANCE,I>
+        DEL R.ECB<ECB.OPEN.BAL.LCL,I>
+        DEL R.ECB<ECB.CREDIT.MVMT,I>
+        DEL R.ECB<ECB.CR.MVMT.LCL,I>
+        DEL R.ECB<ECB.DEBIT.MVMT,I>
+        DEL R.ECB<ECB.DB.MVMT.LCL,I>
+*       DEL R.ECB<ECB.NAU.MVMT,I>
+*       DEL R.ECB<ECB.NAU.TXN.ID,I>
+        DEL R.ECB<ECB.CURR.ASSET.TYPE,I>
+        I -= 1
+        Y.COUNT -= 1
+    NEXT I
+
+    CONSOL.KEY=R.ECB<ECB.CONSOL.KEY>
+    OPEN.TYPE=R.ECB<ECB.OPEN.ASSET.TYPE>
+    R.ECB<ECB.CURRENCY>=CCY
+    R.ECB<ECB.CO.CODE>=CO.CODE
+    R.ECB<ECB.DATE.LAST.UPDATE> = TODAY
+    R.ECB<ECB.POSS.SIGN.CHANGE>=""      ;* Flag will be set while processing ACCT.ENT.TODAY entries
+    R.ECB<ECB.PRODUCT>="AC"
+    R.ECB<ECB.APPLICATION>="ACCOUNT"
+
+    IF OPEN.TYPE[1,3] EQ "NIL" THEN
+        CRT "BM.AC.ECB.REBUILD - New account with NILOPEN type, cannot rebuild - ":ACC.ID
+        SKIP.FLAG=1
+    END ELSE
+        DELETE F.SCT, ACC.ID  ;* Clear STATIC.CHANGE.TODAY will be built if required
+    END
+    RETURN
+*-------------------------------------------------------------------------------------------------------------------*
+CALC.OPEN.ASST.TYPES:
+*-------------------*
+
+    CALL AC.DETERMINE.INIT.ASSET.TYPE(ACC.ID, R.ACC, CHK.TYPE, OPEN.BAL)
+    R.ECB<ECB.OPEN.ASSET.TYPE>=CHK.TYPE
+    OPEN.ASST.TYPE=R.ECB<ECB.OPEN.ASSET.TYPE>
+    OPEN.TYPE=OPEN.ASST.TYPE
+    INIT.OPEN.ASST.TYPE=OPEN.ASST.TYPE
+    CURR.TYPE=OPEN.ASST.TYPE
+    IF OPEN.BAL OR (NOT(OPEN.BAL) AND NOT(R.AET)) THEN      ;* Even if open balance of account zero proceed further.
+        MVMT = OPEN.BAL
+        CNT=1
+        E.CNT=CNT
+        AET.FLAG="";BAL.DTE=""; CR.MVMT = ""; DR.MVMT = ""
+        GOSUB BUILD.AET.ARRAY ;*Build Open Balance movements
+    END
+
+    RETURN
+
+*-------------------------------------------------------------------------------------------------------------------*
+BUILD.AET.ARRAY:
+*--------------*
+
+    CURRENT.ASST.TYPE=OPEN.TYPE
+
+    IF BL.FLAG EQ 'Y' AND (CONTINGENT.ACT) THEN
+        E.CNT=CNT+1
+        OPEN.TYPES<-1>=OPEN.TYPE:BAL.DTE
+        CURRENT.TYPES<-1>=OPEN.TYPE
+        BL.DATE=""
+        IF BOOKING.DATE EQ TODAY THEN
+            BL.DATE="-":TODAY
+        END
+        OPEN.TYPES<-1>=OPEN.TYPE:"BL":BL.DATE
+        OPEN.BALS<-1>=OPEN.BAL
+        OPEN.BALS<-1>=-OPEN.BAL
+        CURRENT.TYPES<-1>=OPEN.TYPE:"BL"
+    END  ELSE
+        OPEN.TYPES<-1>=OPEN.TYPE:BAL.DTE
+        OPEN.BALS<-1>=OPEN.BAL
+        CURRENT.TYPES<-1>=CURR.TYPE
+        GOSUB GET.ACCRUAL.BAL
+    END
+
+    CONT.BAL.DTE=""
+    IF PROCESSING.DATE GT TODAY THEN    ;*Update Contingent balances
+        IF BOOKING.DATE EQ TODAY THEN
+            CONT.BAL.DTE="-":BOOKING.DATE
+        END
+        OPEN.TYPES<-1>=CURR.CONT.TYPE:CONT.BAL.DTE
+        OPEN.TYPES<-1>=CURR.CONT.TYPE:"BL":CONT.BAL.DTE
+        OPEN.TYPES<-1>=CURR.CONT.TYPE:BAL.DTE
+        OPEN.TYPES<-1>=CURR.CONT.TYPE:"BL":BAL.DTE
+
+        CURRENT.TYPES<-1>=CURR.CONT.TYPE
+        CURRENT.TYPES<-1>=CURR.CONT.TYPE:"BL"
+        CURRENT.TYPES<-1>=CURR.CONT.TYPE
+        CURRENT.TYPES<-1>=CURR.CONT.TYPE:"BL"
+
+        OPEN.BALS<-1>=OPEN.BAL
+        OPEN.BALS<-1>=-OPEN.BAL
+        OPEN.BALS<-1>=-OPEN.BAL
+        OPEN.BALS<-1>=OPEN.BAL
+    END
+
+    E.CNT=DCOUNT(OPEN.TYPES,FM)
+
+    FOR M.POS=CNT TO E.CNT
+
+        UPDATE.FLAG=1
+        OPEN.TYPE=OPEN.TYPES<M.POS>
+        OPEN.BAL=OPEN.BALS<M.POS>
+        M.N.POS=""
+        TYP=FIELD(OPEN.TYPE,'-',1)
+        DTE=FIELD(OPEN.TYPE,'-',2)
+        CURR.AST.TYPE= CURRENT.TYPES<M.POS>
+        LOCATE OPEN.TYPE IN R.ECB<ECB.TYPE.SYSDATE,1> SETTING M.N.POS THEN      ;*If its an exising type then update only the movements
+
+            BEGIN CASE
+            CASE  ACCRUAL.FLAG OR  NOT(DTE)
+                R.ECB<ECB.OPEN.BALANCE,M.N.POS>=R.ECB<ECB.OPEN.BALANCE,M.N.POS>+OPEN.BAL
+
+            CASE OTHERWISE
+
+
+                IF TYP[2] EQ 'BL' THEN
+                    IF CR.MVMT THEN
+                        R.ECB<ECB.DEBIT.MVMT,M.N.POS> = R.ECB<ECB.DEBIT.MVMT,M.N.POS>-CR.MVMT
+                    END
+                    IF DR.MVMT THEN
+                        R.ECB<ECB.CREDIT.MVMT,M.N.POS> = R.ECB<ECB.CREDIT.MVMT,M.N.POS>-DR.MVMT
+                    END
+
+                END ELSE
+
+                    R.ECB<ECB.CREDIT.MVMT,M.N.POS>=R.ECB<ECB.CREDIT.MVMT,M.N.POS>+CR.MVMT
+                    R.ECB<ECB.DEBIT.MVMT,M.N.POS>=R.ECB<ECB.DEBIT.MVMT,M.N.POS>+DR.MVMT
+                END
+
+
+            END CASE
+
+
+            E.CNT=E.CNT-1
+            M.POS=M.POS-1
+            DEL OPEN.TYPES<M.N.POS>
+            DEL OPEN.BALS<M.N.POS>
+            DEL CURRENT.TYPES<M.N.POS>
+
+        END ELSE
+
+            INS OPEN.TYPE BEFORE R.ECB<ECB.TYPE.SYSDATE,M.POS>
+            INS "" BEFORE R.ECB<ECB.VALUE.DATE,M.POS>
+            INS "" BEFORE R.ECB<ECB.MAT.DATE,M.POS>
+            INS "" BEFORE R.ECB<ECB.CR.MVMT.LCL,M.POS>
+            INS "" BEFORE R.ECB<ECB.DB.MVMT.LCL,M.POS>
+*           INS "" BEFORE R.ECB<ECB.NAU.MVMT,M.POS>
+*           INS "" BEFORE R.ECB<ECB.NAU.TXN.ID,M.POS>
+*           TYP=FIELD(OPEN.TYPE,'-',1)
+
+            INS CURR.AST.TYPE BEFORE R.ECB<ECB.CURR.ASSET.TYPE,M.POS>
+
+            IF AET.FLAG AND DTE THEN
+                GOSUB UPDATE.MVMT
+            END ELSE
+
+                INS OPEN.BAL BEFORE R.ECB<ECB.OPEN.BALANCE,M.POS>
+                INS "" BEFORE R.ECB<ECB.OPEN.BAL.LCL,M.POS>
+                INS "" BEFORE R.ECB<ECB.CREDIT.MVMT,M.POS>
+                INS "" BEFORE R.ECB<ECB.DEBIT.MVMT,M.POS>
+            END
+        END
+
+    NEXT M.POS
+
+    RETURN
+*-------------------------------------------------------------------------------------------------------------------*
+GET.ACCRUAL.BAL:
+*--------------*
+
+* Determine contigent asset type balances of ECB from interest accrual fields of account
+
+    IF NOT(NUM(ACC.ID)) OR CONTINGENT.ACT OR AET.FLAG THEN
+        ACCRUAL.FLAG=""
+        RETURN
+    END
+    ACCRUAL.FLAG=1
+
+    IF R.ACC<AC.ACCR.CHG.CATEG> THEN
+        IF R.ACC<AC.ACCR.CHG.SUSP> THEN
+            OPEN.TYPES<-1>=R.ACC<AC.ACCR.CHG.CATEG>:"SP"
+            OPEN.BALS<-1>=R.ACC<AC.ACCR.CHG.SUSP>
+            CURRENT.TYPES<-1>=R.ACC<AC.ACCR.CHG.CATEG>:"SP"
+        END ELSE
+            OPEN.TYPES<-1>=R.ACC<AC.ACCR.CHG.CATEG>
+            OPEN.BALS<-1>=R.ACC<AC.ACCR.CHG.AMOUNT>
+            CURRENT.TYPES<-1>=R.ACC<AC.ACCR.CHG.CATEG>
+        END
+    END
+
+    IF R.ACC<AC.ACCR.CR.CATEG> THEN
+        IF R.ACC<AC.ACCR.CR.SUSP> THEN
+            OPEN.TYPES<-1>=R.ACC<AC.ACCR.CR.CATEG>:"SP"
+            OPEN.BAL<-1>=R.ACC<AC.ACCR.CR.SUSP>
+            CURRENT.TYPES<-1>=R.ACC<AC.ACCR.CR.CATEG>:"SP"
+        END ELSE
+            OPEN.TYPES<-1>=R.ACC<AC.ACCR.CR.CATEG>
+            OPEN.BALS<-1>=R.ACC<AC.ACCR.CR.AMOUNT>
+            CURRENT.TYPES<-1>=R.ACC<AC.ACCR.CR.CATEG>
+        END
+    END
+
+    IF R.ACC<AC.ACCR.CR2.CATEG> THEN
+        IF R.ACC<AC.ACCR.CR2.SUSP> THEN
+            OPEN.TYPES<-1>=R.ACC<AC.ACCR.CR2.CATEG>:"SP"
+            OPEN.BALS<-1>=R.ACC<AC.ACCR.CR2.SUSP>
+            CURRENT.TYPES<-1>=R.ACC<AC.ACCR.CR2.CATEG>:"SP"
+        END ELSE
+            OPEN.TYPES<-1>=R.ACC<AC.ACCR.CR2.CATEG>
+            OPEN.BALS<-1>=R.ACC<AC.ACCR.CR2.AMOUNT>
+            CURRENT.TYPES<-1>=R.ACC<AC.ACCR.CR2.CATEG>
+        END
+    END
+
+    IF R.ACC<AC.ACCR.DR.CATEG> THEN
+        IF R.ACC<AC.ACCR.DR.SUSP> THEN
+            OPEN.TYPES<-1>=R.ACC<AC.ACCR.DR.CATEG>:"SP"
+            OPEN.BALS<-1>=R.ACC<AC.ACCR.DR.SUSP>
+            CURRENT.TYPES<-1>=R.ACC<AC.ACCR.DR.CATEG>:"SP"
+        END ELSE
+            OPEN.TYPES<-1>=R.ACC<AC.ACCR.DR.CATEG>
+            OPEN.BALS<-1>=R.ACC<AC.ACCR.DR.AMOUNT>
+            CURRENT.TYPES<-1>=R.ACC<AC.ACCR.DR.CATEG>
+        END
+    END
+    IF R.ACC<AC.ACCR.DR2.CATEG> THEN
+        IF R.ACC<AC.ACCR.DR2.SUSP> THEN
+            OPEN.TYPES<-1>=R.ACC<AC.ACCR.DR2.CATEG>:"SP"
+            OPEN.BALS<-1>=R.ACC<AC.ACCR.DR2.SUSP>
+            CURRENT.TYPES<-1>=R.ACC<AC.ACCR.DR2.CATEG>:"SP"
+        END ELSE
+            OPEN.TYPES<-1>=R.ACC<AC.ACCR.DR2.CATEG>
+            OPEN.BALS<-1>=R.ACC<AC.ACCR.DR2.AMOUNT>
+            CURRENT.TYPES<-1>=R.ACC<AC.ACCR.DR2.CATEG>
+        END
+    END
+
+    RETURN
+*-------------------------------------------------------------------------------------------------------------------*
+GET.AET.MVMTS:
+*------------*
+
+    LAST.PR.DATE="";CONT.ENT.ARRAY=""
+    FOR J = 1 TO AET.CNT
+        STMT.ID=""; STMT.REC=""; AMT=""
+        STMT.ID = R.AET<J>
+        READ STMT.REC FROM F.SE, STMT.ID THEN
+            PROCESSING.DATE=STMT.REC<AC.STE.PROCESSING.DATE>
+            BOOKING.DATE=STMT.REC<AC.STE.BOOKING.DATE>
+
+            IF PROCESSING.DATE NE LAST.PR.DATE THEN         ;*Since balance are derived from ACCT.ACTIVITY, entry with same processing dates are skipped
+
+                ARC.DATE=PROCESSING.DATE ; ACTIV.BAL = 0; BALANCE.DATE = ARC.DATE; YBALANCE = ""; CR.MVMT = ""; DR.MVMT = ""
+                ERR = ""
+                CALL EB.GET.ACCT.BALANCE(ACC.ID, R.ACCOUNT, "BOOKING", BALANCE.DATE, "", YBALANCE, CR.MVMT, DR.MVMT, ERR)
+                MVMT=YBALANCE ;*Current balance passed to determine ASSET TYPE
+
+                IF CURR.TYPE THEN
+                    OPEN.ASST.TYPE = CURR.TYPE    ;*Current ASSET types assaigned to open type
+                END
+
+                GOSUB DETERMINE.CURR.TYPE
+                AST.TYPE=INIT.OPEN.ASST.TYPE:"-":BALANCE.DATE ;ECB.POS=""
+                LOCATE AST.TYPE IN R.ECB<ECB.TYPE.SYSDATE,1> SETTING ECB.POS ELSE
+                    AET.FLAG=1
+                    BAL.DTE="-":PROCESSING.DATE;OPEN.BAL=CR.MVMT+DR.MVMT
+                    CNT=E.CNT+1
+                    E.CNT=CNT
+                    OPEN.TYPE=INIT.OPEN.ASST.TYPE ;*TYPE.SYSDATE field must have OPEN.ASST.TYPE, current asset type determined from CURR.ASST.TYPE field
+                    GOSUB BUILD.AET.ARRAY
+                END
+
+            END
+
+        END
+        LAST.PR.DATE=BALANCE.DATE
+
+    NEXT J
+
+
+
+    RETURN
+
+*-------------------------------------------------------------------------------------------------------------------*
+DETERMINE.CURR.TYPE:
+*------------------*
+
+    CURR.TYPE="";
+    IF MVMT EQ '0' THEN       ;* If ACCOUNT balance has become zero balance after cob, consider OPEN.ASST.TYPE as current asset type
+        CURR.TYPE=OPEN.ASST.TYPE
+        RETURN
+    END
+    IF MVMT GT 0 THEN
+        BEGIN CASE
+        CASE OPEN.ASST.TYPE EQ "CREDIT" OR OPEN.ASST.TYPE EQ "DEBIT"
+            CURR.TYPE = "CREDIT"
+            CURR.CONT.TYPE = "CONTCR"
+        CASE OPEN.ASST.TYPE EQ "OFFSUSP"
+            CURR.TYPE = "OFFSUSP"
+        CASE OPEN.ASST.TYPE EQ "SUSPENS"
+            CURR.TYPE = "SUSPENS"
+        CASE OPEN.ASST.TYPE EQ "OFFCR" OR OPEN.ASST.TYPE EQ "OFFDB"
+            CURR.TYPE = "OFFCR"
+            CURR.CONT.TYPE = "CONTCR"
+
+        END CASE
+    END ELSE
+        BEGIN CASE
+        CASE OPEN.ASST.TYPE EQ "CREDIT" OR OPEN.ASST.TYPE EQ "DEBIT"
+            CURR.TYPE = "DEBIT"
+            CURR.CONT.TYPE = "CONTDB"
+        CASE OPEN.ASST.TYPE EQ "OFFSUSP"
+            CURR.TYPE = "OFFSUSP"
+        CASE OPEN.ASST.TYPE EQ "SUSPENS"
+            CURR.TYPE = "SUSPENS"
+        CASE OPEN.ASST.TYPE EQ "OFFCR" OR OPEN.ASST.TYPE EQ "OFFDB"
+            CURR.TYPE = "OFFDB"
+            CURR.CONT.TYPE = "CONTDB"
+        END CASE
+    END
+    RETURN
+
+*-------------------------------------------------------------------------------------------------------------------*
+CHECK.FOR.STATIC.CHANGE:
+*----------------------*
+
+    IF (OPEN.ASST.TYPE NE CURRENT.ASST.TYPE  AND NOT(R.ECB<ECB.POSS.SIGN.CHANGE>)) OR STATIC.CHANGE.FLAG THEN
+        R.ECB<ECB.POSS.SIGN.CHANGE> = "Y"
+        STATIC.REC=""
+        STATIC.REC<RE.SCT.SYSTEM.ID, 1>  = R.ECB<ECB.PRODUCT>
+        STATIC.REC<RE.SCT.OLD.CONSOL.KEY,1> = R.ECB<ECB.CONSOL.KEY>   ;* To work with routines using previous format
+        STATIC.REC<RE.SCT.NEW.CONSOL.KEY,1> = ""
+        STATIC.REC<RE.SCT.TXN.REF,1> = ""
+        STATIC.REC<RE.SCT.PRODUCT,1> = ""
+        STATIC.REC<RE.SCT.CUSTOMER,1> = ""
+        STATIC.REC<RE.SCT.CURRENCY,1> = ""
+        STATIC.REC<RE.SCT.CURRENCY.MARKET,1> = ""
+        STATIC.REC<RE.SCT.INTEREST.RATE,1> = ""
+        STATIC.REC<RE.SCT.INTEREST.KEY,1> = ""
+        STATIC.REC<RE.SCT.INTEREST.BASIS,1> = ""
+        STATIC.REC<RE.SCT.CRF.TXN.CODE,1> = ""
+        STATIC.REC<RE.SCT.OLD.PRODCAT,1> = PRODUCT.CAT
+        STATIC.REC<RE.SCT.NEW.PRODCAT,1> = ""
+        STATIC.REC<RE.SCT.OLD.TYPE,1,1> = ""
+        STATIC.REC<RE.SCT.NEW.TYPE,1,1> = ""
+        STATIC.REC<RE.SCT.OLD.DATE,1,1> = ""
+        STATIC.REC<RE.SCT.NEW.DATE,1,1> = ""
+        WRITE STATIC.REC TO F.SCT, ACC.ID
+    END   ;* Update Sgn flag and SCT
+
+    RETURN
+
+*-------------------------------------------------------------------------------------------------------------------*
+UPDATE.MVMT:
+*----------*
+
+    INS.CR.MVMT=""
+    INS.DR.MVMT=""
+
+    IF (TYP[1,4] EQ "CONT" AND DTE GT TODAY AND TYP[2] NE 'BL')   OR (TYP[2] EQ 'BL' AND TYP[1,4] NE "CONT") OR (TYP[2] EQ 'BL' AND TYP[1,4] EQ "CONT" AND DTE LE TODAY)  THEN
+        INS.CR.MVMT=-(DR.MVMT)
+        INS.DR.MVMT=-(CR.MVMT)
+    END ELSE
+        INS.CR.MVMT=CR.MVMT
+        INS.DR.MVMT=DR.MVMT
+    END
+
+    INS "" BEFORE R.ECB<ECB.CREDIT.MVMT,M.POS>
+    INS "" BEFORE R.ECB<ECB.DEBIT.MVMT,M.POS>
+
+    IF INS.CR.MVMT THEN
+        INS INS.CR.MVMT BEFORE R.ECB<ECB.CREDIT.MVMT,M.POS>
+    END
+
+    IF INS.DR.MVMT THEN
+        INS INS.DR.MVMT BEFORE R.ECB<ECB.DEBIT.MVMT,M.POS>
+    END
+
+    RETURN
+*-------------------------------------------------------------------------------------------------------------------*
+UPDATE.ECB:
+*---------*
+
+    IF UPDATE.FLAG THEN
+        WRITE R.ECB TO F.ECB, ACC.ID
+    END
+
+    RETURN
+*-------------------------------------------------------------------------------------------------------------------*
+END
+*-------------------------------------------------------------------------------------------------------------------*

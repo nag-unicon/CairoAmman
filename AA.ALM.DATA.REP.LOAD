@@ -1,0 +1,71 @@
+    SUBROUTINE AA.ALM.DATA.REP.LOAD
+******************************************************************
+
+*** ALM Development for reports
+***
+*** Fixed Instruments
+***
+*** Author : Arun K
+***
+*** 17/02/2016  : ALM Report Development
+******************************************************************
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INCLUDE TT.BP I_AA.ALM.COMMON
+
+    GOSUB OPEN.FILES
+
+    RETURN
+
+OPEN.FILES:
+
+    FN.AA.ALM.FIX = 'F.AA.ALM.REP'
+    F.AA.ALM.FIX = ''
+    CALL OPF(FN.AA.ALM.FIX,F.AA.ALM.FIX)
+
+    FN.AA.ALM.FEE ='F.AA.ALM.FEE'
+    F.AA.ALM.FEE =''
+    CALL OPF(FN.AA.ALM.FEE,F.AA.ALM.FEE)
+
+    FN.AA.ARR='F.AA.ARRANGEMENT'
+    F.AA.ARR=''
+    CALL OPF(FN.AA.ARR,F.AA.ARR)
+
+    FN.ECB ='F.EB.CONTRACT.BALANCES'
+    F.ECB =''
+    CALL OPF(FN.ECB,F.ECB)
+
+    FN.AA.SCH.ALM ='F.AA.SCHEDULE.ALM'
+    F.AA.SCH.ALM =''
+    CALL OPF(FN.AA.SCH.ALM,F.AA.SCH.ALM)
+
+    FN.AA.AMT.ALM ='F.AA.AMORT.ALM'
+    F.AA.AMT.ALM =''
+    CALL OPF(FN.AA.AMT.ALM,F.AA.AMT.ALM)
+
+    FN.CUSTOMER = "F.CUSTOMER"
+    F.CUSTOMER = ""
+    CALL OPF(FN.CUSTOMER, F.CUSTOMER)
+
+    FN.AA.PROPERTY = "F.AA.PROPERTY"
+    F.AA.PROPERTY = ""
+    CALL OPF(FN.AA.PROPERTY, F.AA.PROPERTY)
+
+    CUR.DATE = TODAY
+    YDAYS.ORIG = '-1W'
+    CALL CDT ('',CUR.DATE,YDAYS.ORIG)
+    YYYYMM = LEFT(CUR.DATE,6)
+    CALL GET.LAST.DOM(YYYYMM,LAST.DATE,LAST.DAY,MONTH.NAME)
+
+    APP.NAME = 'AA.ARR.CHARGE':FM:'AA.ARR.TERM.AMOUNT'
+    FIELD.NAME='ANNUALCOMM.PER' :VM :'ANNUAL.COMM':FM:'AGREEMENT.CODE'
+    FIELD.POS = '';
+    CALL MULTI.GET.LOC.REF(APP.NAME,FIELD.NAME,FIELD.POS)
+
+    CUSTOMER.STATUS.LIST  = "4870" :VM: "4880" :VM: "4890" :VM: "5470" :VM: "5480" :VM: "5490" :VM: "5970" :VM: "5980" :VM: "5990" :VM: "6460"
+    CUSTOMER.STATUS.LIST := VM: "6470" :VM: "6480" :VM: "6960" :VM: "6970" :VM: "6980" :VM: "7170" :VM: "7180" :VM: "7190" :VM: "8960" :VM: "8970" :VM: "8980"
+
+    RETURN
+
+END

@@ -1,0 +1,43 @@
+*-----------------------------------------------------------------------------
+* <Rating>-20</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE AA.ITSS.UPDATE.ACT.SELECT
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.ACCOUNT
+    $INCLUDE T24.BP I_F.ALTERNATE.ACCOUNT
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT.ACTIVITY
+    $INCLUDE DW.BP I_ITSS.DM.TOOL.COMMON
+
+
+    GOSUB INIT
+    GOSUB PROCESS
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    LIST.PARAMETER = ''
+    CALL BATCH.BUILD.LIST(LIST.PARAMETER, R.AA.FILE.PATH)
+
+    RETURN
+
+*****
+INIT:
+*****
+
+    CALL F.READ(FN.AA.FILE.PATH,'ACCOUNTCHG.csv',R.AA.FILE.PATH,F.AA.FILE.PATH,REC.ERR)
+
+    IF R.AA.FILE.PATH EQ '' THEN
+        REC.ERR = 'DATA TO UPLOAD is empty under the path DW.BP'
+    END ELSE
+        REC.UPLOAD.HEADER = R.AA.FILE.PATH<1>
+        DEL R.AA.FILE.PATH<1>
+    END
+
+    RETURN
+
+END

@@ -1,0 +1,211 @@
+    SUBROUTINE AC.GET.ACCOUNT.DEBIT.INT(ACCOUNT.NO, R.ACCOUNT, DEBIT.INTEREST.RATE, RETURN.ERROR)
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan
+* Development Id   : ITSS
+* Date             : 22nd Nov 2016
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : API routine
+* Attached to      : Generic API routine to get the Account Debit Interest
+*
+* Attached As      : Generic API routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Routine to used to get the Account Debit Interest
+*                    (if ACCOUNT.DEBIT.INT record is exists for an account, otherwise get it from GROUP.DEBIT.INT)
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : ACCOUNT.NO (Mandatory) , R.ACCOUNT (Optional)
+* ARGS -(Output)   : DEBIT.INTEREST.RATE, RETURN.ERROR
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.ACCOUNT.DEBIT.INT
+    $INSERT I_F.GROUP.DEBIT.INT
+    $INSERT I_F.BASIC.INTEREST
+    $INSERT I_F.GROUP.DATE
+    $INSERT I_F.GROUP.DEBIT.INT
+
+    GOSUB CHECK.REQUIED.INFO
+    GOSUB OPEN.FILES
+    GOSUB PROCESS.ACCOUNT.DEBIT.INTEREST
+    GOSUB GET.DR.SUBSCRIPT
+
+    RETURN
+
+CHECK.REQUIED.INFO:
+
+    DEBIT.INTEREST.RATE = ""
+
+    BEGIN CASE
+
+    CASE NOT(ACCOUNT.NO)
+        RETURN.ERROR = "ACCOUNT.NO.MISSING"
+        GOSUB PROGRAM.END
+
+    CASE ACCOUNT.NO AND NOT(R.ACCOUNT)
+        FN.ACCOUNT = "F.ACCOUNT"
+        F.ACCOUNT = ""
+        CALL OPF(FN.ACCOUNT, F.ACCOUNT)
+
+        R.ACCOUNT = ""
+        ERR.ACCOUNT = ""
+
+        CALL F.READ(FN.ACCOUNT, ACCOUNT.NO, R.ACCOUNT, F.ACCOUNT, ERR.ACCOUNT)
+
+    END CASE
+
+    RETURN
+
+*** </region>
+*** <region name= Open Files>
+*** <desc>Do OPF of necessary files</desc>
+
+OPEN.FILES:
+
+    FN.ACCOUNT.DEBIT.INT = "F.ACCOUNT.DEBIT.INT"
+    F.ACCOUNT.DEBIT.INT = ""
+    CALL OPF(FN.ACCOUNT.DEBIT.INT, F.ACCOUNT.DEBIT.INT)
+
+    FN.GROUP.DATE = "F.GROUP.DATE"
+    F.GROUP.DATE = ""
+    CALL OPF(FN.GROUP.DATE, F.GROUP.DATE)
+
+    FN.GROUP.DEBIT.INT = "F.GROUP.DEBIT.INT"
+    F.GROUP.DEBIT.INT = ""
+    CALL OPF(FN.GROUP.DEBIT.INT, F.GROUP.DEBIT.INT)
+
+    FN.BASIC.INTEREST.DATE = "F.BASIC.INTEREST.DATE"
+    F.BASIC.INTEREST.DATE = ""
+    CALL OPF(FN.BASIC.INTEREST.DATE, F.BASIC.INTEREST.DATE)
+
+    FN.BASIC.INTEREST = "F.BASIC.INTEREST"
+    F.BASIC.INTEREST = ""
+    CALL OPF(FN.BASIC.INTEREST, F.BASIC.INTEREST)
+
+    RETURN
+
+*** </region>
+
+PROCESS.ACCOUNT.DEBIT.INTEREST:
+
+    IF R.ACCOUNT<AC.ACCT.DEBIT.INT> THEN          ;* Get the current interest date from the list of debit int date
+
+        TEMP.DATE.LIST = RAISE(R.ACCOUNT<AC.ACCT.DEBIT.INT>)
+        CALL AC.GET.CURRENT.INT.DATE(TEMP.DATE.LIST,CURR.ACCT.DEBIT.INT)
+
+        IF CURR.ACCT.DEBIT.INT THEN
+            ACC.DR.ID = ACCOUNT.NO:'-':CURR.ACCT.DEBIT.INT
+
+            R.ACCOUNT.DEBIT.INT = ""
+            ERR.ACCOUNT.DEBIT.INT = ""
+            CALL F.READ(FN.ACCOUNT.DEBIT.INT, ACC.DR.ID, R.ACCOUNT.DEBIT.INT, F.ACCOUNT.DEBIT.INT, ERR.ACCOUNT.DEBIT.INT)
+
+            IF ERR.ACCOUNT.DEBIT.INT OR R.ACCOUNT.DEBIT.INT<IC.ADI.INTEREST.DAY.BASIS> EQ 'GENERAL'  THEN
+                GOSUB PROCESS.GROUP.DEBIT.INTEREST
+            END
+        END ELSE
+            GOSUB PROCESS.GROUP.DEBIT.INTEREST
+        END
+    END ELSE
+        GOSUB PROCESS.GROUP.DEBIT.INTEREST
+    END
+
+    RETURN
+
+GET.DR.SUBSCRIPT:
+
+    DR.SUB = 1      ;*  1. One is for Actual Interest Rate
+    NO.VM = 2       ;* 2. Second one is for PenaltyInterest which is exceeds the defined limit amount
+
+    FOR DR.SUB = 1 TO NO.VM
+        GOSUB GET.INTEREST.RATE
+        IF RATE THEN
+            DEBIT.INTEREST.RATE<1,-1> = RATE
+        END ELSE
+            DEBIT.INTEREST.RATE<1,-1> = DEBIT.INTEREST.RATE
+        END
+    NEXT DR.SUB
+
+    RETURN
+
+GET.INTEREST.RATE:
+
+    BEGIN CASE
+
+    CASE R.ACCOUNT.DEBIT.INT<IC.ADI.DR.BASIC.RATE,DR.SUB>
+
+        BasicInterestDateKey = R.ACCOUNT.DEBIT.INT<IC.ADI.DR.BASIC.RATE,DR.SUB> : R.ACCOUNT<AC.CURRENCY>
+
+        R.BASIC.INTEREST.DATE = ""
+        ERR.BASIC.INTEREST.DATE = ""
+        CALL F.READ(FN.BASIC.INTEREST.DATE, BasicInterestDateKey , R.BASIC.INTEREST.DATE, F.BASIC.INTEREST.DATE, ERR.BASIC.INTEREST.DATE)
+
+        CALL AC.GET.CURRENT.INT.DATE(R.BASIC.INTEREST.DATE,CURR.BASIC.INTEREST.DATE)
+
+        IF CURR.BASIC.INTEREST.DATE THEN
+            BasicInterestKey = BasicInterestDateKey : CURR.BASIC.INTEREST.DATE
+
+            R.BASIC.INTEREST = ""
+            ERR.BASIC.INTEREST = ""
+            CALL F.READ(FN.BASIC.INTEREST, BasicInterestKey, R.BASIC.INTEREST, F.BASIC.INTEREST, ERR.BASIC.INTEREST)
+            RATE = R.BASIC.INTEREST<EB.BIN.INTEREST.RATE>
+        END
+
+    CASE 1
+        RATE = R.ACCOUNT.DEBIT.INT<IC.ADI.DR.INT.RATE,DR.SUB>
+    END CASE
+
+    BEGIN CASE
+    CASE  R.ACCOUNT.DEBIT.INT<IC.ADI.DR.MARGIN.OPER,DR.SUB> EQ 'ADD'
+        RATE = RATE + R.ACCOUNT.DEBIT.INT<IC.ADI.DR.MARGIN.RATE,DR.SUB>
+
+    CASE R.ACCOUNT.DEBIT.INT<IC.ADI.DR.MARGIN.OPER,DR.SUB> EQ 'SUBTRACT'
+        RATE = RATE - R.ACCOUNT.DEBIT.INT<IC.ADI.DR.MARGIN.RATE,DR.SUB>
+
+    CASE R.ACCOUNT.DEBIT.INT<IC.ADI.DR.MARGIN.OPER,DR.SUB> EQ 'MULTIPLY'
+        RATE = RATE + ((RATE/100) * R.ACCOUNT.DEBIT.INT<IC.ADI.DR.MARGIN.RATE,DR.SUB>)
+
+    END CASE
+
+    IF RATE THEN
+        RATE = RATE/100
+        YVAR.CCY = LCCY
+        CALL EB.ROUND.AMOUNT(YVAR.CCY,RATE,"", "")
+    END
+
+    RETURN
+
+
+PROCESS.GROUP.DEBIT.INTEREST:
+
+    R.GROUP.DATE = ""
+    ERR.GROUP.DATE = ""
+
+    GroupDateKey = R.ACCOUNT<AC.CONDITION.GROUP> : R.ACCOUNT<AC.CURRENCY>
+
+    CALL F.READ(FN.GROUP.DATE, GroupDateKey, R.GROUP.DATE, F.GROUP.DATE, ERR.GROUP.DATE)
+
+    GroupDate = R.GROUP.DATE<AC.GRD.DEBIT.GROUP.DATE>
+
+    R.GROUP.DEBIT.INT = ""
+    ERR.GROUP.DEBIT.INT = ""
+    GroupDebitIntKey = GroupDateKey : GroupDate
+    CALL F.READ(FN.GROUP.DEBIT.INT, GroupDebitIntKey, R.GROUP.DEBIT.INT, F.GROUP.DEBIT.INT, ERR.GROUP.DEBIT.INT)
+
+    R.ACCOUNT.DEBIT.INT = R.GROUP.DEBIT.INT
+
+    RETURN
+
+PROGRAM.END:
+
+    RETURN TO PROGRAM.END
+END

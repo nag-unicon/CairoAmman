@@ -1,0 +1,104 @@
+    SUBROUTINE AA.ALM.REPORT.CONSOLIDATE
+*-----------------------------------------------------------------
+*
+*
+*
+*
+*-----------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.DATES
+
+    LAST.WORKING.DAY = R.DATES(EB.DAT.LAST.WORKING.DAY)
+
+    IF LAST.WORKING.DAY[5,2] NE TODAY[5,2] THEN
+
+        GOSUB INIT
+        GOSUB PROCESS
+
+    END
+
+    RETURN
+
+******
+INIT:
+******
+
+
+    FN.AA.SCH.ALM ='F.AA.SCHEDULE.ALM'
+    F.AA.SCH.ALM =''
+    CALL OPF(FN.AA.SCH.ALM,F.AA.SCH.ALM)
+
+    FN.AA.AMT.ALM ='F.AA.AMORT.ALM'
+    F.AA.AMT.ALM =''
+    CALL OPF(FN.AA.AMT.ALM,F.AA.AMT.ALM)
+
+    FN.AA.ALM.FEE ='F.AA.ALM.FEE'
+    F.AA.ALM.FEE =''
+    CALL OPF(FN.AA.ALM.FEE,F.AA.ALM.FEE)
+
+    SCHEDULE.CONTENT = 'CreationDate;PositionID;DataSource;LegFlag;Coupon_PaymentDate;Coupon_StartDate;Coupon_EndDate;Coupon_Amount;Coupon_PaymentType;Coupon_IsPaymentCompounding'
+    AMORT.CONTENT = 'CreationDate;PositionID;DataSource;LegFlag;Amort_PaymentAmount;Amort_Date;Amort_PaymentType;Amort_AccrualDate'
+    FEE.CONTENT ='CreationDate;PositionID;DataSource;Fee_PaymentDate;Fee_StartDate;Fee_EndDate;Fee_Payment;Fee_PaymentType;Fee_PaymentQuotation'
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    SELECT.CMD= ''
+    SELECT.CMD = "SELECT " : FN.AA.SCH.ALM
+    CALL EB.READLIST(SELECT.CMD,SEL.LIST,LIST.NAME,KEY.LIST,SEL.ERR)
+
+    FOR I = 1 TO KEY.LIST
+        REC.ID = SEL.LIST <I>
+        CALL F.READ(FN.AA.SCH.ALM,REC.ID,R.AA.SCH.ALM,F.AA.SCH.ALM,ERR.ALM)
+        ARR.ID = R.AA.SCH.ALM<1>
+        Y.REP.DATE = R.AA.SCH.ALM<2>
+        CALL CAB.DATE.ALM(Y.REP.DATE)
+        AMOUNT = R.AA.SCH.ALM<3>
+        DATE.PAY = R.AA.SCH.ALM<4>
+        CALL CAB.DATE.ALM(DATE.PAY)
+        AA.SCHEDULE.ALM<-1> = Y.REP.DATE :';': ARR.ID :';T24;0;': DATE.PAY :';': ';;': AMOUNT :';1;0'
+    NEXT I
+    SCHEDULE.CONTENT<-1> = AA.SCHEDULE.ALM
+
+
+    SELECT.CMD= ''
+    SELECT.CMD = "SELECT " : FN.AA.AMT.ALM
+    CALL EB.READLIST(SELECT.CMD,SEL.LIST,LIST.NAME,KEY.LIST,SEL.ERR)
+
+    FOR I = 1 TO KEY.LIST
+        REC.ID = SEL.LIST <I>
+        CALL F.READ(FN.AA.AMT.ALM,REC.ID,R.AA.AMT.ALM,F.AA.AMT.ALM,ERR.ALM)
+        ARR.ID = R.AA.AMT.ALM<1>
+        Y.REP.DATE = R.AA.AMT.ALM<2>
+        CALL CAB.DATE.ALM(Y.REP.DATE)
+        AMOUNT = R.AA.AMT.ALM<3>
+        DATE.PAY = R.AA.AMT.ALM<4>
+        CALL CAB.DATE.ALM(DATE.PAY)
+        END.PAY = R.AA.AMT.ALM<5>
+        CALL CAB.DATE.ALM(END.PAY)
+        AA.AMORT.ALM<-1> = Y.REP.DATE :';': ARR.ID :';T24;0;': AMOUNT :';':DATE.PAY:';1;':END.PAY
+    NEXT I
+    AMORT.CONTENT<-1> = AA.AMORT.ALM
+
+    SELECT.CMD= ''
+    SELECT.CMD = "SELECT " : FN.AA.ALM.FEE
+    CALL EB.READLIST(SELECT.CMD,SEL.LIST,LIST.NAME,KEY.LIST,SEL.ERR)
+
+    FOR I = 1 TO KEY.LIST
+        REC.ID = SEL.LIST <I>
+        CALL F.READ(FN.AA.ALM.FEE,REC.ID,R.AA.ALM.FEE,F.AA.ALM.FEE,ERR.ALM)
+        AA.FEE.ALM<-1> = R.AA.ALM.FEE
+    NEXT I
+    FEE.CONTENT<-1> = AA.FEE.ALM
+
+    WRITELIST SCHEDULE.CONTENT TO 'CouponCashflowTable.txt'
+    WRITELIST AMORT.CONTENT TO 'AmortizationTable.txt'
+    WRITELIST FEE.CONTENT TO 'FeeTable.txt'
+
+    RETURN
+
+END

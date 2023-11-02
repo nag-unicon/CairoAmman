@@ -1,0 +1,90 @@
+    SUBROUTINE AAL.INCREASE.TERM.AMOUNT.FIELDS
+*-----------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Author           :
+* Development Id   : Repayment and Disbursement report
+* Date             :
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Template Routine
+* Attached to      : AAL.INCREASE.TERM.AMOUNT.FIELDS
+*
+*
+* Attached As      : template Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This is a live table to update the Increase Commitment Activity Details
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : N/A
+* ARGS -(Output)   : N/A
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+*----------------------------------------------------------------------------------------------
+*** <region name = Inserts>
+*** <desc> File inserts and common variables in the subroutine </desc>
+*-----------------------------------------------------------------------------
+* Modification History :
+*
+*** <desc>Inserts and control logic</desc>
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_DataTypes
+
+*** </region>
+*-----------------------------------------------------------------------------
+
+*   CALL Table.defineId("TABLE.NAME.ID", T24_String) ;* Define Table id
+    ID.F = "ARRANGEMENT.ID"   ;* Arrangement Number in the format AA/jjjjj/sssss
+    ID.N = '17.1'
+    ID.T = "ARR"
+
+    fieldName = 'XX<AAA.REFERENCE'
+    fieldLength = '30'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'XX-CUSTOMER'
+    fieldLength = '10'
+    fieldType = 'CUS'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'XX-LINKED.ACCOUNT'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'XX-PRODUCT'
+    fieldLength = '30'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'XX-EFFECTIVE.DATE'
+    fieldLength = '11'
+    fieldType = 'D'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'XX>CHANGE.AMOUNT'
+    fieldLength = '25'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+
+    CALL Table.addLocalReferenceField(XX.LOCAL.REF)
+*    CALL Table.addOverrideField
+*-----------------------------------------------------------------------------
+    CALL Table.setAuditPosition         ;* Poputale audit information
+*-----------------------------------------------------------------------------
+    RETURN
+*-----------------------------------------------------------------------------
+END

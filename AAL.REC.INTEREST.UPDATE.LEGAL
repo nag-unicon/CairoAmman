@@ -1,0 +1,98 @@
+    SUBROUTINE AAL.REC.INTEREST.UPDATE.LEGAL
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 26th Sep 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Record routine
+
+* Attached to      : Activity Class  : LENDING-CHANGE.PRODUCT-ARRANGEMENT
+*                    Property Class  : INTEREST
+*                    Action          : UPDATE
+*                    Routine         : AAL.REC.INTEREST.UPDATE.LEGAL
+
+* Attached As      : Record Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Routine is used to default the INTEREST details
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.AA.INTEREST
+    $INSERT I_AA.APP.COMMON
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB PROCESS
+
+    RETURN
+
+*** </region>
+*** <region name= Process>
+
+PROCESS:
+
+    BEGIN CASE
+
+    CASE AA$PROPERTY.ID EQ "PRINCIPALINT"
+
+        IF R.NEW(AA.INT.EFFECTIVE.RATE) THEN
+            R.NEW(AA.INT.FIXED.RATE)     = R.NEW(AA.INT.EFFECTIVE.RATE)
+        END ELSE
+            ARRANGEMENT.ID = AA$ARR.ID
+            INTEREST.PROPERTY = "PRINCIPALINT"
+            INTEREST.RATE = ""
+            CALL AAL.GET.INTEREST.RATE(ARRANGEMENT.ID,INTEREST.PROPERTY,INTEREST.RATE)
+            R.NEW(AA.INT.FIXED.RATE)     = INTEREST.RATE
+        END
+        R.NEW(AA.INT.FLOATING.INDEX) = ""
+        R.NEW(AA.INT.FLOATING.NOTICE)= ""
+        R.NEW(AA.INT.PERIODIC.INDEX) = ""
+        R.NEW(AA.INT.PERIODIC.RATE)  = ""
+        R.NEW(AA.INT.PERIODIC.PERIOD)= ""
+        R.NEW(AA.INT.PERIODIC.METHOD)= ""
+        R.NEW(AA.INT.PERIODIC.RESET) = ""
+        R.NEW(AA.INT.MARGIN.TYPE)    = ""
+        R.NEW(AA.INT.MARGIN.OPER)    = ""
+        R.NEW(AA.INT.MARGIN.RATE)    = ""
+        R.NEW(AA.INT.TIER.MIN.RATE)  = ""
+        R.NEW(AA.INT.TIER.MAX.RATE)  = ""
+
+    CASE AA$PROPERTY.ID EQ "PENALTYINT"
+
+        R.NEW(AA.INT.FIXED.RATE)     = 0
+        R.NEW(AA.INT.FLOATING.INDEX) = ""
+        R.NEW(AA.INT.FLOATING.NOTICE)= ""
+        R.NEW(AA.INT.PERIODIC.INDEX) = ""
+        R.NEW(AA.INT.PERIODIC.RATE)  = ""
+        R.NEW(AA.INT.PERIODIC.PERIOD)= ""
+        R.NEW(AA.INT.PERIODIC.METHOD)= ""
+        R.NEW(AA.INT.PERIODIC.RESET) = ""
+        R.NEW(AA.INT.MARGIN.TYPE)    = ""
+        R.NEW(AA.INT.MARGIN.OPER)    = ""
+        R.NEW(AA.INT.MARGIN.RATE)    = ""
+        R.NEW(AA.INT.TIER.MIN.RATE)  = ""
+        R.NEW(AA.INT.TIER.MAX.RATE)  = ""
+
+
+    END CASE
+
+    RETURN
+
+*** </region>
+
+END

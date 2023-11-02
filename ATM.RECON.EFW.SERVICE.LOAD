@@ -1,0 +1,124 @@
+    SUBROUTINE ATM.RECON.EFW.SERVICE.LOAD
+*-----------------------------------------------------------------------------
+*Modification Details:
+*=====================
+* Modified by        Date              Description
+* Nuha Tuhul         1-10-2018        add crdeit side & subtract 1JD for VERSION
+* Nuha Tuhul         23-10-2018      Extract local amount, subtrct 0.25 TT ,
+*                                    subtract 1 FT   , adjust sign
+* Nuha Tuhul         31-10-2018     Extract  Local Ref EFW.SETT instaed of VALUE.EDATE
+*-----------------------------------------------------------------------------
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE TT.BP I_ATM.RECON.EFW.SERVICE.COMMON
+    $INCLUDE TT.BP I_F.RECON.ATM.PARAMETER
+
+    GOSUB OPENFILES
+    GOSUB GET.LOCAL.FIELDS
+    GOSUB GET.PARAM.RECORD
+
+    RETURN
+
+OPENFILES:
+**********
+    FN.ATM.RECON.ACCOUNT      = 'F.ATM.RECON.ACCOUNT'
+    F.ATM.RECON.ACCOUNT       = ''
+    CALL OPF(FN.ATM.RECON.ACCOUNT,F.ATM.RECON.ACCOUNT)
+
+    FN.STMT.ENTRY             = 'F.STMT.ENTRY'
+    F.STMT.ENTRY              = ''
+    CALL OPF(FN.STMT.ENTRY,F.STMT.ENTRY)
+
+    FN.STMT.ENTRY.DETAIL      = 'F.STMT.ENTRY.DETAIL'
+    F.STMT.ENTRY.DETAIL       = ''
+    CALL OPF(FN.STMT.ENTRY.DETAIL,F.STMT.ENTRY.DETAIL)
+
+    FN.STMT.ENTRY.DETAIL.XREF = 'F.STMT.ENTRY.DETAIL.XREF'
+    F.STMT.ENTRY.DETAIL.XREF  = ''
+    CALL OPF(FN.STMT.ENTRY.DETAIL.XREF,F.STMT.ENTRY.DETAIL.XREF)
+
+    FN.FUNDS.TRANSFER         = 'F.FUNDS.TRANSFER'
+    F.FUNDS.TRANSFER          = ''
+    CALL OPF(FN.FUNDS.TRANSFER,F.FUNDS.TRANSFER)
+
+    FN.FUNDS.TRANSFER$HIS     = 'F.FUNDS.TRANSFER$HIS'
+    F.FUNDS.TRANSFER$HIS      = ''
+    CALL OPF(FN.FUNDS.TRANSFER$HIS, F.FUNDS.TRANSFER$HIS)
+
+    FN.ACCOUNT                = 'F.ACCOUNT'
+    F.ACCOUNT                 = ''
+    CALL OPF(FN.ACCOUNT,F.ACCOUNT)
+
+    FN.TELLER                 = 'F.TELLER'
+    F.TELLER                  = ''
+    CALL OPF(FN.TELLER,F.TELLER)
+
+    FN.TELLER$HIS             = 'F.TELLER$HIS'
+    F.TELLER$HIS              = ''
+    CALL OPF(FN.TELLER$HIS,F.TELLER$HIS)
+
+    FN.CAB.EFW.RECON          = 'F.CAB.EFW.RECON'
+    F.CAB.EFW.RECON           = ''
+    CALL OPF(FN.CAB.EFW.RECON,F.CAB.EFW.RECON)
+
+    FN.RECON.ATM.PARAM        = 'F.RECON.ATM.PARAMETER'
+    F.RECON.ATM.PARAM         = ''
+    CALL OPF(FN.RECON.ATM.PARAM,F.RECON.ATM.PARAM)
+
+    FN.ACCT.ENT.TODAY = 'F.ACCT.ENT.TODAY'
+    F.ACCT.ENT.TODAY = ''
+    CALL OPF(FN.ACCT.ENT.TODAY,F.ACCT.ENT.TODAY)
+
+    FN.ACCT.ENT.LWORK.DAY = 'F.ACCT.ENT.LWORK.DAY'
+    F.ACCT.ENT.LWORK.DAY = ''
+    CALL OPF(FN.ACCT.ENT.LWORK.DAY,F.ACCT.ENT.LWORK.DAY)
+
+    RETURN
+
+GET.LOCAL.FIELDS:
+******************
+    APPL       = 'FUNDS.TRANSFER':FM:'TELLER'
+    FIELD.NAME = 'CBSTXNREF':VM:'ATM.TERM.ID':VM:'VERSION.NAME':VM:"EFW.SETT":FM:'CBSTXNREF':VM:'VERSION.NAME':VM:"EFW.SETT"
+    FIELD.POS  = ''
+
+    CALL MULTI.GET.LOC.REF(APPL,FIELD.NAME,FIELD.POS)
+    CBSTXNREF.POS    = FIELD.POS<1,1>
+    ATM.TERM.ID.POS  = FIELD.POS<1,2>
+    FT.VER.POS       = FIELD.POS<1,3>
+    FT.EFW.SETT.POS  = FIELD.POS<1,4>
+    TT.CBSTXNREF.POS = FIELD.POS<2,1>
+    TT.VER.POS = FIELD.POS<2,2>
+    TT.EFW.SETT.POS  = FIELD.POS<2,3>
+
+    RETURN
+
+GET.PARAM.RECORD:
+*****************
+
+    CALL CACHE.READ(FN.ATM.RECON.ACCOUNT,'EFW',R.ATM.RECON.ACCOUNT.EFW,ATM.ACC.ERR)
+
+    RECON.DIR  = ''
+    RECON.PATH = ''
+    CALL CACHE.READ(FN.RECON.ATM.PARAM,'SYSTEM',R.RECON.ATM.PARAM,RECON.ERR)
+
+    RECON.DIR  = R.RECON.ATM.PARAM<RE.PAR.RECON.PATH,2>
+    RECON.PATH = ''
+
+    OPEN RECON.DIR TO RECON.PATH ELSE
+        YR.CMD = 'SH "cd "':RECON.DIR
+        EXECUTE YR.CMD
+    END
+
+    RECON.EFW.DIR  = 'RECON.EFW'
+    RECON.EFW.PATH = ''
+    OPEN RECON.EFW.DIR TO RECON.EFW.PATH ELSE
+        YSAVE.CMD = 'SH "mkdir "':RECON.EFW.DIR
+        EXECUTE YSAVE.CMD
+        OPEN RECON.EFW.DIR TO RECON.EFW.PATH ELSE
+            CRT 'Error in open EFW Temp path'
+        END
+    END
+
+    RETURN
+END

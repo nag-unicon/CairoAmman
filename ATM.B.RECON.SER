@@ -1,0 +1,225 @@
+    SUBROUTINE ATM.B.RECON.SER(SEL.ID)
+*-----------------------------------------------------------------------------------
+* 17-02-2019    Nuha Tuhul                change Y.DATA location
+*-----------------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT TT.BP I_ATM.B.RECON.SER.COMMON
+    $INSERT ATM.BP I_F.ATM.BRANCH
+    $INSERT I_F.STANDARD.SELECTION
+    $INSERT I_BATCH.FILES
+    $INSERT I_F.STMT.ENTRY
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.DATES
+    $INSERT I_F.FUNDS.TRANSFER
+    $INSERT I_F.TELLER
+    $INSERT I_F.ACCOUNT.STATEMENT
+
+    Y.DATA = ''
+    GOSUB PROCESS
+    RETURN
+
+PROCESS:
+********
+    Y.TODAY     = TODAY
+    Y.FINAL.DATA  = ''
+    Y.DUP.VAL   = ''
+    CALL F.READ(FN.ATM.BRANCH,SEL.ID,R.ATM.BRANCH,F.ATM.BRANCH,BRANCH.ERR)
+    Y.AC.ID     = R.ATM.BRANCH<ATM.BR.CR.ACCT>
+    CONVERT SM TO VM IN Y.AC.ID
+    Y.AC.COUNT  = DCOUNT(Y.AC.ID,VM)
+
+
+    FOR Y.AC.INIT = 1 TO Y.AC.COUNT
+        Y.ENT.TODAY.ENTRY = ''
+        Y.ACC.NO = Y.AC.ID<1,Y.AC.INIT>
+        LOCATE Y.ACC.NO IN Y.CHK.ACC SETTING ACC.POS ELSE
+            GOSUB FETCH.DETAIL
+        END
+        Y.CHK.ACC<-1> = Y.ACC.NO
+    NEXT Y.AC.INIT
+
+    RETURN
+
+FETCH.DETAIL:
+*************
+
+    CALL F.READ(FN.ACCOUNT,Y.ACC.NO,R.ACC.REC,F.ACCOUNT,ACC.ERR)
+    ACCT.CCY = R.ACC.REC<AC.CURRENCY>
+
+    REC.ID.TEMP = Y.ACC.NO
+    CALL F.READ(FN.AC.SUB.ACCOUNT,Y.ACC.NO,R.AC.SUB.ACCOUNT,F.AC.SUB.ACCOUNT,SUB.ERR)
+    IF R.AC.SUB.ACCOUNT THEN
+        R.AC.SUB.ACCOUNT<-1> = Y.ACC.NO
+        LOOP
+            REMOVE SUB.ACCT FROM R.AC.SUB.ACCOUNT SETTING SUB.POS
+        WHILE SUB.ACCT:SUB.POS
+            REC.ID = SUB.ACCT
+            GOSUB GET.EXTRACT.ENTRIES
+        REPEAT
+    END ELSE
+        GOSUB GET.EXTRACT.ENTRIES
+    END
+
+    RETURN
+
+GET.EXTRACT.ENTRIES:
+********************
+    CALL F.READ(FN.ACCT.ENT.TODAY,Y.ACC.NO,R.ACCT.ENT.TODAY,F.ACCT.ENT.TODAY,ACCT.ENT.ERR)
+    CALL F.READ(FN.ACCT.ENT.LWORK.DAY,Y.ACC.NO,R.ACCT.ENT.LWORK.DAY,F.ACCT.ENT.LWORK.DAY,ACCT.ENT.ERR)
+
+    R.ACCT.ENTRY = R.ACCT.ENT.LWORK.DAY:FM:R.ACCT.ENT.TODAY
+
+    GOSUB FIN.DETAIL
+
+    RETURN
+
+CHECK.ACT.ENTRY:
+****************
+***Y.DATA = ''
+    IF R.ACCT.ENTRY THEN
+        LOOP
+            REMOVE YR.STMT.ID FROM R.ACCT.ENTRY SETTING STMT.POS
+        WHILE YR.STMT.ID:STMT.POS
+            YR.FIELD.VALUE.FINAL = ''
+            IF YR.STMT.ID[1,1] EQ 'S' THEN
+                STMT.CNT = 1
+                LOOP
+                    STMT.XREF.ID = YR.STMT.ID:'-':STMT.CNT
+                    R.STMT.ENTRY.DETAIL.XREF = ''
+                    XREF.ERR = ''
+                    CALL F.READ(FN.STMT.ENTRY.DETAIL.XREF,STMT.XREF.ID,R.STMT.ENTRY.DETAIL.XREF,F.STMT.ENTRY.DETAIL.XREF,XREF.ERR)
+                WHILE NOT(XREF.ERR)
+                    STMT.CNT+=1
+                    LOOP
+                        REMOVE STMT.ID FROM R.STMT.ENTRY.DETAIL.XREF SETTING XREF.POS
+                    WHILE STMT.ID:XREF.POS
+                        GOSUB READ.STMT.ENTRY
+                    REPEAT
+                REPEAT
+            END ELSE
+                STMT.ID = YR.STMT.ID
+                GOSUB READ.STMT.ENTRY
+            END
+        REPEAT
+    END
+    RETURN
+
+READ.STMT.ENTRY:
+****************
+    CALL F.READ(FN.STMT.ENTRY,STMT.ID,R.STMT.ENTRY,F.STMT.ENTRY,STMT.ENT.ERR)
+    IF R.STMT.ENTRY EQ '' THEN
+        CALL F.READ(FN.STMT.ENTRY.DETAIL,STMT.ID,R.STMT.ENTRY,F.STMT.ENTRY.DETAIL,STMT.ENT.DET.ERR)
+    END
+
+    Y.BOOKING.DATE = R.STMT.ENTRY<AC.STE.BOOKING.DATE>
+    Y.FET.TIM      = R.STMT.ENTRY<AC.STE.DATE.TIME>
+    Y.TIME         = Y.FET.TIM[7,4]
+    Y.DATE         = Y.FET.TIM[1,6]
+    Y.TODATE       = Y.DATE - 1
+    Y.F.DATE       = Y.TODAY[1,2]:Y.DATE:' ':Y.TIME[1,2]:':':Y.TIME[3,2]
+
+    GOSUB CHECK.DATE.DETAIL
+
+    RETURN
+
+CHECK.DATE.DETAIL:
+******************
+    IF ACCT.CCY EQ LCCY THEN
+        Y.AMT = R.STMT.ENTRY<AC.STE.AMOUNT.LCY>
+    END ELSE
+        Y.AMT = R.STMT.ENTRY<AC.STE.AMOUNT.FCY>
+    END
+    Y.SYS.ID  = R.STMT.ENTRY<AC.STE.SYSTEM.ID>
+    TRANS.REF = FIELD(R.STMT.ENTRY<AC.STE.TRANS.REFERENCE>,'\',1)
+    Y.CHK.AMT = Y.AMT[1,1]
+    IF Y.CHK.AMT EQ '-' THEN
+        Y.FIN.AMT = Y.AMT
+    END ELSE
+        Y.FIN.AMT = '+':Y.AMT
+    END
+    IF Y.SYS.ID EQ 'FT' THEN
+        CALL EB.READ.HISTORY.REC(F.FUNDS.TRANSFER$HIS,TRANS.REF,R.FT.REC,FTH.ERR)
+        IF R.FT.REC ELSE
+            TRANS.REF = FIELD(R.STMT.ENTRY<AC.STE.TRANS.REFERENCE>,'\',1)
+            CALL F.READ(FN.FUNDS.TRANSFER,TRANS.REF,R.FT.REC,F.FUNDS.TRANSFER,FT.ERR)
+        END
+        Y.TRANS.TYPE = R.FT.REC<FT.TRANSACTION.TYPE>
+        IF Y.TRANS.TYPE EQ 'ACAW' OR Y.TRANS.TYPE EQ 'ACAD' THEN
+            Y.FT.ID         = FIELD(TRANS.REF,';',1)
+            Y.STAT          = R.FT.REC<FT.RECORD.STATUS>
+            Y.DEBIT.AC.NO   = R.FT.REC<FT.DEBIT.ACCT.NO>
+            Y.CREDIT.AC.NO  = R.FT.REC<FT.CREDIT.ACCT.NO>
+            Y.RRN.ID        = R.FT.REC<FT.LOCAL.REF,Y.UNIQUE.POS>
+            Y.UNIQUE.ID     = FMT(Y.RRN.ID,'R(#12)')
+
+            IF Y.RRN.ID NE '' THEN
+                Y.RRN = Y.UNIQUE.ID
+            END ELSE
+                Y.RRN = ''
+            END
+            Y.CARD.NO      = R.FT.REC<FT.LOCAL.REF,Y.CARD.POS>[1,6]
+            Y.TRANS.TYPE   = 'DEP'
+            IF Y.DEBIT.AC.NO EQ Y.ACC.NO THEN
+                Y.FT.AC.NO = Y.CREDIT.AC.NO
+            END
+            IF Y.CREDIT.AC.NO EQ Y.ACC.NO THEN
+                Y.FT.AC.NO = Y.DEBIT.AC.NO
+            END
+
+            GOSUB READ.FINAL.VALUE
+
+        END
+
+    END
+
+
+    RETURN
+
+READ.FINAL.VALUE:
+*****************
+    IF Y.STAT NE 'REVE' THEN
+
+        Y.FINAL.DATA = SEL.ID:'|':Y.RRN:'|':Y.TRANS.TYPE:'|':Y.F.DATE:'|':Y.FIN.AMT:'|':ACCT.CCY:'|':Y.FT.AC.NO:'|':Y.CARD.NO
+        LOCATE Y.FINAL.DATA IN Y.DUP.VALUE SETTING CHK.POS THEN
+            Y.DATA<-1>= SEL.ID:'|':Y.RRN:'|':Y.TRANS.TYPE:'|':Y.F.DATE:'|':Y.FIN.AMT:'|':ACCT.CCY:'|':Y.FT.AC.NO:'|':Y.CARD.NO:'|':Y.FT.ID:'|':'D'
+        END ELSE
+            Y.DATA<-1>= SEL.ID:'|':Y.RRN:'|':Y.TRANS.TYPE:'|':Y.F.DATE:'|':Y.FIN.AMT:'|':ACCT.CCY:'|':Y.FT.AC.NO:'|':Y.CARD.NO:'|':Y.FT.ID:'|'
+        END
+        Y.DUP.VALUE<-1> = Y.FINAL.DATA
+    END
+    RETURN
+
+FIN.DETAIL:
+***********
+    Y.CHK.DUP      = ''
+    Y.WORKING.DATE = R.DATES(EB.DAT.LAST.WORKING.DAY)
+    Y.CHK.DATE     = Y.WORKING.DATE
+    NOF.DAYS       = 'C'
+    CALL CDD('',Y.WORKING.DATE,Y.TODAY,NOF.DAYS)
+
+    Y.FREQ.DAY     = '0D'
+    FOR Y.DAY.INIT = 1 TO NOF.DAYS
+        CALL CALENDAR.DAY(Y.CHK.DATE,"+",Y.FREQ.DAY)
+        Y.CHK.DATE = Y.FREQ.DAY
+        Y.FIN.ID   = Y.CHK.DATE
+        Y.FREQ1.DAY = 0
+        IF Y.FREQ1.DAY EQ '0' THEN
+            Y.FREQ.DAY = '1D'
+        END
+
+        IF Y.WORKING.DATE EQ Y.CHK.DATE THEN
+            GOSUB CHECK.ACT.ENTRY
+            Y.FIN.ID    = Y.FIN.ID:'-':SEL.ID
+
+            IF Y.DATA NE '' THEN
+                CALL F.WRITE(FN.FLAT.FILE,Y.FIN.ID,Y.DATA)
+            END
+
+        END
+
+    NEXT Y.DAY.INIT
+
+    RETURN
+
+END

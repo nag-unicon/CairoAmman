@@ -1,0 +1,249 @@
+    SUBROUTINE ATM.RECON.EFW.SERVICE(REC.ID)
+*-----------------------------------------------------------------------------
+*Modification Details:
+*=====================
+* Modified by        Date              Description
+* Nuha Tuhul         1-10-2018        add crdeit side & subtract 1JD for VERSION
+*                                     add  CAB Fess  at end
+* Nuha Tuhul         23-10-2018      Extract local amount, subtrct 0.25 TT ,
+*                                    subtract 1 FT   , adjust sign
+* Nuha Tuhul         31-10-2018      Extract  Local Ref EFW.SETT instaed of VALUE.EDATE
+*-----------------------------------------------------------------------------
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.STANDARD.SELECTION
+    $INCLUDE T24.BP I_BATCH.FILES
+    $INCLUDE T24.BP I_F.STMT.ENTRY
+    $INCLUDE T24.BP I_F.ACCOUNT
+    $INCLUDE T24.BP I_F.DATES
+    $INCLUDE T24.BP I_F.FUNDS.TRANSFER
+    $INCLUDE T24.BP I_F.STMT.ENTRY
+    $INCLUDE T24.BP I_F.CURRENCY
+    $INCLUDE T24.BP I_F.ACCT.ACTIVITY
+    $INCLUDE T24.BP I_F.ACCOUNT.STATEMENT
+    $INCLUDE T24.BP I_F.TELLER
+    $INCLUDE TT.BP I_ATM.RECON.EFW.SERVICE.COMMON
+    TRUE = 1
+    FALSE = 0
+    GOSUB INIT
+    GOSUB STMT.PROCESS
+    RETURN
+
+INIT:
+*****
+    Y.TODAY             = TODAY
+    Y.LAST.WORKING.DATE = R.DATES(EB.DAT.LAST.WORKING.DAY)
+    RETURN
+
+CONTROL.PROCESS:
+*****************
+    GOSUB CLEAR.DETAIL.VALUE
+    TRANS.REF = FIELD(R.STMT.ENTRY<AC.STE.TRANS.REFERENCE>,'\',1)
+
+    YR.FT.VERS.1JD  = ",EPAY.TT":@VM:",EPAY.PREPAID.TT"
+    YR.TT.VER.25JD  =  ",LCY.POSTPAID.CASH.OFC":@VM:",LCY.PREPAID.CASH.OFC"
+
+    IF R.STMT.ENTRY<AC.STE.SYSTEM.ID> EQ 'FT' THEN
+        GOSUB READ.FT.RECORD
+        Y.TRANS.TYPE   = 'EFEN'
+        Y.TRANS.REF.ID =  Y.FT.ID
+    END ELSE
+        GOSUB READ.TT.RECORD
+        Y.TRANS.TYPE  = 'EFTT'
+        Y.TRANS.REF.ID = Y.TT.ID
+    END
+
+    IF R.STMT.ENTRY<AC.STE.RECORD.STATUS> EQ 'REVE' THEN
+        LOCATE Y.TRANS.REF.ID IN Y.DUP.REV.ID SETTING DUP.REV.POS THEN
+            Y.REC.STATUS = ''
+        END ELSE
+            Y.REC.STATUS = 'R'
+        END
+        Y.DUP.REV.ID<-1> = Y.TRANS.REF.ID
+    END ELSE
+        Y.REC.STATUS = ''
+    END
+
+    LOCATE Y.TRANS.REF.ID IN Y.DUP.TRANS.ID SETTING DUP.TRANS.POS ELSE
+        Y.EFW.AC.NO       = REC.ID
+        Y.EFW.CCY         = Y.CCY
+        Y.EFW.VALUE.DATE  = Y.VALUE.DATE
+        Y.EFW.POST.DATE   = Y.POST.DATE
+        Y.EFW.AMOUNT      = Y.AMOUNT
+        Y.EFW.REVERSAL    = Y.REC.STATUS
+        Y.EFW.TRANS.TYPE  = Y.TRANS.TYPE
+        Y.EFW.TRANS.REF   = Y.TRANS.REF.ID
+        Y.EFW.ATM.TERM.ID = Y.ATM.TERM.ID
+        Y.EFW.CBSF.TRANS  = Y.CBSTXNREF
+        Y.EFW.CREDIT.ACCT = Y.CREDIT.ACCT
+        YR.EFW.CAB.FEES   = Y.CAB.FEES
+
+        Y.DATA = Y.EFW.AC.NO:'|':Y.EFW.CCY:'|':Y.EFW.VALUE.DATE:'|':Y.EFW.POST.DATE:'|':Y.EFW.AMOUNT:'|':Y.EFW.REVERSAL:'|':Y.EFW.TRANS.TYPE:'|':Y.EFW.TRANS.REF:'|':Y.EFW.ATM.TERM.ID:'|':Y.EFW.CBSF.TRANS:'|':Y.EFW.CREDIT.ACCT:'|':YR.EFW.CAB.FEES:'|'
+        YR.EFW.WRITE<-1> = Y.DATA
+    END
+    Y.DUP.TRANS.ID<-1> = Y.TRANS.REF.ID
+    RETURN
+
+STMT.PROCESS:
+*************
+    R.FT.REC = ''; R.TT.REC = ''; YR.OPEN.BAL = ''; Y.SERIAL = ''; CCY.DECIMAL = '';
+
+    REC.ID.TEMP = REC.ID
+
+    GOSUB GET.EXTRACT.ENTRIES
+    GOSUB WRITE.FILE
+    RETURN
+
+GET.EXTRACT.ENTRIES:
+********************
+*CALL CAB.ACCT.ENTRY.LIST(REC.ID,Y.TODAY,Y.LAST.WORKING.DATE,Y.STMT.ENTRY.ID,YID.LIST,ER)
+
+    CALL F.READ(FN.ACCT.ENT.TODAY,REC.ID,R.ACCT.ENT.TODAY,F.ACCT.ENT.TODAY,ACCT.ENT.ERR)
+    CALL F.READ(FN.ACCT.ENT.LWORK.DAY,REC.ID,R.ACCT.ENT.LWORK.DAY,F.ACCT.ENT.LWORK.DAY,ACCT.ENT.ERR)
+
+    Y.STMT.ENTRY.ID = R.ACCT.ENT.LWORK.DAY:FM:R.ACCT.ENT.TODAY
+
+    IF Y.STMT.ENTRY.ID THEN
+
+        LOOP
+            REMOVE YR.STMT.ID FROM Y.STMT.ENTRY.ID SETTING XREF.POS
+        WHILE YR.STMT.ID:XREF.POS
+            YR.FIELD.VALUE.FINAL = ''
+
+            IF YR.STMT.ID[1,1] EQ 'S' THEN
+                STMT.CNT = 1
+                LOOP
+                    STMT.XREF.ID = YR.STMT.ID:'-':STMT.CNT
+                    R.STMT.ENTRY.DETAIL.XREF = ''
+                    XREF.ERR = ''
+                    CALL F.READ(FN.STMT.ENTRY.DETAIL.XREF,STMT.XREF.ID,R.STMT.ENTRY.DETAIL.XREF,F.STMT.ENTRY.DETAIL.XREF,XREF.ERR)
+                WHILE NOT(XREF.ERR)
+                    STMT.CNT+=1
+                    LOOP
+                        REMOVE STMT.ID FROM R.STMT.ENTRY.DETAIL.XREF SETTING XREF.POS
+                    WHILE STMT.ID:XREF.POS
+
+                        GOSUB READ.STMT.ENTRY
+                    REPEAT
+                REPEAT
+            END ELSE
+                STMT.ID = YR.STMT.ID
+                GOSUB READ.STMT.ENTRY
+            END
+        REPEAT
+    END
+    RETURN
+
+READ.STMT.ENTRY:
+*****************
+    CALL F.READ(FN.STMT.ENTRY,STMT.ID,R.STMT.ENTRY,F.STMT.ENTRY,STMT.ENT.ERR)
+
+    IF R.STMT.ENTRY EQ '' THEN
+        CALL F.READ(FN.STMT.ENTRY.DETAIL,STMT.ID,R.STMT.ENTRY,F.STMT.ENTRY.DETAIL,STMT.ENT.DET.ERR)
+    END
+
+    R.STMT.DATE = R.DATES(EB.DAT.LAST.WORKING.DAY)[1,2]:R.STMT.ENTRY<AC.STE.DATE.TIME>[1,6]
+    R.STMT.TIME = R.STMT.ENTRY<AC.STE.DATE.TIME>[7,10]
+    BEGIN CASE
+    CASE R.STMT.DATE EQ Y.LAST.WORKING.DATE AND R.STMT.TIME GE '1500'
+        GOSUB CONTROL.PROCESS
+    CASE R.STMT.DATE GT Y.LAST.WORKING.DATE AND R.STMT.DATE LT Y.TODAY
+        GOSUB CONTROL.PROCESS
+    CASE R.STMT.DATE EQ Y.TODAY AND R.STMT.TIME LE '1500'
+        GOSUB CONTROL.PROCESS
+    END CASE
+    RETURN
+
+READ.FT.RECORD:
+***************
+    CALL EB.READ.HISTORY.REC(F.FUNDS.TRANSFER$HIS,TRANS.REF,R.FT.REC,FTH.ERR)
+
+    IF R.FT.REC ELSE
+        TRANS.REF = FIELD(R.STMT.ENTRY<AC.STE.TRANS.REFERENCE>,'\',1)
+        CALL F.READ(FN.FUNDS.TRANSFER,TRANS.REF,R.FT.REC,F.FUNDS.TRANSFER,FT.ERR)
+    END
+
+    IF R.FT.REC THEN
+        Y.FT.ID       = FIELD(TRANS.REF,';',1)
+        Y.CBSTXNREF   = R.FT.REC<FT.LOCAL.REF,CBSTXNREF.POS>
+        Y.ATM.TERM.ID = R.FT.REC<FT.LOCAL.REF,ATM.TERM.ID.POS>
+        Y.DEBIT.ACCT  = R.FT.REC<FT.DEBIT.ACCT.NO>
+        Y.DATE.TIME   = R.FT.REC<FT.DATE.TIME>
+        Y.TIME        = Y.DATE.TIME[7,4]
+        Y.DATE        = Y.DATE.TIME[1,6]
+        Y.POST.DATE   = Y.TODAY[1,2]:Y.DATE:' ':Y.TIME[1,2]:':':Y.TIME[3,2]
+        Y.CCY        = R.FT.REC<FT.DEBIT.CURRENCY>
+        Y.VALUE.DATE = R.FT.REC<FT.LOCAL.REF,FT.EFW.SETT.POS>
+
+
+*    IF R.FT.REC<FT.DEBIT.AMOUNT> NE '' THEN
+*         Y.AMOUNT     = '-':R.FT.REC<FT.DEBIT.AMOUNT>
+*     END ELSE
+*         Y.AMOUNT     = '+':R.FT.REC<FT.CREDIT.AMOUNT>
+*     END
+
+        IF Y.DEBIT.ACCT  EQ REC.ID  THEN
+            Y.CREDIT.ACCT  = R.FT.REC<FT.CREDIT.ACCT.NO>
+            Y.AMOUNT     = '-':R.FT.REC<FT.LOC.AMT.CREDITED>
+        END ELSE
+            Y.CREDIT.ACCT  = Y.DEBIT.ACCT
+            IF R.FT.REC<FT.LOCAL.REF,FT.VER.POS>  MATCHES  YR.FT.VERS.1JD    THEN
+                Y.AMOUNT    = '+': FMT(R.FT.REC<FT.LOC.AMT.DEBITED> - 1,'R3')
+                Y.CAB.FEES  = 1
+            END ELSE
+                Y.AMOUNT     = '+':R.FT.REC<FT.LOC.AMT.DEBITED>
+            END
+        END
+    END
+    RETURN
+
+READ.TT.RECORD:
+***************
+    CALL EB.READ.HISTORY.REC(F.TELLER$HIS,TRANS.REF,R.TT.REC,TTH.ERR)
+
+    IF R.TT.REC ELSE
+        TRANS.REF = FIELD(R.STMT.ENTRY<AC.STE.TRANS.REFERENCE>,'\',1)
+        CALL F.READ(FN.TELLER,TRANS.REF,R.TT.REC,F.TELLER,TT.ERR)
+    END
+    IF R.TT.REC THEN
+        Y.TT.ID      = FIELD(TRANS.REF,';',1)
+        Y.CCY        = R.TT.REC<TT.TE.CURRENCY.2>
+        IF R.TT.REC<TT.TE.LOCAL.REF,TT.VER.POS>  MATCHES   ",LCY.POSTPAID.CASH":@VM:",LCY.PREPAID.CASH"  THEN
+            Y.AMOUNT     = FMT(R.TT.REC<TT.TE.AMOUNT.LOCAL.2>  - 1,'R3')
+            Y.CAB.FEES   = 1
+        END ELSE
+            IF R.TT.REC<TT.TE.LOCAL.REF,TT.VER.POS>  MATCHES  YR.TT.VER.25JD THEN
+                Y.AMOUNT     = FMT(R.TT.REC<TT.TE.AMOUNT.LOCAL.2>  - 0.25,'R3')
+                Y.CAB.FEES   = 0.250
+            END ELSE
+                Y.AMOUNT     = R.TT.REC<TT.TE.AMOUNT.LOCAL.2>
+            END
+        END
+        Y.VALUE.DATE = R.TT.REC<TT.TE.LOCAL.REF,TT.EFW.SETT.POS>
+        Y.CBSTXNREF  = R.TT.REC<TT.TE.LOCAL.REF,TT.CBSTXNREF.POS>
+        Y.DATE.TIME  = R.TT.REC<TT.TE.DATE.TIME>
+        Y.TIME       = Y.DATE.TIME[7,4]
+        Y.DATE       = Y.DATE.TIME[1,6]
+        Y.POST.DATE  = Y.TODAY[1,2]:Y.DATE:' ':Y.TIME[1,2]:':':Y.TIME[3,2]
+        Y.CREDIT.ACCT   = R.TT.REC<TT.TE.ACCOUNT.1>
+    END
+    RETURN
+
+WRITE.FILE:
+************
+    Y.FILE.ID = 'EFW_':Y.TODAY:'.txt'
+    IF YR.EFW.WRITE NE '' THEN
+        CALL F.WRITE(FN.CAB.EFW.RECON,Y.FILE.ID,YR.EFW.WRITE)
+    END
+    RETURN
+
+CLEAR.DETAIL.VALUE:
+*******************
+    Y.TT.ID = ''; Y.CCY = ''; Y.AMOUNT = ''; Y.VALUE.DATE = ''; Y.CBSTXNREF = ''; Y.DATE.TIME = '';
+    Y.TIME = ''; Y.DATE = ''; R.TT.REC = ''; Y.POST.DATE  = ''; TTH.ERR     = ''; TT.ERR      = '';
+    Y.FT.ID = ''; Y.CBSTXNREF = ''; Y.ATM.TERM.ID = ''; Y.DEBIT.ACCT = ''; Y.DATE.TIME = '';
+    Y.TIME  = ''; Y.DATE      = ''; Y.POST.DATE   = ''; R.FT.REC     = ''; R.TT.REC = '';Y.CREDIT.ACCT='';Y.CAB.FEES =''
+    Y.DATA = ''
+    RETURN
+END

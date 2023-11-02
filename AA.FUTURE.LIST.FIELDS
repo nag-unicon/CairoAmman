@@ -1,0 +1,92 @@
+*-----------------------------------------------------------------------------
+* <Rating>-1</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE AA.FUTURE.LIST.FIELDS
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_DataTypes
+
+*-----------------------------------------------------------------------------
+    dataType = ''
+    dataType<2> = '90.1'
+    dataType<3> = 'A'
+    CALL Table.defineId("AA.ID", dataType)        ;* Define Table id
+*-----------------------------------------------------------------------------
+
+    CALL Table.addField('BRANCH.NAME', T24_String, "", "")
+    CALL Table.addField('COMPANY.CODE', T24_String, "", "")
+    CALL Table.addField('PRODUCT.NAME', T24_String, "", "")
+    CALL Table.addField('CATEGORY', T24_String, "", "")
+    CALL Table.addField('ARRANGEMENT.ID', T24_String, "", "")
+    CALL Table.addField('LOAN.ACCT.NO', T24_String, "", "")
+    CALL Table.addField('CURRENCY', T24_String, "", "")
+    CALL Table.addField('CUSTOMER.ID', T24_String, "", "")
+    CALL Table.addField('CUST.STATUS', T24_String, "", "")
+    CALL Table.addField('LOAN.STATUS', T24_String, "", "")
+    CALL Table.addField('CURACCOUNT', T24_String, "", "")
+    CALL Table.addField('ACCT.OFFICER', T24_String, "", "")
+    CALL Table.addField('CUST.NAME', T24_String, "", "")
+    CALL Table.addField('ACCR.STATUS', T24_String, "", "")
+    CALL Table.addField('SETL.ACCT', T24_String, "", "")
+    CALL Table.addField('SETL.CATEG', T24_String, "", "")
+
+    fieldName = 'XX<PAYMENT.DATE'
+    fieldLength = '12'
+    fieldType = 'D'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'XX.PAYMENT.TYPE'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'XX.TOTAL.DUE'
+    fieldLength = '19'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'XX.TOTAL.CAP'
+    fieldLength = '19'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'XX.TOTAL.INTEREST'
+    fieldLength = '19'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'XX.TOTAL.SUBSIDY'
+    fieldLength = '19'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'XX.TOTAL.CHARGE'
+    fieldLength = '3'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'XX.TOTAL.PRINCIPAL'
+    fieldLength = '19'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'XX>CURRENT.OS'
+    fieldLength = '19'
+    fieldType = 'AMT'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    CALL Table.setAuditPosition         ;* Poputale audit information
+*-----------------------------------------------------------------------------
+    RETURN
+*-----------------------------------------------------------------------------
+END

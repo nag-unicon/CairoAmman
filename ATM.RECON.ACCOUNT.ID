@@ -1,0 +1,31 @@
+*-----------------------------------------------------------------------------
+* <Rating>0</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE ATM.RECON.ACCOUNT.ID
+*-----------------------------------------------------------------------------
+!** FIELD definitions FOR TEMPLATE
+*!
+* @author youremail@temenos.com
+* @stereotype id
+* @package infra.eb
+* @uses E
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INCLUDE CAB.BP I_F.ATM.RECON.PARAMETER
+*-----------------------------------------------------------------------------
+* TODO Add logic to validate the id
+* TODO Create an EB.ERROR record if you are creating a new error code
+*-----------------------------------------------------------------------------
+
+    FN.ATM.RECON.PARAMETER = 'F.ATM.RECON.PARAMETER'
+
+
+
+    CALL CACHE.READ(FN.ATM.RECON.PARAMETER,'SYSTEM',R.ATM.RECON.PARAMETER,ATM.RECON.ERR)
+
+    LOCATE ID.NEW IN R.ATM.RECON.PARAMETER<ATM.REC.PARAM.RECON.TYPE,1> SETTING POS ELSE 
+        E = 'EB-MISS.RECON.TYPE' 
+        RETURN
+    END
+END

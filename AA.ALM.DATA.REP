@@ -1,0 +1,790 @@
+    SUBROUTINE AA.ALM.DATA.REP(ARR.ID)
+*****************************************************************
+*** ALM Report Development for Loans
+***
+*** Fixed Instruments
+***
+*** Author : Arun K
+***
+*** 17/02/2016  : ALM Report Development
+***
+*** 14/03/2016  : Modification done based on the Request from Business Team
+***
+*** 14/06/2016  : ALM Report Changed to fetch the pastdue and NPA's
+***               Account
+***
+*** 21/06/2016  : Included Non Mature Loan contracts
+***
+*** 31/07/2016  : EOM balance should be take for this report
+***
+*** 15/08/2016  : Amort of charge & interest and schedule has been defined under seperate files
+***      to ALM system
+***
+*** 22/08/2016  :Fee data need to provide
+******************************************************************
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.AA.ARRANGEMENT
+    $INSERT I_F.AA.PAYMENT.SCHEDULE
+    $INSERT I_F.AA.INTEREST
+    $INSERT I_F.AA.TERM.AMOUNT
+    $INSERT I_F.AA.ACCOUNT
+    $INSERT I_F.AA.CHARGE
+    $INSERT I_F.EB.CONTRACT.BALANCES
+    $INSERT I_F.CUSTOMER
+    $INSERT TT.BP I_AA.ALM.COMMON
+    $INSERT I_F.AA.PROPERTY
+
+
+    GOSUB INIT
+    GOSUB GET.ARRANGEMENT
+    GOSUB GET.PROPERTY.RECORDS
+    GOSUB GET.INTEREST.RATE
+    GOSUB GET.CUSTOMER.RECORD
+    GOSUB GET.ECB.RECORD
+    GOSUB GET.NEXT.DUE
+    GOSUB BUILD.FORMAT.OUTPUT
+    GOSUB PROCESS.LOAN.SCHEDULE.DETAILS
+    GOSUB GET.PAYMENT.SCHEDULE.DETAILS
+    GOSUB GET.SCHEDULE
+*    GOSUB PROCESS.LOAN.SCHEDULE.DETAILS
+    GOSUB PROCESS.SELECT.STATEMENT
+    GOSUB PROCESS.ACCOUNT.LINES
+    GOSUB DO.WRITE
+
+    CALL LOAD.COMPANY(SAVE.ID.COMPANY)
+
+    RETURN
+
+GET.ARRANGEMENT:
+
+    CALL AA.GET.ARRANGEMENT(ARR.ID,R.ARRANGEMENT,ERR.ARR)
+
+    IF R.ARRANGEMENT<AA.ARR.ORIG.CONTRACT.DATE> NE '' THEN
+        LOAN.CREATE.DATE = R.ARRANGEMENT<AA.ARR.ORIG.CONTRACT.DATE>
+    END ELSE
+        LOAN.CREATE.DATE = R.ARRANGEMENT<AA.ARR.START.DATE>
+    END
+
+    CUST.ID      = R.ARRANGEMENT<AA.ARR.CUSTOMER>
+    ACC.ID       = R.ARRANGEMENT<AA.ARR.LINKED.APPL.ID,1>
+    PRD.NAME     = R.ARRANGEMENT<AA.ARR.PRODUCT,1>
+    VAL.DATE     = R.ARRANGEMENT<AA.ARR.START.DATE>
+    ARR.CURRENCY = R.ARRANGEMENT<AA.ARR.CURRENCY>
+    LOAN.ACCOUNT = R.ARRANGEMENT<AA.ARR.LINKED.APPL.ID,1>
+    ARR.CCY      = R.ARRANGEMENT<AA.ARR.CURRENCY>
+
+    ARRANGEMENT.PROPERTY.LIST = R.ARRANGEMENT<AA.ARR.PROPERTY>
+    CHANGE SM TO VM IN ARRANGEMENT.PROPERTY.LIST
+
+    LOCATE 'PRINCIPALINT' IN ARRANGEMENT.PROPERTY.LIST<1,1> SETTING PROP.POS THEN
+        idPropertyClass = "INTEREST"
+        idProperty      = "PRINCIPALINT"
+        GOSUB GET.ARRANGEMENT.CONDITIONS
+
+        R.INTEREST.RECORD = R.AA.CONDITIONS
+        GOSUB GET.INTEREST.DETAILS
+    END
+
+    RETURN
+
+PROCESS.SELECT.STATEMENT:
+
+    SAVE.ID.COMPANY = ID.COMPANY
+    CALL LOAD.COMPANY(R.ARRANGEMENT<AA.ARR.CO.CODE>)
+
+    FN.RE.CRF.CABGL ="F.RE.CRF.CABGL"
+    F.RE.CRF.CABGL = ""
+    CALL OPF(FN.RE.CRF.CABGL, F.RE.CRF.CABGL)
+
+    CON.KEY   =  R.ECB<ECB.CONSOL.KEY>
+
+    SEL.CMD = "SELECT ":FN.RE.CRF.CABGL :" WITH @ID LIKE ...":CON.KEY:'*':LOAN.ACCOUNT:"..."
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+
+    REP.VAL.DATE = ""
+    REP.MAT.DATE = ""
+    CURRENT.ACCOUNT = ""
+
+    R.AA.ALM.FIXED = ""
+    R.AA.ALM.FLOAT = ""
+    R.AA.ALM.NONMATURE = ""
+
+    RETURN
+
+PROCESS.ACCOUNT.LINES:
+
+    LINE.CNT = 1
+
+    LOOP
+        REMOVE CRF.ID FROM SEL.LIST SETTING CRF.ID.POS
+
+    WHILE CRF.ID : CRF.ID.POS
+
+        R.RE.CRF.CABGL = ""
+        ERR.RE.CRF.CABGL = ""
+
+        CALL F.READ(FN.RE.CRF.CABGL, CRF.ID, R.RE.CRF.CABGL, F.RE.CRF.CABGL, ERR.RE.CRF.CABGL)
+        BalanceType = FIELD(CRF.ID, "*", 5)
+        PropertyName = BalanceType[4,30]
+
+        IF PropertyName[2] NE "SP" AND BalanceType[1,3] NE "TOT" AND BalanceType[1,3] NE "UNC" THEN
+
+            R.AA.PROPERTY = ""
+            ERR.AA.PROPERTY = ""
+
+            CALL CACHE.READ('F.AA.PROPERTY', PropertyName, R.AA.PROPERTY, ERR.AA.PROPERTY)
+            PropertyClassName = R.AA.PROPERTY<AA.PROP.PROPERTY.CLASS>
+
+            GL.LINE = FIELD(CRF.ID, "*", 1)
+            GL.LINE = FIELD(GL.LINE, ".", 1) :'.':FIELD(GL.LINE, ".", 2)
+
+            INTEREST.BASIS = R.RE.CRF.CABGL<18>
+
+            GOSUB GET.INTEREST.BASIS
+
+            IF NOT(REP.VAL.DATE) THEN
+
+                LOAN.START.DATE    = R.RE.CRF.CABGL<14>
+                LOAN.MATURITY.DATE = R.RE.CRF.CABGL<15>
+
+                IN.DATE = LOAN.START.DATE
+                GOSUB CHANGE.DATE.FORMAT
+                REP.VAL.DATE = IN.DATE
+
+                IN.DATE = LOAN.MATURITY.DATE
+                GOSUB CHANGE.DATE.FORMAT
+                REP.MAT.DATE = IN.DATE
+
+            END
+
+            GOSUB PROCESS.FILES
+        END
+
+    REPEAT
+
+    RETURN
+
+PROCESS.FILES:
+
+    BALANCE.AMOUNT = ABS(R.RE.CRF.CABGL<11>)
+
+    BEGIN CASE
+
+    CASE BalanceType EQ "CURCOMMITMENT" OR BalanceType EQ "CURCOMMITMENTBL"     ;* Nothing to do. Ignore.
+
+    CASE PROCESS.NONMATURE EQ 1
+        IF PropertyClassName EQ "CHARGE" AND BalanceType[1,3] EQ "ACC" THEN     ;* Nothing to do. Ignore ACC:<Charge>
+            GOSUB PROCESS.FEE.FILE
+        END ELSE
+            GOSUB PROCESS.NONMATURE.FILE
+        END
+
+    CASE R.INTEREST.RECORD<AA.INT.PERIODIC.INDEX> NE '' AND BalanceType EQ "CURACCOUNT"
+        GOSUB PROCESS.FLOAT.FILE
+
+    CASE R.INTEREST.RECORD<AA.INT.PERIODIC.INDEX> EQ '' AND BalanceType EQ "CURACCOUNT"
+        GOSUB PROCESS.FIXED.FILE
+
+    CASE PropertyClassName EQ "ACCOUNT"
+        GOSUB PROCESS.NONMATURE.FILE
+
+    CASE PropertyClassName EQ "INTEREST"
+        IF BalanceType MATCHES "ACCPRINCIPALINT" :VM: "ACCANNUALCOMINT" :VM: "ACCCOMMISSIONINT" :VM: "ACCHOUSESUBLOW" :VM: "ACCOPICCOM" :VM: "ACCPRINCIPALINT" ELSE
+            GOSUB PROCESS.NONMATURE.FILE
+        END
+
+    CASE PropertyClassName EQ "CHARGE"
+        IF NOT(PROCESS.NONMATURE) AND BalanceType[1,3] NE "ACC" THEN  ;* Display all the dues if it is Non Delinquent.
+            GOSUB PROCESS.NONMATURE.FILE
+        END
+        GOSUB PROCESS.FEE.FILE
+
+    END CASE
+
+
+    RETURN
+
+PROCESS.FIXED.FILE:
+
+    R.AA.ALM.FIXED  = REP.TODAY :';': ARR.ID :';T24;': GL.LINE :';': PRD.NAME :';;': REP.VAL.DATE :';;': REP.MAT.DATE :';1;': BALANCE.AMOUNT :';': BALANCE.AMOUNT :';;;;;;;;': ARR.CURRENCY :';':
+    R.AA.ALM.FIXED := ARR.CURRENCY :';': ARR.CURRENCY :';1;2;1;;;;;;;;': PRI.INTEREST :';': Y.INTEREST.BASIS :';1;': DUE.FREQUENCY :';': DUE.TYPE.FRQ :';2;;;': Y.CAP.TYPE :';;': REP.NEXT.DUE.DATE :';;;;':
+    R.AA.ALM.FIXED := ';1;2;;3;':ARR.CCY:';1;0;;;': GEN.PAY.TYPE :';': GEN.PAY.TYPE.VAL :';;;': DUE.FREQUENCY :';':DUE.TYPE.FRQ :';;;': REP.NEXT.RESET.DATE :';': RESET.FREQUENCY :';2;0;;;;;;;;;;;;;;;':FEE.FLAG:';;;;;;;;;1'
+
+    RETURN
+
+PROCESS.FLOAT.FILE:
+
+    R.AA.ALM.FLOAT = REP.TODAY :';': ARR.ID :';T24;': GL.LINE :';': PRD.NAME :';;': REP.VAL.DATE :';;': REP.MAT.DATE :';1;': BALANCE.AMOUNT :';': BALANCE.AMOUNT :';;;;;;;;': ARR.CURRENCY :';':
+    R.AA.ALM.FLOAT := ARR.CURRENCY :';': ARR.CURRENCY :';1;2;;;;;;;;;': PRI.INTEREST :';': Y.INTEREST.BASIS :';1;': DUE.FREQUENCY :';': DUE.TYPE.FRQ :';2;;;': Y.CAP.TYPE :';;': REP.NEXT.DUE.DATE :';;;;':
+    R.AA.ALM.FLOAT :=  ';1;2;;3;;':ARR.CCY:';1;0;': RESET.FREQUENCY :';': RESET.FRE.TYPE :';;;;;;1;;;;;;;;;;;;;;;': ARR.CCY:';1;;;;': GEN.PAY.TYPE :';': GEN.PAY.TYPE.VAL :';;;': AMT.DUE.FREQUENCY :';':AMT.DUE.TYPE.FRQ :';;;;': AMT.REP.NEXT.RESET.DATE :';2;0;;;;;;;;;;;;;;;;':FEE.FLAG:';;;;;;;;;1'
+
+    RETURN
+
+PROCESS.NONMATURE.FILE:
+
+    IF BalanceType MATCHES "ACCPRINCIPALINT" :VM: "ACCANNUALCOMINT" :VM: "ACCCOMMISSIONINT" :VM: "ACCHOUSESUBLOW" :VM: "ACCOPICCOM" :VM: "ACCPRINCIPALINT" ELSE
+        IF LINE.CNT EQ 1 THEN
+            CURRENT.ACCOUNT = BALANCE.AMOUNT
+        END ELSE
+
+            LOCATE GL.LINE IN PROCESSED.LINE SETTING LINE.POS THEN
+                CURRENT.ACCOUNT + = BALANCE.AMOUNT
+            END ELSE
+                ARR.REC.ID = ARR.ID :'_NONMATURE_':BalanceType
+                CALL F.WRITE(FN.AA.ALM.FIX,ARR.REC.ID,R.AA.ALM.NONMATURE)
+                CURRENT.ACCOUNT = BALANCE.AMOUNT
+            END
+        END
+
+        LINE.CNT + = 1
+        PROCESSED.LINE<-1> = GL.LINE
+
+        R.AA.ALM.NONMATURE = REP.TODAY :';': ARR.ID:';T24;': GL.LINE :';': PRD.NAME :';1;': CURRENT.ACCOUNT :';;;': ARR.CURRENCY :';': ARR.CURRENCY :';': ARR.CURRENCY :';1;2;;;': PRI.INTEREST :';': Y.INTEREST.BASIS :';1;': COUPON.FRQ :';3;;;;;1;2;;': ARR.CURRENCY :';1;;;;;;;;1;1;;'
+    END
+
+    RETURN
+
+DO.WRITE:
+
+    IF R.AA.ALM.FIXED THEN
+        ARR.REC.ID = ARR.ID :'_FIXED'
+        CALL F.WRITE(FN.AA.ALM.FIX,ARR.REC.ID,R.AA.ALM.FIXED)
+    END
+
+    IF R.AA.ALM.FLOAT THEN
+        ARR.REC.ID = ARR.ID :'_FLOAT'
+        CALL F.WRITE(FN.AA.ALM.FIX,ARR.REC.ID,R.AA.ALM.FLOAT)
+    END
+
+    IF R.AA.ALM.NONMATURE THEN
+        ARR.REC.ID = ARR.ID :'_NONMATURE_':BalanceType
+        CALL F.WRITE(FN.AA.ALM.FIX,ARR.REC.ID,R.AA.ALM.NONMATURE)
+    END
+
+    RETURN
+
+GET.ECB.RECORD:
+
+    R.ECB = ""
+    ERR.ECB = ""
+    CALL F.READ(FN.ECB,ACC.ID,R.ECB,F.ECB,ERR.ECB)
+
+    RETURN
+
+GET.CUSTOMER.RECORD:
+
+    R.CUSTOMER = ""
+    ERR.CUSTOMER = ""
+    CALL F.READ(FN.CUSTOMER, CUST.ID, R.CUSTOMER, F.CUSTOMER, ERR.CUSTOMER)
+
+    CUSTOMER.STATUS = R.CUSTOMER<EB.CUS.CUSTOMER.STATUS>
+
+    PROCESS.NONMATURE = 0
+
+    LOCATE CUSTOMER.STATUS IN CUSTOMER.STATUS.LIST<1,1> SETTING STATUS.POS THEN
+        PROCESS.NONMATURE = 1
+    END
+
+    RETURN
+
+GET.PROPERTY.RECORDS:
+
+    BALANCE.TYPE = 'TOTCOMMITMENT'
+
+    idPropertyClass = "TERM.AMOUNT"
+    idProperty = ""
+    effectiveDate = LAST.DATE
+
+    GOSUB GET.ARRANGEMENT.CONDITIONS
+    R.AA.TERM.AMOUNT = R.AA.CONDITIONS
+    COMMITMENT.AMOUNT = R.AA.TERM.AMOUNT<AA.AMT.AMOUNT>
+
+    idPropertyClass = "CHARGE"
+    idProperty      = "ANNUALCOMM"
+    GOSUB GET.ARRANGEMENT.CONDITIONS
+    R.ANNUAL.RECORD = R.AA.CONDITIONS
+    ANN.CMM = R.ANNUAL.RECORD<AA.CHG.LOCAL.REF,FIELD.POS<1,2>>
+
+    idPropertyClass = "ACCOUNT"
+    idProperty = ""
+    GOSUB GET.ARRANGEMENT.CONDITIONS
+    R.ACCOUNT.RECORD = R.AA.CONDITIONS
+
+    RETURN
+
+GET.ARRANGEMENT.CONDITIONS:
+
+    returnIds = ""
+    R.AA.CONDITIONS = ""
+    returnError = ""
+
+    CALL AA.GET.ARRANGEMENT.CONDITIONS(ARR.ID, idPropertyClass, idProperty, effectiveDate, returnIds, R.AA.CONDITIONS, returnError)
+    R.AA.CONDITIONS = RAISE(R.AA.CONDITIONS)
+
+    RETURN
+
+GET.INTEREST.DETAILS:
+
+    NEXT.RESET.PERIOD = R.INTEREST.RECORD<AA.INT.PERIODIC.RESET>
+    IF NOT(NEXT.RESET.PERIOD) THEN
+        NEXT.RESET.PERIOD = R.INTEREST.RECORD<AA.INT.PERIODIC.PERIOD>
+    END
+
+    RESET.FREQUENCY.INPUT = NEXT.RESET.PERIOD     ;***Reset period has been available only for period contract other not required to process
+    IF NEXT.RESET.PERIOD NE '' THEN
+        COMI = TODAY: NEXT.RESET.PERIOD
+        CALL CFQ
+        NEXT.RESET.DATE = COMI
+        NEXT.RESET.DATE = NEXT.RESET.DATE[1,8]
+        GOSUB RESET.FRQ
+    END
+
+    RETURN
+
+RESET.FRQ:
+
+    RESET.FREQUENCY = RESET.FREQUENCY.INPUT
+
+    CALL CAB.ALM.RESET.FREQ(RESET.FREQUENCY)
+
+    BEGIN CASE
+
+    CASE RESET.FREQUENCY EQ '12'
+        RESET.FRE.TYPE ='3'
+
+    CASE RESET.FREQUENCY EQ '3'
+        RESET.FRE.TYPE ='3'
+
+    CASE RESET.FREQUENCY EQ '6'
+        RESET.FRE.TYPE ='3'
+
+    CASE RESET.FREQUENCY EQ '1'
+        RESET.FRE.TYPE ='4'
+
+    END CASE
+
+    RETURN
+
+GET.INTEREST.RATE:
+
+    PRI.INT =''
+    PEN.INT =''
+
+    CALL CAB.GET.INTEREST.RATE(ARR.ID,PRI.INT,PEN.INT)
+
+    PRI.INTEREST = PRI.INT<1>
+    PRI.MIN.RATE = PRI.INT<2>
+    PRI.MAX.RATE = PRI.INT<3>
+
+    IF PRI.INTEREST EQ '' THEN
+        IF NOT(ID.ADD) THEN
+            ID.ADD = "FIXED"
+        END
+        GOSUB OTHER.INT.PROP
+    END
+
+    RETURN
+
+OTHER.INT.PROP:
+
+    idProperty = ""
+
+    LOCATE "DISCOUNTINT" IN ARRANGEMENT.PROPERTY.LIST<1,1> SETTING PROP.POS THEN
+        idProperty      = "DISCOUNTINT"
+    END ELSE
+        LOCATE "FLATINTEREST" IN ARRANGEMENT.PROPERTY.LIST<1,1> SETTING PROP.POS THEN
+            idProperty      = "FLATINTEREST"
+        END ELSE
+            LOCATE "EASYINSTLMENT" IN ARRANGEMENT.PROPERTY.LIST<1,1> SETTING PROP.POS THEN
+                idProperty      = "EASYINSTLMENT"
+            END
+        END
+
+    END
+
+    IF idProperty THEN
+        idPropertyClass = "CHARGE"
+
+        GOSUB GET.ARRANGEMENT.CONDITIONS
+        R.DISCOUNTINT.RECORD = R.AA.CONDITIONS
+
+        PRI.INTEREST = R.DISCOUNTINT.RECORD<AA.CHG.LOCAL.REF,FIELD.POS<1,1>>
+
+        IF PRI.INTEREST EQ '' THEN
+            PRI.INTEREST = '0'
+        END
+
+    END
+
+    RETURN
+
+GET.NEXT.DUE:
+
+*** Morethan One payment date
+
+    GOSUB GET.SCHEDULE.PROJECTOR
+
+    PAY.DATE = FUR.DUE.DATES  ;* DUE.DATES
+    PAY.PROP = FUR.DUE.PROPS  ;*DUE.PROPS
+
+    FIND.PROP='ACCOUNT'       ;*** Always consider this frequency as monthly
+
+    CALL CAB.PAY.FREQ.CNT(ARR.ID,FREQ.DET)
+
+    BEGIN CASE
+    CASE FREQ.DET EQ 'M'
+        DUE.FREQUENCY ='12'
+        DUE.TYPE.FRQ = '3'
+
+    CASE FREQ.DET EQ 'SA'
+        DUE.FREQUENCY ='6'
+        DUE.TYPE.FRQ = '4'
+
+    CASE FREQ.DET EQ 'Q'
+        DUE.FREQUENCY ='4'
+        DUE.TYPE.FRQ = '4'
+
+    CASE FREQ.DET EQ 'A'
+        DUE.FREQUENCY ='1'
+        DUE.TYPE.FRQ = '4'
+
+    CASE 1
+        DUE.FREQUENCY ='52'
+        DUE.TYPE.FRQ = '99'
+    END CASE
+
+    MNT.STD = R.ARRANGEMENT<AA.ARR.START.DATE>
+    MNT.STD = (MNT.STD[1,4] + 1) : MNT.STD[5,9]
+
+***Special case for migrated loan
+
+    NEXT.DATES = FUR.DUE.DATES
+    LOCATE TODAY IN NEXT.DATES BY "AR" SETTING NEX.POS THEN
+    END
+    NEXT.DUE.DATE = NEXT.DATES<NEX.POS>
+
+    GRACE.END.PERIOD =''
+    CAP.TYPE   = 'INTEREST.CAP'
+    NO.OF.DAYS = DCOUNT(FUR.DUE.DATES, FM)
+    Y.CAP.TYPE = '0'
+
+    FOR NO.CAP = 1 TO NO.OF.DAYS
+
+        LOCATE CAP.TYPE IN FUR.DUE.TYPES SETTING CP.POS THEN
+            GRACE.END.PERIOD = FUR.DUE.DATES<CP.POS>
+            FUR.DUE.TYPES<CP.POS> = ''
+            NO.CAP = CP.POS
+            Y.CAP.TYPE = '1'
+        END
+
+    NEXT NO.CAP
+
+    RETURN
+
+GET.PAYMENT.SCHEDULE.DETAILS:
+
+    idPropertyClass = "PAYMENT.SCHEDULE"
+    idProperty      = ""
+    GOSUB GET.ARRANGEMENT.CONDITIONS
+    R.PAYMENT.SCHEDULE.RECORD = R.AA.CONDITIONS
+
+    BEGIN CASE
+
+    CASE  R.PAYMENT.SCHEDULE.RECORD<AA.PS.PAYMENT.FREQ,1> NE ''
+        PAY.FRQ = R.PAYMENT.SCHEDULE.RECORD<AA.PS.PAYMENT.FREQ,1>
+
+    CASE  R.PAYMENT.SCHEDULE.RECORD<AA.PS.PAYMENT.FREQ,2> NE ''
+        PAY.FRQ = R.PAYMENT.SCHEDULE.RECORD<AA.PS.PAYMENT.FREQ,2>
+
+    CASE 1
+        PAY.FRQ ='e0Y e1M e0W o30D e0F'
+
+    END CASE
+
+    GEN.PAY.TYPE     = '6'
+    GEN.PAY.TYPE.VAL = '1'
+
+    IF ANN.CMM EQ '1' THEN    ;*If arrangement contains for amort fee in furture. ANNUALCOMM Method 1 alone
+        GEN.PAY.TYPE            = '6'
+        GEN.PAY.TYPE.VAL        = '1'
+        AMT.DUE.FREQUENCY       = '12'
+        AMT.DUE.TYPE.FRQ        = '3'
+        AMT.REP.NEXT.RESET.DATE = ''
+    END ELSE
+        GEN.PAY.TYPE            = '1'
+        GEN.PAY.TYPE.VAL        = ''
+        AMT.DUE.FREQUENCY       = ''
+        AMT.DUE.TYPE.FRQ        = ''
+        AMT.REP.NEXT.RESET.DATE = ''
+    END
+
+    RETURN
+
+PROCESS.FEE.FILE:
+
+*** Charge and Interest Amorted amount
+
+    PR.ID = PropertyName
+
+    PROS.LIST = R.ARRANGEMENT<AA.ARR.PROPERTY>
+    CONVERT SM TO FM IN PROS.LIST
+    PR.CNT = DCOUNT(PR.ID, FM)
+
+    ASSET.TYPE  = R.ECB<ECB.TYPE.SYSDATE>
+    CONVERT VM TO FM IN ASSET.TYPE
+    GL.ID = 1
+
+    LOCATE PR.ID<GL.ID> IN PROS.LIST SETTING POS.VAL THEN
+        BAL.TYPE = "ACC":PR.ID<GL.ID>
+
+        BALANCE.TYPE = "ACC":PR.ID<GL.ID>
+        GOSUB GET.BALANCE.AMT
+        CHG.AMT = BALANCE.AMOUNT
+
+        IF CHG.AMT GT 0 THEN
+            LOCATE BAL.TYPE IN ASSET.TYPE SETTING POS.FLD THEN
+                NO.ITEMS = DCOUNT(R.ECB<ECB.MAT.DATE,POS.FLD>, SM)
+            END
+
+            IF NO.ITEMS GE 1 THEN
+            END ELSE
+                BalanceType = BAL.TYPE :'-'
+                FINDSTR BalanceType IN ASSET.TYPE SETTING POS.FLD THEN
+                    NO.ITEMS = DCOUNT(R.ECB<ECB.MAT.DATE,POS.FLD>, SM)
+                END
+            END
+
+            IF NO.ITEMS GE 1 THEN
+                CHARGE.MATURITY.DATE = SORT(R.ECB<ECB.MAT.DATE,POS.FLD>)
+                CHG.MAT    = CHARGE.MATURITY.DATE<NO.ITEMS>
+                FEE.PAY.DT = ""
+                FEE.PAY.DT = LOAN.START.DATE      ;* LEFT(CHG.MAT,4)-1 : RIGHT(CHG.MAT,4)
+                CALL CAB.DATE.ALM(FEE.PAY.DT)
+
+                IF CHG.MAT THEN
+                    CALL CAB.DATE.ALM(CHG.MAT)
+                END
+
+                Y.REP.DATE = LAST.DATE
+                CALL CAB.DATE.ALM(Y.REP.DATE)
+
+                REC.KEY = ARR.ID
+                LOCATE REC.KEY IN PROCESSED.KEYS SETTING KEY.POS THEN
+                    REC.KEY = ARR.ID :'_':PR.ID<GL.ID>[1,1]
+                    LOCATE REC.KEY IN PROCESSED.KEYS SETTING KEY.POS THEN
+                        REC.KEY = ARR.ID :'_':PR.ID<GL.ID>[1,1] :PR.ID<GL.ID>[1]
+                    END
+                END
+
+                RECORD             = Y.REP.DATE :';': REC.KEY :';T24;':FEE.PAY.DT:';':Y.REP.DATE :';': CHG.MAT :';': CHG.AMT :';1;1'
+                PROCESSED.KEYS<-1> = REC.KEY
+                REC.ID             = ARR.ID : BAL.TYPE
+                CALL F.WRITE(FN.AA.ALM.FEE,REC.ID,RECORD)
+                NO.ITEMS = ""
+            END
+        END
+        FEE.FLAG  = '2'
+    END
+
+*    PROCESSED.KEYS = ""
+
+    RETURN
+
+GET.SCHEDULE.PROJECTOR:
+
+    FUR.CYCLE.DATE<1> = LAST.DATE
+    CALL AA.SCHEDULE.PROJECTOR(ARR.ID, SIM.REF, "",FUR.CYCLE.DATE, FUR.TOT.PAYMENT, FUR.DUE.DATES, FUR.DUE.TYPES, FUR.DUE.METHODS,FUR.DUE.TYPE.AMTS, FUR.DUE.PROPS, FUR.DUE.PROP.AMTS, FUR.DUE.OUTS)
+
+    RETURN
+
+BUILD.FORMAT.OUTPUT:
+
+    REP.TODAY    = EFFECTIVE.DATE
+    REP.MAT.DATE = LOAN.MATURITY.DATE
+    REP.VAL.DATE = VAL.DATE
+
+    REP.NEXT.DUE.DATE   = NEXT.DUE.DATE
+    REP.NEXT.RESET.DATE = NEXT.RESET.DATE
+    REP.GRACE.END.PERIOD= GRACE.END.PERIOD
+
+    CALL CAB.DATE.ALM(REP.TODAY)
+    CALL CAB.DATE.ALM(REP.MAT.DATE)
+    CALL CAB.DATE.ALM(REP.VAL.DATE)
+    CALL CAB.DATE.ALM(REP.NEXT.DUE.DATE)
+    CALL CAB.DATE.ALM(REP.NEXT.RESET.DATE)
+    CALL CAB.DATE.ALM(REP.GRACE.END.PERIOD)
+
+    PRI.INTEREST = PRI.INTEREST / 100
+*** Check the table
+
+    RETURN
+
+GET.INTEREST.BASIS:
+
+    BEGIN CASE
+    CASE INTEREST.BASIS EQ 'A'
+        Y.INTEREST.BASIS = '1'
+
+    CASE INTEREST.BASIS EQ 'B'
+        Y.INTEREST.BASIS = '2'
+
+    CASE INTEREST.BASIS EQ 'C'
+        Y.INTEREST.BASIS = '3'
+
+    CASE INTEREST.BASIS EQ 'D'
+        Y.INTEREST.BASIS = '1'
+
+    CASE 1
+        Y.INTEREST.BASIS = '2'
+    END CASE
+
+    RETURN
+
+
+VALID.AMOUNT:
+
+*** This line is because no need for showing the zero amount in report
+
+    IF CURRENT.ACCOUNT EQ '0' THEN
+        GL.LINE = ''
+    END
+
+    RETURN
+
+*************
+GET.SCHEDULE:
+*************
+
+    SCH.FLG = '0'
+
+    IF R.ACCOUNT.RECORD<AA.AC.CATEGORY> MATCHES '3008' :@VM: '3009' :@VM: '3010' :@VM: '3011' :@VM: '3012' :@VM: '3013' :@VM: '3014' :@VM: '3016' THEN
+        SCH.FLG = '1'
+    END
+
+    CHECK.SCH = R.AA.TERM.AMOUNT<AA.AMT.LOCAL.REF,FIELD.POS<2,1>>
+
+    IF R.ACCOUNT.RECORD<AA.AC.CATEGORY> EQ '3001' AND CHECK.SCH MATCHES '202' :@VM: '85' :@VM: '99' THEN
+        SCH.FLG = '1'
+    END
+
+    RETURN
+
+PROCESS.LOAN.SCHEDULE.DETAILS:
+
+    ANN.COM.EXISTS = 0
+
+    MAT.DATE  = LOAN.MATURITY.DATE
+
+    NO.DUES = DCOUNT(FUR.DUE.DATES, FM)
+
+    FOR i =1 TO NO.DUES
+
+        REC.ID = ARR.ID : FUR.DUE.DATES<i>
+
+        IF FUR.DUE.TYPES<i> NE 'ANNCOMM' THEN
+
+            IF SCH.FLG THEN
+                ACCOUNT.BAL= 0
+                GOSUB GET.DUE.AMT
+                IF ACCOUNT.BAL EQ '' THEN
+                    ACCOUNT.BAL = 0
+                END
+                SCH.REC<1> = ARR.ID
+                SCH.REC<2> = LAST.DATE
+                SCH.REC<3> = ACCOUNT.BAL
+                SCH.REC<4> = FUR.DUE.DATES<i>
+
+                CALL F.WRITE(FN.AA.SCH.ALM, REC.ID, SCH.REC)
+            END
+
+        END ELSE
+            ANN.COM.EXISTS = 1
+            IF FUR.TOT.PAYMENT<i> GT 0 THEN
+
+                SCH.REC<1> = ARR.ID
+                SCH.REC<2> = LAST.DATE
+                SCH.REC<3> = FUR.TOT.PAYMENT<i>
+                SCH.REC<4> = FUR.DUE.DATES<i>
+                YDATE = FUR.DUE.DATES<i>
+                YDATE = LEFT(YDATE,4) + 1 : RIGHT(YDATE,4)
+
+                IF YDATE GT MAT.DATE THEN
+                    SCH.REC<5> = FUR.DUE.DATES<i>
+                END ELSE
+                    SCH.REC<5> = YDATE
+                END ;**Amort till the maturity date dont do beyond that
+
+                CALL F.WRITE(FN.AA.AMT.ALM,REC.ID,SCH.REC)
+            END ELSE
+                ANN.CMM = ''  ;* if Annual comm does not exists in future
+            END
+        END
+
+    NEXT i
+
+    IF NOT(ANN.COM.EXISTS) THEN         ;* if Annual comm does not exists in future
+        ANN.CMM = ''
+    END
+
+    RETURN
+
+GET.DUE.AMT:
+
+    DUE.PROPS = FUR.DUE.PROPS<i>
+    CONVERT SM TO VM IN DUE.PROPS
+    CONVERT VM TO FM IN DUE.PROPS
+    CNT.PRI = DCOUNT(DUE.PROPS,FM)
+
+    DUE.PROPS.AMT = FUR.DUE.PROP.AMTS<i>
+    CONVERT SM TO VM IN DUE.PROPS.AMT
+    CONVERT VM TO FM IN DUE.PROPS.AMT
+    CNT.PRI.AMT = DCOUNT(DUE.PROPS.AMT,FM)
+
+    FOR J = 1 TO CNT.PRI
+        IF DUE.PROPS<J> EQ 'ACCOUNT' THEN
+            ACCOUNT.BAL = ACCOUNT.BAL + DUE.PROPS.AMT<J>
+        END
+    NEXT J
+
+    RETURN
+
+INIT:
+
+    SET.CUR.FLG      = '0'
+    GRACE.END.PERIOD = ''
+    NEXT.RESET.DATE  = ''
+    RESET.FREQUENCY  = ''
+    COUPON.FRQ       = 1
+    FEE.FLAG         = 1      ;* Assume always no fee.
+    EFFECTIVE.DATE   = LAST.DATE
+
+    RETURN
+
+GET.BALANCE.AMT:
+
+    REP.EFF.DATE   = LAST.DATE
+    BALANCE.AMOUNT = ""
+    RET.ERR1       = ""
+
+    CALL AA.GET.ECB.BALANCE.AMOUNT(LOAN.ACCOUNT, BALANCE.TYPE, REP.EFF.DATE, BALANCE.AMOUNT,RET.ERR1)
+
+    BALANCE.AMOUNT = ABS(BALANCE.AMOUNT)
+
+    RETURN
+
+CHANGE.DATE.FORMAT:
+
+    IF IN.DATE MATCHES "8N" THEN
+        TEMP.YEAR = LEFT(IN.DATE,4)
+        TEMP.MONTH = LEFT(RIGHT(IN.DATE,4),2)
+        TEMP.DATE = RIGHT(IN.DATE,2)
+
+        TEMP.DATE = TEMP.YEAR:'-':TEMP.MONTH :'-': TEMP.DATE
+        IN.DATE = TEMP.DATE
+
+    END
+
+    RETURN
+END

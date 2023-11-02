@@ -1,0 +1,40 @@
+    SUBROUTINE AA.EASY.INSTAL.CONSO
+*******************************************************************************
+*** Batch job is used for generating EASYINSTALMENT Loan Report
+***
+***
+*******************************************************************************
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE TT.BP I_EASY.INSTAL.COMMON
+
+
+    FN.EASY = 'F.CAB.AA.EASY.INST.LOAN'
+    F.EASY =''
+    CALL OPF(FN.EASY,F.EASY)
+
+    OPEN '','&SAVEDLISTS&' TO FN.SAVEDLISTS ELSE
+        ERR.OPEN ='EB.RTN.CANT.OPEN.&SAVEDLISTS'
+    END
+
+    REP.ID =''
+    REP.ID :="Arrangement Id,Customer Number,Customer Name,Supplier Branch Name,Supplier Branch Code,Supplier Number,Supplier Account,Supplier Name,Loan Current Balance,Product Name,"
+    REP.ID :="Grant Date,Branch Name,Branch Code,Aging Status,Total Commitment,Interest Rate,Loan Term,Supplier Net Amount,Maturity Date,Last Payment Date,Total Past dues,Loan Status"
+    REPORT.LIST<-1> = REP.ID
+
+    SELECT.CMD= ''
+    SELECT.CMD = "SELECT ": FN.EASY
+    CALL EB.READLIST(SELECT.CMD,SEL.LIST,LIST.NAME,KEY.LIST,SEL.ERR)
+
+    FOR I= 1 TO KEY.LIST
+        ARR.ID = SEL.LIST<I>
+        CALL F.READ(FN.EASY,ARR.ID,R.EASY,F.EASY,ERR.EASY)
+
+        REPORT.LIST<-1> =ARR.ID : ',' :R.EASY
+
+    NEXT I
+
+    WRITE REPORT.LIST TO FN.SAVEDLISTS,'Easy_Instalment_Report_':TODAY:'.csv'
+
+    RETURN

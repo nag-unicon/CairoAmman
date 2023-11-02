@@ -1,0 +1,19 @@
+*-----------------------------------------------------------------------------
+* <Rating>-2</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE AT.GET.NEXT.WORK.DATE(TXN.DATE,VALUE.DATE)
+*-----------------------------------------------------------------------------
+*DEVELOPED BY:  Nuha Tuhul
+*DEVELOPED ON:  04 Sep 2019
+*DESCRIPTION :  assign next working date to value date
+*-----------------------------------------------------------------------------
+
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INCLUDE ATM.BP I_AT.ISO.COMMON
+    $INCLUDE ATM.BP I_F.INTRF.MAPPING
+    $INCLUDE T24.BP I_F.DATES
+
+     VALUE.DATE = R.DATES(EB.DAT.NEXT.WORKING.DAY)
+
+    RETURN

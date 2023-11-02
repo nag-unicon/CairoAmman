@@ -1,0 +1,153 @@
+*-----------------------------------------------------------------------------
+* <Rating>638</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE ASP.REBUILD
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.ACCOUNT.STATEMENT
+    $INSERT I_F.STMT.ENTRY
+****************************
+MAIN:
+******
+    EXECUTE "COMO ON ASP.REBUILD"
+
+    GOSUB INITIALISE
+    GOSUB OPENFILE
+    GOSUB PROCESS
+    EXECUTE "COMO OFF ASP.REBUILD"
+    RETURN
+*************
+INITIALISE:
+*************
+    FN.ACCOUNT = 'F.ACCOUNT'
+    FV.ACCOUNT = " "
+    FN.STMT.PRINTED="F.STMT.PRINTED"
+    FV.STMT.PRINTED = " "
+    FN.ACCOUNT.STATEMENT = 'F.ACCOUNT.STATEMENT'
+    FV.ACCOUNT.STATEMENT = ''
+    FN.ACCT.STMT.PRINT = 'F.ACCT.STMT.PRINT'
+    FV.ACCT.STMT.PRINT = ''
+    FN.STMT.ENTRY = 'F.STMT.ENTRY'
+    FV.STMT.ENTRY = ''
+    R.STMT.PRINTED = ""
+    SEL.CMD = ""
+    SEL.LIST = ""
+    NO.OF.REC = ""
+    RET.CODE = ""
+    ASP.ID = ""
+    CALL OPF(FN.ACCOUNT,FV.ACCOUNT)
+    MNE.ID = FN.ACCOUNT[2,3]
+    SEL.CMD=''; SEL.LIST=''; NO.REC=''; POS=''; RET='';  ACC.ID=''
+    SEL.CMD = 'GET.LIST AC.ACC'
+    CALL EB.READLIST(SEL.CMD, SEL.LIST, '', NO.REC, RET)
+
+    RETURN
+***********
+OPENFILE:
+***********
+   * CALL OPF(FN.ACCOUNT,FV.ACCOUNT)
+    CALL OPF(FN.STMT.PRINTED,FV.STMT.PRINTED)
+    CALL OPF(FN.ACCOUNT.STATEMENT,FV.ACCOUNT.STATEMENT)
+    CALL OPF(FN.ACCT.STMT.PRINT,FV.ACCT.STMT.PRINT)
+    CALL OPF(FN.STMT.ENTRY,FV.STMT.ENTRY)
+    RETURN
+************
+PROCESS:
+************
+    R.ACCOUNT = ''; ASP.ID =''
+    LOOP
+        REMOVE TEMP.ID FROM SEL.LIST SETTING POS
+    WHILE TEMP.ID:POS
+        ASP.ID = FIELD(TEMP.ID,'*',1)
+        READU R.ACCOUNT FROM FV.ACCOUNT,ASP.ID THEN
+            PRINT "Processing account no : ":ASP.ID
+            FLAG=""
+            GOSUB CORRECT.PRINTED.ACCOUNTS
+        END
+        RELEASE FV.ACCOUNT,ASP.ID
+    REPEAT
+
+    RETURN
+
+CORRECT.PRINTED.ACCOUNTS:
+*========================
+    ASP.REC = '' ; R.ACCOUNT.STATEMENT = ''
+    READ ASP.REC FROM FV.ACCT.STMT.PRINT, ASP.ID ELSE ASP.REC = ''
+    READ R.ACCOUNT.STATEMENT FROM FV.ACCOUNT.STATEMENT,ASP.ID ELSE R.ACCOUNT.STATEMENT = ''
+    STMT.DATES = FIELDS(ASP.REC,"/",1,1)
+    STMT.BALS = FIELDS(ASP.REC,"/",2,1)
+    NEXT.DATE.NO = DCOUNT(STMT.DATES,FM)
+
+    FOR I = 1 TO NEXT.DATE.NO
+        CURRENT.DATE = STMT.DATES<I>
+        * IF CURRENT.DATE LT '20130401' THEN GOTO 100
+        PRINT " Pocessing rebuild for the Date :":CURRENT.DATE
+        IF NOT(FLAG) THEN
+            I.BAL = I+1
+            GOSUB INIT.STMT.BALS
+        END
+
+        SP.DATE = STMT.DATES<I>
+        IF SP.DATE GE TODAY THEN GOTO 100         ;* Do not calculate closing bal for the frequency scheduled for printing
+        SP.ID = ASP.ID:"-":SP.DATE
+        READ SP.REC FROM FV.STMT.PRINTED, SP.ID ELSE SP.REC = ''
+        CNT.STMT = DCOUNT(SP.REC,@FM)
+        SET.UPDATE = ''
+        STMT.BAL = ''
+        FOR X = 1 TO CNT.STMT
+            STMT.ID = SP.REC<X>
+            READ R.STMT.ENTRY FROM FV.STMT.ENTRY,STMT.ID ELSE R.STMT.ENTRY = ''
+            IF R.STMT.ENTRY<AC.STE.AMOUNT.FCY> THEN
+                STMT.BAL += R.STMT.ENTRY<AC.STE.AMOUNT.FCY>
+            END ELSE
+                STMT.BAL += R.STMT.ENTRY<AC.STE.AMOUNT.LCY>
+            END
+        NEXT X
+
+        OP.BAL = 0
+        IF STMT.BALS<I> THEN OP.BAL = STMT.BALS<I>
+        NEXT.FREQ = '' ; NEXT.FREQ.BAL = ''
+        NEXT.FREQ.BAL = OP.BAL + STMT.BAL
+        NEXT.FREQ = STMT.DATES<I+1>
+        IF NEXT.FREQ = '' THEN
+            R.ACCOUNT.STATEMENT<AC.STA.FQU1.LAST.BALANCE> = NEXT.FREQ.BAL
+            WRITE R.ACCOUNT.STATEMENT TO FV.ACCOUNT.STATEMENT,ASP.ID
+        END ELSE
+            IF NEXT.FREQ LT TODAY THEN
+                STMT.BALS<I+1> = NEXT.FREQ.BAL
+            END ELSE
+                STMT.BALS<I+1> = NEXT.FREQ.BAL
+                R.ACCOUNT.STATEMENT<AC.STA.FQU1.LAST.BALANCE> = NEXT.FREQ.BAL
+                WRITE R.ACCOUNT.STATEMENT TO FV.ACCOUNT.STATEMENT,ASP.ID
+            END
+        END
+
+100: NEXT I
+    IF ASP.REC THEN
+
+        LOCATE "PASSBOOK" IN STMT.DATES SETTING POSITION THEN
+            STMT.BALS<POSITION> = "0"
+        END
+        ASP.REC = SPLICE(STMT.DATES, "/", STMT.BALS)
+        WRITE ASP.REC TO FV.ACCT.STMT.PRINT,ASP.ID
+    END
+
+    RETURN
+INIT.STMT.BALS:
+    FOR J = I.BAL TO NEXT.DATE.NO
+        STMT.BALS<J> = 0
+    NEXT J
+    FLAG=1
+    RETURN
+END
+
+
+
+
+
+
+
+
+
+

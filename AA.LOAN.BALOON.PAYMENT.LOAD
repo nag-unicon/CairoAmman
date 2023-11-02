@@ -1,0 +1,56 @@
+    SUBROUTINE AA.LOAN.BALOON.PAYMENT.LOAD
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 03rd Jul 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Batch Routine
+* Attached to      : BNK/AA.LOAN.BALOON.PAYMENT
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This routine used to get the last two payment amount for AA Loan
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT TT.BP I_AA.LOAN.BALOON.PAYMENT.COMMON
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB OPEN.FILES
+
+*** </region>
+
+    RETURN
+
+*** </region>
+*** <region name= Open Files>
+
+OPEN.FILES:
+
+    FN.AA.ARRANGEMENT = "F.AA.ARRANGEMENT"
+    F.AA.ARRANGEMENT = ""
+    CALL OPF(FN.AA.ARRANGEMENT, F.AA.ARRANGEMENT)
+
+    FN.AA.BALOON.PAYMENT.LIST = "F.AA.BALOON.PAYMENT.LIST"
+    F.AA.BALOON.PAYMENT.LIST = ""
+    CALL OPF(FN.AA.BALOON.PAYMENT.LIST, F.AA.BALOON.PAYMENT.LIST)
+
+    RETURN
+
+END
