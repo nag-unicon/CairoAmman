@@ -1,0 +1,133 @@
+    SUBROUTINE CAB.B.CRD.CARD.SETTLMENT(ACCT.ID)
+************************************************************
+**Nuha Tuhul    2/2/2020         execlude Linc Branch
+**Nuha Tuhul    2/2/2020         execlude CHATBOT Branch
+**Nuha Tuhul    27/6/2022        replace 12000 to  12001
+************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.ACCOUNT
+    $INCLUDE BP I_F.CAB.VISA.BRANCH.ACCTS
+    $INCLUDE CRD_CARD.BP I_CAB.B.CRD.CARD.SETTLMENT.COMMON
+    $INCLUDE BP I_F.CAB.CREDIT.CARD.PARAM
+    $INCLUDE T24.BP I_F.STMT.ENTRY
+    $INCLUDE T24.BP I_F.FUNDS.TRANSFER
+    $INCLUDE CRD_CARD.BP I_F.CAB.CARD.EXCLUDE.CHANNELS
+
+**************
+* this routine will extract
+* the master cards payment
+* we need to exclude the transactions
+* from mobile banking and IB and specific
+* types of transactions
+***************
+
+    TOT.TRANS = ''; MAST.BANK.ID='';POS=''
+    CALL F.READ(FN.ACCOUNT,ACCT.ID,R.ACCOUNT,F.ACCOUNT,ACCT.ERR)
+    IF ACCT.ERR THEN
+        CALL EB.READ.HISTORY.REC(F.ACCOUNT.HIS,ACCT.ID,R.ACCOUNT,ERR.YERROR)
+        ACCT.ID = FIELD(ACCT.ID,';',1)
+    END
+    IF R.ACCOUNT<AC.CATEGORY> EQ '7002' THEN
+        CALL CACHE.READ(FN.CAB.VISA.BRANCH.ACCTS,R.ACCOUNT<AC.CO.CODE>,VISA.REC,VISA.ERR)
+        IF VISA.ERR THEN
+            VISA.REC<CAB.VISA.SETL.TRANS.CODE> = 'AC'
+        END
+        CALL GET.LOC.REF("ACCOUNT","CARD.ACCT",M.POS)
+        Y.MAST.CARD.ID = R.ACCOUNT<AC.LOCAL.REF,M.POS>
+        CALL F.READ(FN.ACCT.ENT.LWORK.DAY,ACCT.ID,ENT.LWORK.REC,F.ACCT.ENT.LWORK.DAY,LWORK.ERR)
+        IF ENT.LWORK.REC THEN
+            NO.REC = DCOUNT(ENT.LWORK.REC,FM)
+            FOR I = 1 TO NO.REC
+                STMT.ID = FIELD(ENT.LWORK.REC,FM,I)
+                CALL F.READ(FN.STMT.ENTRY,STMT.ID,STMT.REC,F.STMT.ENTRY,STMT.ERR)
+                Y.CHANNEL = FIELD(STMT.REC<AC.STE.INPUTTER>,"_",5)
+                IF (STMT.REC<AC.STE.RECORD.STATUS> NE 'REVE' ) THEN
+                    TXN.ID = FIELD(STMT.REC<AC.STE.TRANS.REFERENCE>,"\",1) : ';1'
+*************20180214 Ammar *******************************
+                    IF TXN.ID[1,2] EQ 'FT' THEN
+                        CALL F.READ(FN.FUNDS.TRANSFER,TXN.ID,FUNDS.REC,F.FUNDS.TRANSFER,FUNDS.ERR)
+                        IF FUNDS.REC<FT.TRANSACTION.TYPE> EQ 'ACMP' THEN
+                            RETURN
+                        END
+                    END
+*****************************************************
+*                    IF Y.CHANNEL MATCHES 'ARCIB':VM:'T24.MOB.BANK':VM:'CAB.IVR':VM:'OFS.EFAWA':VM:'CAB.LINC':VM:'CAB.CHATBOT' ELSE
+                    IF Y.CHANNEL MATCHES R.EXCL.CHANNELS<CARDEXCL.EXCLUDE.CHANNEL> ELSE
+                        IF  STMT.REC<AC.STE.AMOUNT.LCY> GT 0 THEN
+                            TOT.TRANS += STMT.REC<AC.STE.AMOUNT.LCY>
+                            GOSUB UPD.SEQFILE
+                        END
+                    END
+                END
+            NEXT
+            Y.BALANCE = R.ACCOUNT<AC.OPEN.CLEARED.BAL>
+            IF Y.BALANCE GT 0 AND TOT.TRANS GT 0 THEN
+                GOSUB BRANCH.PROCESS
+            END
+        END
+    END
+    RETURN
+***************
+BRANCH.PROCESS:
+***************
+    FT.REC = ''
+    FT.REC<FT.DEBIT.AMOUNT> = Y.BALANCE
+    FT.REC<FT.DEBIT.ACCT.NO>  = ACCT.ID
+    FT.REC<FT.TRANSACTION.TYPE> = VISA.REC<CAB.VISA.SETL.TRANS.CODE>
+    FT.REC<FT.DEBIT.CURRENCY>   = R.ACCOUNT<AC.CURRENCY>
+    FT.REC<FT.CREDIT.ACCT.NO>   = Y.MAST.CARD.ID
+    FT.REC<FT.ORDERING.BANK>    = R.ACCOUNT<AC.CO.CODE>
+
+    APP.NAME = FIELD(R.CARD.PARAM<CAB.CCMP.TRANS.VERSION>,",",1)
+    OFS.RECORD = ''
+    OFSVERSION = R.CARD.PARAM<CAB.CCMP.TRANS.VERSION>
+    NO.OF.AUTH = "0"
+    Y.FT.ID = ''
+
+    CALL OFS.BUILD.RECORD(APP.NAME, FUNCT, "PROCESS", OFSVERSION, "", NO.OF.AUTH,Y.FT.ID,FT.REC, OFS.RECORD)
+    OFS.REQ = OFS.RECORD
+
+    theResponse = ""
+    txnCommitted = ""
+    options = ''
+    options<1> = R.CARD.PARAM<CAB.CCMP.OFS.SOURCE>
+    options<4> = "HLD"
+    CALL OFS.CALL.BULK.MANAGER(options,OFS.REQ,theResponse,txnCommitted)
+    RES = theResponse
+    WRITESEQ  R.ACCOUNT<AC.CO.CODE> : ',' :  FT.REC<FT.DEBIT.ACCT.NO> : ',' : FT.REC<FT.DEBIT.AMOUNT> APPEND TO TRANS.FILE ELSE
+    END
+    RETURN
+************
+UPD.SEQFILE:
+************
+    BANK.ID = FMT('10200','L#20')
+!!    IF MAST.BANK.ID NE '' THEN
+!!        BANK.ID = FMT(MAST.BANK.ID,'L#20')
+!!    END
+!!    BANK.ID = FMT('10200','L#20')
+    TOD.DATE = 20:STMT.REC<AC.STE.DATE.TIME>[1,6]
+    BRANCH.ID = FMT(R.ACCOUNT<AC.CO.CODE>[6,4],'L#20')
+    TRANS.CODE = '12001'
+
+!!  TRANS.AMNT =  FMT((TOT.TRANS * 1000),'R%15')
+    TRANS.AMNT = FMT(STMT.REC<AC.STE.AMOUNT.LCY> * 1000,'R%15')
+    CCY.CODE = '400'
+    FEE.CD = FMT(FEE.CD,'l%10')
+    DC.DB = 'C'
+    IF R.ACCOUNT<AC.ALT.ACCT.ID,1>[1,2] EQ '01' THEN
+        MXP.ACCT = FMT(R.ACCOUNT<AC.ALT.ACCT.ID,1>,'L#24')
+    END ELSE
+        MXP.ACCT = FMT(ACCT.ID,'L#24')
+    END
+    SEQ.REC = BANK.ID:TOD.DATE:BRANCH.ID:TOD.DATE:TRANS.CODE:TRANS.AMNT:CCY.CODE:FEE.CD:DC.DB:MXP.ACCT:MXP.ACCT
+!!    IF MAST.BANK.ID NE '' THEN
+!!        WRITESEQ SEQ.REC APPEND TO M.SET.FILE ELSE
+!!        END
+!!    END ELSE
+    WRITESEQ SEQ.REC APPEND TO SET.FILE ELSE
+    END
+!!END
+    RETURN
+
+END

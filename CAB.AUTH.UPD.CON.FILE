@@ -1,0 +1,54 @@
+*-----------------------------------------------------------------------------
+* <Rating>-20</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AUTH.UPD.CON.FILE
+*****************************************************************************
+*Company   Name    : CABK BANK
+*Developed By      : TAM
+*Program   Name    : CAB.AUTH.UPD.CON.FILE
+*----------------------------------------------------------------------------
+*Description       : Input routine to update the contact file CHEQUE.ISSUE.CON.FILE
+*Linked With       :
+*ODR Number        :ODR-2011-10-0063
+*----------------------------------------------------------------------------
+*Modification Details:
+*=====================
+*
+*----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.CHEQUE.ISSUE
+    $INCLUDE CAB.BP I_F.CHEQUE.ISSUE.CON.FILE
+*----------------------------------------------------------------------------
+
+    GOSUB PROCESS
+
+    RETURN
+*-----------------------------------------------------------------------------
+PROCESS:
+*-------
+
+    FN.CHE.CON = "F.CHEQUE.ISSUE.CON.FILE"
+    F.CHE.CON = ""
+    CALL OPF(FN.CHE.CON,F.CHE.CON)
+
+    APP.ARR = ''
+    APP.ARR = 'CHEQUE.ISSUE'
+    FIELD.ARR = ''
+    FIELD.ARR = 'L.CHQ.NO.END':VM:'L.CHQ.START.NO'
+    FIELD.POS = ''
+
+    CALL MULTI.GET.LOC.REF(APP.ARR,FIELD.ARR,FIELD.POS)
+    CHQ.NO.END.POS = FIELD.POS<1,1>
+    L.CHQ.START.NO.POS = FIELD.POS<1,2>
+
+    R.CHE.CON<CICF.LAST.CHEQUE.NO> = R.NEW(CHEQUE.IS.LOCAL.REF)<1,CHQ.NO.END.POS>
+    R.CHE.CON<CICF.LAST.CHEQUE.SERIAL> = FIELD(ID.NEW,".",3)
+    R.CHE.CON<CICF.CHEQUE.START.NO> = R.NEW(CHEQUE.IS.LOCAL.REF)<1,L.CHQ.START.NO.POS>
+    R.CHE.CON<CICF.CHEQUE.TYPE> = FIELD(ID.NEW,".",1)
+    CALL F.WRITE(FN.CHE.CON,FIELD(ID.NEW,".",2),R.CHE.CON)
+
+    RETURN
+*------------------------------------------------------------------------------
+END

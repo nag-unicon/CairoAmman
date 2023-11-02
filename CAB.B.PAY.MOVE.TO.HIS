@@ -1,0 +1,87 @@
+*-----------------------------------------------------------------------------
+* <Rating>-40</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.PAY.MOVE.TO.HIS(PAY.DET.ID)
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.B.PAY.MOVE.TO.HIS
+*---------------------------------------------------------------
+*Description       : Multi threaded run routine that moves the payment details records
+*                  : of status paid and returned to history and delete the live records based on dates.
+*Linked With       : BATCH>BNK/CAB.B.PAY.MOVE.TO.HIS
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0064
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.TELLER
+    $INSERT I_F.FUNDS.TRANSFER
+    $INCLUDE CAB.BP I_F.PAYMENT.DETAILS
+    $INCLUDE CAB.BP I_CAB.B.PAY.MOVE.TO.HIS.COMMON
+
+    CALL F.READ(FN.PAY.DET,PAY.DET.ID,R.PAY.DET,F.PAY.DET,PAY.DET.ERR)
+    IF R.PAY.DET THEN
+        PAYMENT.STATUS = R.PAY.DET<PY.DET.PAYMENT.STATUS>
+        PAY.RETURN.DATE = R.PAY.DET<PY.DET.PAY.RETURN.DATE>
+        IF PAYMENT.STATUS EQ "RETURNED" THEN
+            CALL CDD("W",PAY.RETURN.DATE,TODAY,DIFF.DAYS)
+            GOSUB MOVE.HIS.RECORDS
+        END ELSE
+            GOSUB CHECK.NON.RETURN.STATUS
+        END
+    END
+
+    RETURN
+
+************************
+CHECK.NON.RETURN.STATUS:
+************************
+
+    TXN.REF.NO = R.PAY.DET<PY.DET.TXN.REF.NO>
+    IF TXN.REF.NO[1,2] EQ "FT" THEN
+        CALL F.READ(FN.FT,TXN.REF.NO,R.FT,F.FT,FT.ERR)
+        IF R.FT THEN
+            CHECK.DATE = R.FT<FT.DEBIT.VALUE.DATE>
+        END ELSE
+            TXN.REF.NO = TXN.REF.NO:";1"
+            CALL F.READ(FN.FTHIS,TXN.REF.NO,R.FTHIS,F.FTHIS,FT.ERR)
+            IF R.FTHIS THEN
+                CHECK.DATE = R.FTHIS<FT.DEBIT.VALUE.DATE>
+            END
+        END
+    END ELSE
+        CALL F.READ(FN.TELLER,TXN.REF.NO,R.TELLER,F.TELLER,TT.ERR)
+        IF R.TELLER THEN
+            CHECK.DATE = R.TELLER<TT.TE.VALUE.DATE.1>
+        END ELSE
+            TXN.REF.NO = TXN.REF.NO:";1"
+            CALL F.READ(FN.TELLER.HIS,TXN.REF.NO,R.TELLERHIS,F.TELLER.HIS,TT.ERR)
+            IF R.TELLERHIS THEN
+                CHECK.DATE = R.TELLERHIS<TT.TE.VALUE.DATE.1>
+            END
+        END
+    END
+    CALL CDD("W",CHECK.DATE,TODAY,DIFF.DAYS)
+    GOSUB MOVE.HIS.RECORDS
+
+    RETURN
+
+*****************
+MOVE.HIS.RECORDS:
+*****************
+
+    IF DIFF.DAYS GT "3" THEN
+        R.PAY.DET<PY.DET.RECORD.STATUS> = "MAT"
+        HIST.ID = PAY.DET.ID:";":R.PAY.DET<PY.DET.CURR.NO>
+        CALL F.WRITE(FN.PAY.DET.HIS,HIST.ID,R.PAY.DET)
+        CALL F.DELETE(FN.PAY.DET,PAY.DET.ID)
+    END
+
+    RETURN
+END

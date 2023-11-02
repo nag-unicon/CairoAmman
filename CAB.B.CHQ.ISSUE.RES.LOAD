@@ -1,0 +1,55 @@
+*-----------------------------------------------------------------------------
+* <Rating>-20</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.CHQ.ISSUE.RES.LOAD
+*-------------------------------------------------------------------------------------------------------------------
+* Company   Name    : CABK Bank
+* Developed By      : Temenos Application Management
+* Reference         : ODR-2011-10-0063
+*-------------------------------------------------------------------------------------------------------------------
+* Program Name      : CAB.B.CHQ.ISSUE.RES
+* Author            : Abdul Rahman. J
+* Date              : 23 Jan 2012
+*-------------------------------------------------------------------------------------------------------------------
+* Description       :
+* Type              : BATCH Routine
+* Linked with       : Attached to the BATCH record
+* In  Parameter     : None
+* Out Parameter     : None
+*-------------------------------------------------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.CHEQUE.ISSUE
+    $INCLUDE CAB.BP I_CAB.CHQ.RESERVED.COMMON
+    $INCLUDE CAB.BP I_F.CHEQUE.ISSUE.RESERVED
+
+    FN.CHEQUE.ISSUE = 'F.CHEQUE.ISSUE'
+    F.CHEQUE.ISSUE = ''
+    R.CHQ.ISS = ''
+    CALL OPF(FN.CHEQUE.ISSUE,F.CHEQUE.ISSUE)
+    FN.CHEQUE.ISSUE.RESERVED = 'F.CHEQUE.ISSUE.RESERVED'
+    F.CHEQUE.ISSUE.RESERVED = ''
+    CALL OPF(FN.CHEQUE.ISSUE.RESERVED,F.CHEQUE.ISSUE.RESERVED)
+    APP.ARR = ''
+    APP.ARR = 'CHEQUE.ISSUE'
+    FLD.ARR = 'L.CUST.ID':VM:'L.ACCT.NO':VM:'L.CHQ.BOK.TITLE':VM:'L.CHQ.TYPE':VM:'L.NOOFBOOKS':VM:'L.NO.OF.LEAVES':VM:
+    FLD.ARR := 'L.CHQ.START.NO':VM:'L.CHQ.NO.END':VM:'L.RECEIVINGBRN':VM:'L.MOBILE.NO':VM:'L.PAPER.TYPE':VM:'L.PRINTING.TYPE':VM:'L.CUST.NAME.TYP':VM:'L.AUTH.PER'
+
+    CALL MULTI.GET.LOC.REF(APP.ARR,FLD.ARR,FLD.POS)
+    CUST.ID.POS = FLD.POS<1,1>
+    ACCT.NO.POS = FLD.POS<1,2>
+    CHQ.BOK.TITLE.POS = FLD.POS<1,3>
+    CHQ.TYPE.POS = FLD.POS<1,4>
+    NOOFBOOKS.POS = FLD.POS<1,5>
+    NO.OF.LEAVES.POS = FLD.POS<1,6>
+    CHQ.START.NO.POS = FLD.POS<1,7>
+    CHQ.NO.END.POS = FLD.POS<1,8>
+    RECEIVINGBRN.POS = FLD.POS<1,9>
+    MOBILE.NO.POS = FLD.POS<1,10>
+    PAPER.TYPE.POS = FLD.POS<1,11>
+    PRINTING.TYPE.POS = FLD.POS<1,12>
+    CUST.NAME.TYP.POS = FLD.POS<1,13>
+    AUTH.PER.POS = FLD.POS<1,14>
+
+    RETURN
+END

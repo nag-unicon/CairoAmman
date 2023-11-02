@@ -1,0 +1,60 @@
+*-----------------------------------------------------------------------------
+* <Rating>-10</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.SCHEDULE.INTIALISE(COMPANY.ID)
+*--------------------------------------------------------------------------------------------------------------
+* Date -
+* Desc - This routine is to generate the date wise disbursement activity for all Loans
+* by Branch wise.
+* Attached Enquiry -
+* Author
+*
+*----------------------------------------------------------------------------------------------------------------
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT T24.BP I_ENQUIRY.COMMON
+    $INSERT T24.BP I_F.ACCOUNT
+    $INSERT T24.BP I_F.COMPANY
+    $INSERT T24.BP I_F.CUSTOMER
+    $INSERT TEST.BP I_CAB.SCHEDULE.DUE.COMMON
+
+    IF COMPANY.ID THEN
+        ID.COMPANY = COMPANY.ID
+        CALL LOAD.COMPANY(ID.COMPANY)
+    END
+
+    GOSUB INIT
+
+    RETURN
+***-------------------------------------------------------------------
+
+*****
+INIT:
+*****
+
+    FN.REP.FLAT = "F.REPAY.LIST"
+    F.REP.FLAT = ""
+    CALL OPF(FN.REP.FLAT,F.REP.FLAT)
+
+    FN.ACCOUNT = "F.ACCOUNT"
+    F.ACCOUNT = ""
+    CALL OPF(FN.ACCOUNT,F.ACCOUNT)
+    R.ACCOUNT = ""; ACC.ERR = ""
+
+    FN.CUST ="F.CUSTOMER"
+    F.CUST = ""
+    CALL OPF(FN.CUST,F.CUST)
+    R.CUSTOMER = "" ;CUS.ERR = ""
+
+    FN.COMPANY = "F.COMPANY"
+    F.COMPANY = ""
+    CALL OPF(FN.COMPANY,F.COMPANY)
+    RR.COMPANY = "" ;COM.ERR = ""
+
+    FN.AA.SCHEDULED.ACTIVITY = 'F.AA.SCHEDULED.ACTIVITY'
+    F.AA.SCHEDULED.ACTIVITY  = ''
+    CALL OPF(FN.AA.SCHEDULED.ACTIVITY,F.AA.SCHEDULED.ACTIVITY)
+
+    SEL.CMD = "" ;SEL.LIST = "" ; SEL.CNT = "" ;SEL.ERR = ""
+
+    RETURN

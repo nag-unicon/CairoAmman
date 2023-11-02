@@ -1,0 +1,86 @@
+*-----------------------------------------------------------------------------------
+* <Rating>-12</Rating>
+*-----------------------------------------------------------------------------------
+    SUBROUTINE CAB.AUTH.UPD.MOF.LOG
+*-----------------------------------------------------------------------------------
+* Subroutine Type : AUTHORISATION ROUTINE
+* Attached to     :
+* Attached as     :
+* Primary Purpose :
+*
+* Incoming:
+* ---------
+*
+*
+* Outgoing:
+* ---------
+*
+*
+* Error Variables:
+* ----------------
+*
+*
+*-----------------------------------------------------------------------------------
+* Modification History:
+*
+*-----------------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_GTS.COMMON
+    $INSERT I_F.FUNDS.TRANSFER
+    $INSERT I_F.EB.FREE.MESSAGE
+    $INSERT I_F.CAB.MOF.ACCT.LOG.TODAY
+
+    GOSUB OPEN
+    GOSUB UPDATE.LOG
+
+    RETURN
+
+********
+OPEN:
+********
+
+
+    FN.CAB.MOF.ACCT.LOG.TODAY = 'F.CAB.MOF.ACCT.LOG.TODAY'
+    F.CAB.MOF.ACCT.LOG.TODAY = ''
+    CALL OPF(FN.CAB.MOF.ACCT.LOG.TODAY,F.CAB.MOF.ACCT.LOG.TODAY)
+
+    RETURN
+
+************
+UPDATE.LOG:
+************
+
+    Y.MOF.ACCOUT = ''
+    IF APPLICATION EQ 'FUNDS.TRANSFER' THEN
+        Y.MOF.ACCOUNT = R.NEW(FT.DEBIT.ACCT.NO)
+        Y.ACCT.CO.CODE = R.NEW(FT.CO.CODE)
+    END ELSE
+        Y.MOF.ACCOUNT = R.NEW(EB.FM.OUR.REFERENCE)
+        Y.ACCT.CO.CODE = R.NEW(EB.FM.CO.CODE)
+    END
+
+    Y.CAB.MOF.ACCT.LOG.TODAY=''
+    R.CAB.MOF.ACCT.LOG.TODAY=''
+    E.CAB.MOF.ACCT.LOG.TODAY=''
+    Y.ERR.MESSAGE=''
+    Y.CAB.MOF.ACCT.LOG.TODAY = Y.MOF.ACCOUNT:".":TODAY
+    CALL F.READ(FN.CAB.MOF.ACCT.LOG.TODAY,Y.CAB.MOF.ACCT.LOG.TODAY,R.CAB.MOF.ACCT.LOG.TODAY,F.CAB.MOF.ACCT.LOG.TODAY,E.CAB.MOF.ACCT.LOG.TODAY)
+    IF R.CAB.MOF.ACCT.LOG.TODAY THEN
+        R.CAB.MOF.ACCT.LOG.TODAY<MOF.LOG.MOF.ACCT.ID,-1> = Y.MOF.ACCOUNT
+        R.CAB.MOF.ACCT.LOG.TODAY<MOF.LOG.MOF.STATUS,-1> = "SUCCESS"
+        R.CAB.MOF.ACCT.LOG.TODAY<MOF.LOG.MOF.TXN,-1> = ID.NEW
+        R.CAB.MOF.ACCT.LOG.TODAY<MOF.LOG.MOF.MESSAGE,-1> = Y.ERR.MESSAGE
+    END ELSE
+        R.CAB.MOF.ACCT.LOG.TODAY<MOF.LOG.COM.CODE> = Y.ACCT.CO.CODE
+        R.CAB.MOF.ACCT.LOG.TODAY<MOF.LOG.TXN.DATE> = TODAY
+        R.CAB.MOF.ACCT.LOG.TODAY<MOF.LOG.MOF.ACCT.ID> = Y.MOF.ACCOUNT
+        R.CAB.MOF.ACCT.LOG.TODAY<MOF.LOG.MOF.STATUS> = "SUCCESS"
+        R.CAB.MOF.ACCT.LOG.TODAY<MOF.LOG.MOF.TXN> = ID.NEW
+        R.CAB.MOF.ACCT.LOG.TODAY<MOF.LOG.MOF.MESSAGE> = Y.ERR.MESSAGE
+    END
+    CALL F.WRITE(FN.CAB.MOF.ACCT.LOG.TODAY,Y.CAB.MOF.ACCT.LOG.TODAY,R.CAB.MOF.ACCT.LOG.TODAY)
+
+    RETURN
+
+END

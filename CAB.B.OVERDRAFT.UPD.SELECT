@@ -1,0 +1,43 @@
+*-----------------------------------------------------------------------------
+* <Rating>-20</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.OVERDRAFT.UPD.SELECT
+*---------------------------------------------------------------------
+* Company   Name    : CABK Bank
+* Developed By      : Temenos Application management
+* Reference         : ODR-2012-01-0044
+* Program Name      : CAB.B.OVERDRAFT.UPD.SELECT
+*---------------------------------------------------------------------
+*
+* Description       : This routine is used to select the Account file
+*                     with a specific overdraft category accounts.
+* Type              : BATCH Routine
+* Linked with       : Attached to the BATCH>BNK/CAB.B.OVERDRAFT.UPD
+* In  Parameter     : None
+* Out Parameter     : None
+*---------------------------------------------------------------------
+* Modification History
+* Reference     Date
+*
+*---------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.DATES
+    $INSERT I_F.ACCOUNT
+    $INCLUDE CAB.BP I_CAB.B.OVERDRAFT.UPD.COMMON
+    DEBUG
+    GOSUB SEL.FILE
+    RETURN
+*----------------------------------------------------------------------
+SEL.FILE:
+*----------
+
+    CHANGE VM TO ' ' IN Y.OD.CATEG
+    SEL.CMD = 'SELECT ':FN.ACCOUNT:' WITH CATEGORY EQ ':Y.OD.CATEG:
+* CALL EB.READLIST(SEL.CMD,SEL.LIST,'',NO.OF.REC,S.ERR)
+    SEL.LIST = 090000050554
+    CALL BATCH.BUILD.LIST('',SEL.LIST)
+
+    RETURN
+*-----------------------------------------------------------------------
+END

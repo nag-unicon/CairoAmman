@@ -1,0 +1,977 @@
+*-----------------------------------------------------------------------------
+* <Rating>-126</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.OVERDRAFT.UPD(Y.ID)
+*---------------------------------------------------------------------
+* Company   Name    : CABK Bank
+* Developed By      : Temenos Application management
+* Reference         : ODR-2012-01-0044
+* Program Name      : CAB.B.OVERDRAFT.UPD
+*---------------------------------------------------------------------
+*
+* Description       : This routine is a COB routine is to handle the
+*                     overdraft processing for accounts.
+* Type              : BATCH Routine
+* Linked with       : Attached to the BATCH>BNK/CAB.B.OVERDRAFT.UPD
+* In  Parameter     : Y.ID
+* Out Parameter     : None
+*---------------------------------------------------------------------
+* Modification History
+* Reference     Date
+*
+*---------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.CUSTOMER
+    $INSERT I_GTS.COMMON
+    $INSERT I_F.DATES
+    $INSERT I_F.LIMIT
+    $INSERT I_F.STMT.ENTRY
+    $INSERT I_F.STMT.ACCT.DR
+    $INSERT I_F.STMT.ACCT.CR
+    $INSERT I_DAS.STMT.ACCT.CR
+    $INSERT I_DAS.STMT.ACCT.DR
+    $INSERT I_F.ACCT.ACTIVITY
+    $INCLUDE CAB.BP I_CAB.B.OVERDRAFT.UPD.COMMON
+    $INCLUDE CAB.BP I_F.CABK.OVERDUE.LOCAL.CATEGORY
+    $INCLUDE CAB.BP I_F.CABK.OVERDUE.PARAMETER
+    $INCLUDE CAB.BP I_F.CABK.OVERDUE.OD.ACCOUNT
+    $INCLUDE CAB.BP I_F.CABK.CHEQUE.RETURNS
+    DEBUG
+    GOSUB TEMP.UPD
+
+    RETURN
+*----------------------------------------------------------------------
+TEMP.UPD:
+*-------
+
+    DEBIT.INT.FLAG = '1'
+    Y.AC.ID = Y.ID
+    CALL F.READ(FN.ACCOUNT,Y.AC.ID,R.ACCOUNT,F.ACCOUNT,AC.ERR)
+    IF R.ACCOUNT THEN
+        Y.CUS = R.ACCOUNT<AC.CUSTOMER>
+        Y.CURR = R.ACCOUNT<AC.CURRENCY>
+        Y.ONL.BAL = R.ACCOUNT<AC.ONLINE.ACTUAL.BAL>
+        Y.LIM.REF = R.ACCOUNT<AC.LIMIT.REF>
+        Y.CAP.DATE.CR.INT = R.ACCOUNT<AC.CAP.DATE.CR.INT>
+        Y.CAP.DATE.DR.INT = R.ACCOUNT<AC.CAP.DATE.DR.INT>
+    END ELSE
+        MESSAGE.INFO<1> = 'CAB.B.OVERDRAFT.UPD'
+        MESSAGE.INFO<4> = 'Cannot find the Account record:':Y.ID
+        CALL FATAL.ERROR(MESSAGE.INFO)
+        RETURN
+    END
+    LIAB.RET = ""
+    CALL F.READ(FN.CUSTOMER,Y.CUS,R.CUSTOMER,F.CUSTOMER,CUS.ERR)
+    IF R.CUSTOMER THEN
+        LIAB.RET = R.CUSTOMER<EB.CUS.CUSTOMER.LIABILITY>
+    END
+    LIAB.NO = LIAB.RET
+    IF LIAB.NO AND LIAB.NO NE Y.CUS THEN
+        Y.LIMIT.ID = LIAB.NO:'.':FMT(Y.LIM.REF,"10'0'R")
+    END ELSE
+        Y.LIMIT.ID = Y.CUS:'.':FMT(Y.LIM.REF,"10'0'R")
+    END
+    IF Y.LIM.REF THEN
+        GOSUB CHECK.ACCOUNT
+    END
+
+    RETURN
+*--------------------------------------------------------------------
+CHECK.ACCOUNT:
+*-------------
+
+    GOSUB SUB.CHECK.ACCOUNT
+    GOSUB CHECK.AGE.STATUS
+
+    RETURN
+
+*--------------------------------------------------------------------
+SUB.CHECK.ACCOUNT:
+*------------------
+
+    CALL F.READ(FN.LIMIT,Y.LIMIT.ID,R.LIMIT,F.LIMIT,LIM.ERR)
+    IF R.LIMIT THEN
+        Y.CR.LINE = R.LIMIT<LI.CREDIT.LINE>
+        Y.EXP.DATE = R.LIMIT<LI.EXPIRY.DATE>
+        Y.LIM.ST.DATE = R.LIMIT<LI.ONLINE.LIMIT.DATE>
+        ALLOCAT.AMT = R.LIMIT<LI.MAXIMUM.TOTAL>
+    END
+    LIM.ERR = ''
+*--changed for LI32CR start----------
+    IF Y.EXP.DATE EQ '' OR Y.LIM.ST.DATE EQ '' OR ALLOCAT.AMT EQ '' THEN
+        CALL F.READ(FN.LIMIT,Y.CR.LINE,R.LIMIT,F.LIMIT,LIM.ERR)
+        IF R.LIMIT THEN
+            Y.EXP.DATE = R.LIMIT<LI.EXPIRY.DATE>
+            Y.LIM.ST.DATE = R.LIMIT<LI.ONLINE.LIMIT.DATE>
+            ALLOCAT.AMT = R.LIMIT<LI.MAXIMUM.TOTAL>
+        END
+    END
+*---li32 end--------------------------
+    LIMIT.REF = Y.LIM.REF
+    ALLOCATED = ''
+    AVAILABLE = ''
+    CALL GET.ACCOUNT.LIMIT.AMTS(LIAB.NO, Y.CUS, Y.LIM.REF, Y.CURR, ALLOCATED, AVAILABLE)
+    IF Y.ONL.BAL LT 0 AND AVAILABLE LT "0" AND AVAILABLE NE "" THEN
+        Y.AVL.AMT = AVAILABLE
+        Y.AVL.AMT.EXCESS = -(AVAILABLE)
+        EXCESS.PER = (Y.AVL.AMT.EXCESS/ALLOCATED)*100
+        CALL EB.ROUND.AMOUNT(Y.CCY,EXCESS.PER,"","")
+*--- below lines are commented for li32 CR
+*        IF EXCESS.PER LT Y.OD.PERCENT THEN
+*            RETURN
+*        END
+*--- above lines are commented for li32 CR
+    END ELSE
+        IF AVAILABLE EQ 0 AND ALLOCATED EQ "" AND Y.ONL.BAL LT 0 THEN
+            EXCESS.PER = "EXPIRED"
+        END ELSE
+            CALL F.READ(FN.CABK.OVERDUE.OD.ACCOUNT,Y.AC.ID,R.OVER.OD,F.CABK.OVERDUE.OD.ACCOUNT,OVER.ERR)
+            IF R.OVER.OD THEN
+                CALL F.DELETE(FN.CABK.OVERDUE.OD.ACCOUNT,Y.AC.ID)
+            END
+            RETURN
+        END
+    END
+*---LI32 CR start
+*---for getting the date back of 3 months
+    Y.TODAY = TODAY
+    Y.DATE.FREQ = TODAY:'M0301'
+    COMI = Y.DATE.FREQ
+    CALL CBQ
+    Y.BCK.DATE.FREQ = COMI
+    Y.BCK.DATE = Y.BCK.DATE.FREQ[1,8]
+    Y.40STAT.DATE = Y.BCK.DATE.FREQ[1,8]
+    Y.AC.TOT.INT = ''
+*---LI32 CR end
+    GOSUB STMT.AC.DR
+    Y.THR.INT.DR = Y.AC.TOT.INT.DR
+
+    Y.TO.YY.MM = Y.TODAY[1,6]
+    Y.ONE.MN.FREQ = TODAY:'M0101'
+    COMI = Y.ONE.MN.FREQ
+    CALL CBQ
+    Y.ONE.MNTH.FREQ = COMI
+    Y.ONE.MN.DATE = Y.ONE.MNTH.FREQ[1,6]
+*----LI32 CR start
+    Y.TWO.MN.FREQ = TODAY:'M0201'
+    COMI = Y.TWO.MN.FREQ
+    CALL CBQ
+    Y.TWO.MNTH.FREQ = COMI
+    Y.TWO.MN.DATE = Y.TWO.MNTH.FREQ[1,6]
+    Y.30STAT.DATE = Y.TWO.MNTH.FREQ[1,6]
+*----li32 CR end
+    Y.YEAR.MNTH = Y.TO.YY.MM:FM:Y.ONE.MN.DATE:FM:Y.TWO.MN.DATE:FM:Y.BCK.DATE[1,6]
+    Y.TOT.TURN.CRED = ''
+
+    GOSUB ACCT.ACTIVITY
+    Y.THR.TURN.CRED = Y.TOT.TURN.CRED
+    Y.THR.RET.AMT = Y.RET.AMT
+
+    GOSUB STMT.AC.CR
+    Y.THR.INT.CR = Y.AC.TOT.INT.CR
+
+    YID.LIST = ''
+    OPENING.BAL = ''
+    ER = ''
+
+*----li32 cr start
+    Y.BCK.DATE = Y.TWO.MNTH.FREQ[1,8]
+*----li32 cr end
+    GOSUB EB.ACCT.ENTRY
+    Y.THR.REV.AMT = Y.REV.AMT
+*----li32 cr start
+    IF DEBIT.INT.FLAG EQ "1" THEN
+        Y.BCK.DATE = Y.30STAT.DATE
+    END
+    IF DEBIT.INT.FLAG EQ "2" THEN
+        Y.BCK.DATE = Y.40STAT.DATE
+    END
+*--Account entries for int.service check
+    GOSUB EB.ACCT.ENTRY
+    Y.THR.REV.AMT.DEBIT.MNTH = Y.REV.AMT
+*--Account entries for int.service check
+    Y.INT.COVER1 = Y.THR.INT.DR.DEBIT.MNTH - ( Y.THR.TURN.CRED.DEBIT.MNTH - Y.THR.INT.CR.DEBIT.MNTH - Y.THR.RET.AMT.DEBIT.MNTH - Y.THR.REV.AMT.DEBIT.MNTH )
+*----li32 cr end
+    Y.INT.COVER = Y.THR.INT.DR - ( Y.THR.TURN.CRED - Y.THR.INT.CR - Y.THR.RET.AMT - Y.THR.REV.AMT )
+
+    GOSUB TOT.FIELD.UPD
+    GOSUB UPD.OD.ACCOUNT
+
+    RETURN
+*-----------------------------------------------------------------------------
+TOT.FIELD.UPD:
+*-------------
+
+    Y.LIM.ST.DATE = R.LIMIT<LI.ONLINE.LIMIT.DATE>
+*---Amended for LI32CR start------
+*---Checking the limit start date for one year if its above one year
+    Y.LIM.ST.DATE.MNTH = Y.LIM.ST.DATE[1,6]
+    CHECK.LIM.ST.DATE = Y.TODAY:"M1101"
+    COMI = CHECK.LIM.ST.DATE
+    CALL CBQ
+    CHECK.LIM.ST.DATE = COMI[1,8]
+    CHECK.LIM.ST.DATE = CHECK.LIM.ST.DATE[1,6]
+    IF Y.LIM.ST.DATE.MNTH LE CHECK.LIM.ST.DATE THEN
+        LIM.YY.MM = CHECK.LIM.ST.DATE
+        COMI = Y.TODAY:"M12":Y.TODAY[7,2]
+        CALL CBQ
+        Y.BCK.DATE = COMI[1,8]
+    END ELSE
+        Y.BCK.DATE = Y.LIM.ST.DATE
+        LIM.YY.MM = Y.LIM.ST.DATE[1,6]
+    END
+*----LI32CR end---------------------
+    Y.AC.FREQ = Y.TODAY:'M0101'
+    Y.MM = Y.TODAY[1,6]
+*    LIM.YY.MM = Y.LIM.ST.DATE[1,6]
+    Y.YEAR.MNTH.AC<-1> = Y.AC.FREQ[1,6]
+    LOOP
+    WHILE LIM.YY.MM LT Y.MM
+        COMI = Y.AC.FREQ
+        CALL CBQ
+        Y.ACCT.MNTH.FREQ = COMI
+        Y.YEAR.MNTH.AC<-1> = Y.ACCT.MNTH.FREQ[1,6]
+        Y.MM = Y.ACCT.MNTH.FREQ[1,6]
+        Y.AC.FREQ = Y.ACCT.MNTH.FREQ[1,8]:'M0101'
+    REPEAT
+    Y.YEAR.MNTH = ''
+    Y.YEAR.MNTH = Y.YEAR.MNTH.AC
+
+    GOSUB ACCT.ACTIVITY
+    Y.TOT.TURN.OVER = Y.TOT.TURN.CRED
+    T.TOT.CHQRET.AMT = Y.RET.AMT
+
+*    Y.BCK.DATE = Y.LIM.ST.DATE
+    GOSUB EB.ACCT.ENTRY
+    Y.TOTAL.REV.AMT = Y.REV.AMT
+
+    GOSUB STMT.AC.CR
+    Y.TOAL.INT.CREDIT = Y.AC.TOT.INT.CR
+
+    Y.TURNOVER.RATIO = (Y.TOT.TURN.OVER - Y.TOTAL.REV.AMT - T.TOT.CHQRET.AMT - Y.TOAL.INT.CREDIT)/ALLOCAT.AMT
+
+    RETURN
+*-----------------------------------------------------------------------------
+STMT.AC.DR:
+*----------
+
+    DR.INT.CNT = DCOUNT(Y.CAP.DATE.DR.INT,VM)
+    CNT = 1
+    LOOP
+    WHILE CNT LE DR.INT.CNT
+        IF Y.CAP.DATE.DR.INT<1,CNT> GE Y.BCK.DATE THEN
+            GOSUB SUB.STMT.AC.DR
+        END ELSE
+            CNT = DR.INT.CNT + 1
+        END
+    REPEAT
+*---li32 CR start
+*    Y.THR.INT.DR.DEBIT.MNTH = Y.THR.INT.DR.DEBIT.MNTH + Y.AC.TOT.INT.DR
+*---li32 CR end
+
+    RETURN
+
+*-------------------------------------------------------------------------------
+SUB.STMT.AC.DR:
+*--------------
+
+    STMT.DR.ID = Y.AC.ID:"-":Y.CAP.DATE.DR.INT<1,CNT>
+    CALL F.READ(FN.STMT.ACCT.DR,STMT.DR.ID,R.STMT.ACCT.DR,F.STMT.ACCT.DR,STMT.DR.ERR)
+    IF R.STMT.ACCT.DR THEN
+        Y.TOT.INT = R.STMT.ACCT.DR<IC.STMDR.TOTAL.INTEREST>
+*---li32 CR start
+*--- Below piece of code for calculating 2 and 3 months values
+        IF FIELD(STMT.DR.ID,'-',2)[1,6] NE Y.BCK.DATE[1,6] THEN
+            Y.AC.TOT.INT.DR += Y.TOT.INT
+        END
+        IF FIELD(STMT.DR.ID,'-',2)[1,6] NE TODAY[1,6] THEN
+            Y.THR.INT.DR.DEBIT.MNTH += Y.TOT.INT
+            IF FIELD(STMT.DR.ID,'-',2)[1,6] EQ Y.BCK.DATE[1,6] THEN
+                DEBIT.INT.FLAG = '2'
+            END
+        END
+*---li32 CR end
+    END
+    CNT = CNT + 1
+
+    RETURN
+
+*-----------------------------------------------------------------------------
+STMT.AC.CR:
+*----------
+
+    CR.INT.CNT = DCOUNT(Y.CAP.DATE.CR.INT,VM)
+    CNT = 1
+    LOOP
+    WHILE CNT LE CR.INT.CNT
+        IF Y.CAP.DATE.CR.INT<1,CNT> GE Y.BCK.DATE THEN
+            GOSUB SUB.STMT.AC.CR
+        END ELSE
+            CNT = CR.INT.CNT + 1
+        END
+    REPEAT
+*---li32 CR start
+*    Y.THR.INT.CR.DEBIT.MNTH = Y.AC.TOT.INT.CR + Y.THR.INT.CR.DEBIT.MNTH
+*---li32 CR start
+
+    RETURN
+
+*------------------------------------------------------------------------------
+SUB.STMT.AC.CR:
+*---------------
+
+    STMT.CR.ID = Y.AC.ID:"-":Y.CAP.DATE.CR.INT<1,CNT>
+    CALL F.READ(FN.STMT.ACCT.CR,STMT.CR.ID,R.STMT.ACCT.CR,F.STMT.ACCT.CR,STMT.CR.ERR)
+    IF R.STMT.ACCT.CR THEN
+        GOSUB CALC.SUB.STMT.AC.CR
+    END
+    CNT = CNT + 1
+
+    RETURN
+
+*-----------------------------------------------------------------------------------
+CALC.SUB.STMT.AC.CR:
+*-------------------
+
+    Y.TOT.INT.CR = R.STMT.ACCT.CR<IC.STMCR.TOTAL.INTEREST>
+*---li32 CR start
+*--- Below piece of code for calculating 2 and 3 months values
+    IF FIELD(STMT.CR.ID,'-',2)[1,6] NE Y.BCK.DATE[1,6] THEN
+        Y.AC.TOT.INT.CR += Y.TOT.INT.CR
+    END
+    IF FIELD(STMT.CR.ID,'-',2)[1,6] NE TODAY[1,6] THEN
+        IF FIELD(STMT.CR.ID,'-',2)[1,6] EQ Y.BCK.DATE[1,6] THEN
+            IF DEBIT.INT.FLAG EQ '2' THEN
+                Y.THR.INT.CR.DEBIT.MNTH += Y.TOT.INT.CR
+            END
+        END ELSE
+            Y.THR.INT.CR.DEBIT.MNTH += Y.TOT.INT.CR
+        END
+    END
+*---li32 CR end
+
+    RETURN
+
+*-----------------------------------------------------------------------------
+EB.ACCT.ENTRY:
+*------------
+
+    CALL EB.ACCT.ENTRY.LIST(Y.AC.ID,Y.BCK.DATE,Y.TODAY,YID.LIST,OPENING.BAL,ER)
+    Y.LCY.AMOUNT = ''
+    Y.FCY.AMOUNT = ''
+    Y.REV.AMT = ''
+    LOOP
+        REMOVE STMT.ID FROM YID.LIST SETTING STMT.POS
+    WHILE STMT.ID:STMT.POS
+        CALL F.READ(FN.STMT.ENTRY,STMT.ID,R.STMT.ENTRY,F.STMT.ENTRY,STMT.ERR)
+        Y.REV.MARK = R.STMT.ENTRY<AC.STE.REVERSAL.MARKER>
+        Y.LCY.AMT = R.STMT.ENTRY<AC.STE.AMOUNT.LCY>
+        Y.F.AMT = Y.LCY.AMT[1,1]
+        IF ((Y.REV.MARK EQ 'R') AND (Y.F.AMT EQ '-' )) THEN
+            IF Y.CURR EQ LCCY THEN
+                Y.LCY.AMOUNT = R.STMT.ENTRY<AC.STE.AMOUNT.LCY>
+                Y.LCY.AMOUNT = -(Y.LCY.AMOUNT)
+                Y.REV.AMT += Y.LCY.AMOUNT
+            END ELSE
+                Y.FCY.AMOUNT = R.STMT.ENTRY<AC.STE.AMOUNT.FCY>
+                Y.FCY.AMOUNT = -(Y.FCY.AMOUNT)
+                Y.REV.AMT += Y.FCY.AMOUNT
+            END
+        END
+    REPEAT
+
+    RETURN
+*-----------------------------------------------------------------------------
+ACCT.ACTIVITY:
+*-------------
+
+    Y.TOT.TURN.CRED = ''
+    Y.TURN.CRDT = ''
+    Y.TURNOVER.CR = ''
+    Y.RET.AMOUNT = ''
+    Y.RET.AMT  =''
+    LOOP
+        REMOVE Y.YY.MM FROM Y.YEAR.MNTH SETTING YY.POS
+    WHILE Y.YY.MM:YY.POS
+        Y.ACCT.ACTIVITY.ID = Y.AC.ID:'-':Y.YY.MM
+        CALL F.READ(FN.ACCT.ACTIVITY,Y.ACCT.ACTIVITY.ID,R.ACCT.ACTIVITY,F.ACCT.ACTIVITY,ACT.ERR)
+*--- Below piece of code for calculating 2 and 3 months values
+        IF R.ACCT.ACTIVITY THEN
+            GOSUB SUB.ACCT.ACTIVITY
+        END
+        CALL F.READ(FN.CABK.CHEQUE.RETURNS,Y.ACCT.ACTIVITY.ID,R.CABK.CHEQUE.RETURNS,F.CABK.CHEQUE.RETURNS,CAB.CHQ.RTN.ERR)
+        IF R.CABK.CHEQUE.RETURNS THEN
+            GOSUB SUB.CHEQUE.RETURNS
+        END
+    REPEAT
+*---li32 CR start
+*    Y.THR.TURN.CRED.DEBIT.MNTH = Y.TOT.TURN.CRED - Y.THR.TURN.CRED.DEBIT.MNTH
+*    Y.THR.RET.AMT.DEBIT.MNTH = Y.RET.AMT - Y.THR.RET.AMT.DEBIT.MNTH
+*---li32 CR end
+
+    RETURN
+
+*------------------------------------------------------------------------------
+SUB.ACCT.ACTIVITY:
+*-----------------
+
+    Y.TURNOVER.CR = R.ACCT.ACTIVITY<IC.ACT.TURNOVER.CREDIT>
+    Y.T.CR.CNT = DCOUNT(Y.TURNOVER.CR,VM)
+    CNT = '1'
+    LOOP
+    WHILE CNT LE Y.T.CR.CNT
+        GOSUB CALC.SUB.ACCT.ACTIVITY
+    REPEAT
+
+    RETURN
+
+*----------------------------------------------------------------------------
+CALC.SUB.ACCT.ACTIVITY:
+*----------------------
+
+    Y.TURN.CRDT = FIELD(Y.TURNOVER.CR,VM,CNT)
+*---li32 CR start
+*--- Below piece of code for calculating 2 and 3 months values
+    IF FIELD(Y.ACCT.ACTIVITY.ID,'-',2)[1,6] NE Y.BCK.DATE[1,6] THEN
+        Y.TOT.TURN.CRED += Y.TURN.CRDT
+    END
+    IF FIELD(Y.ACCT.ACTIVITY.ID,'-',2)[1,6] NE TODAY[1,6] THEN
+        IF FIELD(Y.ACCT.ACTIVITY.ID,'-',2)[1,6] EQ Y.BCK.DATE[1,6] THEN
+            IF DEBIT.INT.FLAG EQ '2' THEN
+                Y.THR.TURN.CRED.DEBIT.MNTH += Y.TURN.CRDT
+            END
+        END ELSE
+            Y.THR.TURN.CRED.DEBIT.MNTH += Y.TURN.CRDT
+        END
+    END
+    CNT +=1
+*---li32 CR end
+
+    RETURN
+*-----------------------------------------------------------------------------
+SUB.CHEQUE.RETURNS:
+*------------------
+
+    Y.RET.AMOUNT = R.CABK.CHEQUE.RETURNS<CHEQ.RET.RET.AMOUNT>
+    Y.T.RET.CNT = DCOUNT(Y.RET.AMOUNT,VM)
+    CNT = '1'
+    LOOP
+    WHILE CNT LE Y.T.RET.CNT
+        GOSUB CALC.SUB.CHEQUE.RETURNS
+    REPEAT
+
+    RETURN
+
+*-------------------------------------------------------------------------------
+CALC.SUB.CHEQUE.RETURNS:
+*------------------------
+
+*---li32 CR start
+*--- Below piece of code for calculating 2 and 3 months values
+    IF FIELD(Y.ACCT.ACTIVITY.ID,'-',2)[1,6] NE Y.BCK.DATE[1,6] THEN
+        Y.RET.AMT +=  FIELD(Y.RET.AMOUNT,VM,CNT)
+    END
+    IF FIELD(Y.ACCT.ACTIVITY.ID,'-',2)[1,6] NE TODAY[1,6] THEN
+        IF FIELD(Y.ACCT.ACTIVITY.ID,'-',2)[1,6] EQ Y.BCK.DATE[1,6] THEN
+            IF DEBIT.INT.FLAG EQ '2' THEN
+                Y.THR.RET.AMT.DEBIT.MNTH += FIELD(Y.RET.AMOUNT,VM,CNT)
+            END
+        END ELSE
+            Y.THR.RET.AMT.DEBIT.MNTH += FIELD(Y.RET.AMOUNT,VM,CNT)
+        END
+    END
+*---li32 CR end
+    CNT +=1
+
+    RETURN
+
+*-----------------------------------------------------------------------------
+UPD.OD.ACCOUNT:
+*--------------
+
+    IF EXCESS.PER EQ "EXPIRED" THEN
+        EXCESS.PER.1 = ""
+    END ELSE
+        EXCESS.PER.1 = EXCESS.PER
+    END
+    CALL F.READ(FN.CABK.OVERDUE.OD.ACCOUNT,Y.AC.ID,R.CABK.OVERDUE.OD.ACCOUNT,F.CABK.OVERDUE.OD.ACCOUNT,CABK.OD.ERR)
+
+    R.CABK.OVERDUE.OD.ACCOUNT<OVER.OD.LIMIT.ID>            = Y.LIMIT.ID
+    R.CABK.OVERDUE.OD.ACCOUNT<OVER.OD.EXPIRY.DATE>         = Y.EXP.DATE
+    R.CABK.OVERDUE.OD.ACCOUNT<OVER.OD.ACCT.BALANCE>        = Y.ONL.BAL
+    R.CABK.OVERDUE.OD.ACCOUNT<OVER.OD.LIMIT.AMOUNT>        = Y.AVL.AMT
+    R.CABK.OVERDUE.OD.ACCOUNT<OVER.OD.EXCESS>              = EXCESS.PER.1
+    R.CABK.OVERDUE.OD.ACCOUNT<OVER.OD.DEBIT.INT.3MNTH>     = Y.THR.INT.DR
+    R.CABK.OVERDUE.OD.ACCOUNT<OVER.OD.CRED.TRNOVER.3MNTH>  = Y.THR.TURN.CRED
+    R.CABK.OVERDUE.OD.ACCOUNT<OVER.OD.CREDIT.INT.3MNTH>    = Y.THR.INT.CR
+    R.CABK.OVERDUE.OD.ACCOUNT<OVER.OD.REV.CREDIT.3MNTH>    = Y.THR.REV.AMT
+    R.CABK.OVERDUE.OD.ACCOUNT<OVER.OD.CHQ.RETNS.CR.3MNTH>  = Y.THR.RET.AMT
+    R.CABK.OVERDUE.OD.ACCOUNT<OVER.OD.INT.COVER>           = Y.INT.COVER
+    R.CABK.OVERDUE.OD.ACCOUNT<OVER.OD.CRED.TRNOVER.TOTAL>  = Y.TOT.TURN.OVER
+    R.CABK.OVERDUE.OD.ACCOUNT<OVER.OD.REV.CREDIT.TOTAL>    = Y.TOTAL.REV.AMT
+    R.CABK.OVERDUE.OD.ACCOUNT<OVER.OD.CREDIT.INT.TOTAL>    = Y.TOAL.INT.CREDIT
+    R.CABK.OVERDUE.OD.ACCOUNT<OVER.OD.CHQ.RETNS.CR.TOTAL>  = T.TOT.CHQRET.AMT
+    R.CABK.OVERDUE.OD.ACCOUNT<OVER.OD.TURNOVER.RATIO>      = Y.TURNOVER.RATIO
+    R.CABK.OVERDUE.OD.ACCOUNT<OVER.OD.ONLINE.LIMIT.DATE>   = Y.LIM.ST.DATE
+    CALL F.WRITE(FN.CABK.OVERDUE.OD.ACCOUNT,Y.AC.ID,R.CABK.OVERDUE.OD.ACCOUNT)
+
+    RETURN
+*----------------------------------------------------------------------------
+CHECK.AGE.STATUS:
+*---------------
+
+    Y.OD.DATE = R.ACCOUNT<AC.LOCAL.REF,L.OV.DATE.POS>
+    L.AGING.STATUS = R.ACCOUNT<AC.LOCAL.REF,L.AG.S.POS>
+    L.AGE.DAYS = R.ACCOUNT<AC.LOCAL.REF,L.AG.D.POS>
+    Y.ONL.BAL = R.ACCOUNT<AC.ONLINE.ACTUAL.BAL>
+    DEBUG
+    IF L.AGING.STATUS EQ '' AND Y.ONL.BAL LT 0 THEN
+        L.AGING.STATUS = 'NULL'
+        IF Y.EXP.DATE LT TODAY THEN
+            GOSUB LIM.TURN.CHECK
+        END ELSE
+            IF EXCESS.PER LT Y.OD.PERCENT THEN
+                GOSUB LIM.SERVE.CHK
+            END
+        END
+        IF LIMIT.TURN.FLAG NE 'Y' OR INT.SRV.FLAG NE 'Y' AND EXCESS.PER GT Y.OD.PERCENT AND EXCESS.PER NE 'EXPIRED' THEN
+            R.AGE.D = 1
+            R.OV.DATE = TODAY
+            R.ST.CHNGE = 'Y'
+            R.PREV.STATUS = L.AGING.STATUS
+            Y.ACC.DATA = 'ACCOUNT,OVR/I/PROCESS,,':Y.AC.ID:',L.AGING.DAYS::=':R.AGE.D:',L.PREVS.STATUS::=':R.PREV.STATUS:',L.STATUS.CHANGE::=':R.ST.CHNGE:',L.OVERDUE.DATE::=':R.OV.DATE:
+            ADAY = 1
+            GOSUB DAYS.CHECK
+            GOSUB POST.OFS.MSG
+        END
+    END
+    IF L.AGING.STATUS NE '' THEN
+        GOSUB OVERDUE.PROCESS
+    END
+    RETURN
+
+*----------------------------------------------------------------------------
+OVERDUE.PROCESS:
+*---------------
+    DEBUG
+    IF ((Y.ONL.BAL GE 0) OR (EXCESS.PER LT Y.OD.PERCENT)) THEN
+*--LI32 CR start
+        IF Y.INT.COVER LE 0 AND Y.INT.COVER NE '' THEN
+            GOSUB SUB.OVERDUE.PROCESS
+        END ELSE
+            GOSUB AGE.UPDATE
+        END
+*--LI32 CR start
+    END ELSE
+        GOSUB AGE.UPDATE
+    END
+
+    RETURN
+
+*----------------------------------------------------------------------------
+LIMIT.CHECK:
+*-----------
+
+    IF Y.EXP.DATE LT TODAY THEN
+        GOSUB LIM.TURN.CHECK
+    END ELSE
+        GOSUB LIM.SERVE.CHK
+    END
+
+    RETURN
+*--------------------------------------------------------------------------
+LIM.TURN.CHECK:
+*--------------
+    DEBUG
+    ST.POS = ''
+    IF Y.TURNOVER.RATIO LT '2' AND Y.TURNOVER.RATIO NE "" THEN
+        R.AGE.STATUS = '30'
+        LOCATE '30' IN Y.ST.CODE<1,1> SETTING ST.POS THEN
+            Y.THR.MIN.DAYS = R.CABK.OVERDUE.PARAMETER<OVER.PAR.MIN.DAYS,ST.POS>
+        END
+        R.AGE.D = Y.THR.MIN.DAYS
+        R.OV.DATE = TODAY
+        R.ST.CHNGE = 'Y'
+        LIMIT.TURN.FLAG = 'Y'
+        Y.ACC.DATA = 'ACCOUNT,OVR/I/PROCESS,,':Y.AC.ID:',L.AGING.DAYS::=':R.AGE.D:',L.STATUS.CHANGE::=':R.ST.CHNGE:',L.OVERDUE.DATE::=':R.OV.DATE:',L.AGING.STATUS::=':R.AGE.STATUS:',L.PREVS.STATUS::=':L.AGING.STATUS
+        GOSUB POST.OFS.MSG
+    END
+
+    RETURN
+*---------------------------------------------------------------------------
+LIM.SERVE.CHK:
+*------------
+    DEBUG
+    Y.LIM.ST.DATE = R.LIMIT<LI.ONLINE.LIMIT.DATE>
+    Y.TODAY = TODAY
+    Y.L.FREQ = Y.LIM.ST.DATE:'M03':Y.LIM.ST.DATE[7,2]
+
+    COMI = Y.L.FREQ
+    CALL CFQ
+    Y.THR.LIM.START = COMI[1,8]
+
+    IF TODAY GE Y.THR.LIM.START THEN
+        GOSUB SUB.LIM.SERVE.CHK
+    END
+
+    RETURN
+
+*------------------------------------------------------------------------------
+SUB.LIM.SERVE.CHK:
+*------------------
+    DEBUG
+    IF DEBIT.INT.FLAG EQ '2' AND Y.INT.COVER1 GT '0' AND Y.INT.COVER1 NE '' THEN
+        R.AGE.STATUS = '40'
+        ST.POS = ''
+        LOCATE '40' IN Y.ST.CODE<1,1> SETTING ST.POS THEN
+            Y.FOR.MIN.DAYS = R.CABK.OVERDUE.PARAMETER<OVER.PAR.MIN.DAYS,ST.POS>
+        END
+        R.AGE.D = Y.FOR.MIN.DAYS
+*----LI32 CR start
+*            R.OV.DATE = TODAY
+        R.OV.DATE = Y.40STAT.DATE
+*----LI32 CR end
+        R.ST.CHNGE = 'Y'
+        INT.SRV.FLAG = 'Y'
+        Y.ACC.DATA = 'ACCOUNT,OVR/I/PROCESS,,':Y.AC.ID:',L.AGING.DAYS::=':R.AGE.D:',L.STATUS.CHANGE::=':R.ST.CHNGE:',L.OVERDUE.DATE::=':R.OV.DATE:',L.AGING.STATUS::=':R.AGE.STATUS:',L.PREVS.STATUS::=':L.AGING.STATUS
+        GOSUB POST.OFS.MSG
+        GOSUB REWRITE.CABK.OVERDUE.OD.ACCOUNT
+    END
+
+    IF DEBIT.INT.FLAG EQ '1' AND Y.INT.COVER1 GT '0' AND Y.INT.COVER1 NE '' THEN
+        R.AGE.STATUS = '30'
+        ST.POS = ''
+        LOCATE '30' IN Y.ST.CODE<1,1> SETTING ST.POS THEN
+            Y.FOR.MIN.DAYS = R.CABK.OVERDUE.PARAMETER<OVER.PAR.MIN.DAYS,ST.POS>
+        END
+        R.AGE.D = Y.FOR.MIN.DAYS
+*----LI32 CR start
+*            R.OV.DATE = TODAY
+        R.OV.DATE = Y.40STAT.DATE
+*----LI32 CR end
+        R.ST.CHNGE = 'Y'
+        INT.SRV.FLAG = 'Y'
+        Y.ACC.DATA = 'ACCOUNT,OVR/I/PROCESS,,':Y.AC.ID:',L.AGING.DAYS::=':R.AGE.D:',L.STATUS.CHANGE::=':R.ST.CHNGE:',L.OVERDUE.DATE::=':R.OV.DATE:',L.AGING.STATUS::=':R.AGE.STATUS:',L.PREVS.STATUS::=':L.AGING.STATUS
+        GOSUB POST.OFS.MSG
+        GOSUB REWRITE.CABK.OVERDUE.OD.ACCOUNT
+    END
+
+    RETURN
+
+*---------------------------------------------------------------------------
+DAYS.CHECK:
+*----------
+
+    DYS.CNT = DCOUNT(Y.MIN.DAYS,VM)
+    D.CNT = 1
+    Y.FLAG = ''
+    LOOP
+    WHILE D.CNT LE DYS.CNT AND Y.FLAG NE 'Y'
+        MA.DAYS = FIELD(Y.MAX.DAYS,VM,D.CNT)
+
+        IF ADAY LE MA.DAYS THEN
+            R.AGE.STATUS = FIELD(Y.ST.CODE,VM,D.CNT)
+            Y.ACC.DATA:=',L.AGING.STATUS::=':R.AGE.STATUS
+            Y.FLAG = 'Y'
+        END
+        D.CNT +=1
+    REPEAT
+
+    RETURN
+
+*------------------------------------------------------------------------------
+SUB.OVERDUE.PROCESS:
+*-------------------
+    DEBUG
+    IF L.AGING.STATUS EQ 'PastDue1' OR L.AGING.STATUS EQ 'PastDue2' OR L.AGING.STATUS EQ 30 THEN
+        R.AGE.D = 'NULL'
+        R.AGE.STATUS = 'NULL'
+        R.OV.DATE = 'NULL'
+        R.PREV.STATUS = L.AGING.STATUS
+        R.ST.CHNGE = 'Y'
+        Y.ACC.DATA = 'ACCOUNT,OVR/I/PROCESS,,':Y.AC.ID:',L.AGING.DAYS::=':R.AGE.D:',L.STATUS.CHANGE::=':R.ST.CHNGE:',L.OVERDUE.DATE::=':R.OV.DATE:',L.AGING.STATUS::=':R.AGE.STATUS:',L.PREVS.STATUS::=':R.PREV.STATUS
+        GOSUB POST.OFS.MSG
+    END
+    IF L.AGING.STATUS EQ 40 THEN
+        GOSUB CHECK.L.AGING.STATUS.40
+    END
+    IF L.AGING.STATUS EQ 50 OR L.AGING.STATUS EQ 60 THEN
+        IF Y.OD.DATE THEN
+            R.AGE.D = 'NULL'
+            R.OV.DATE = 'NULL'
+            R.ST.CHNGE = "N"
+            Y.ACC.DATA = 'ACCOUNT,OVR/I/PROCESS,,':Y.AC.ID:',L.AGING.DAYS::=':R.AGE.D:',L.OVERDUE.DATE::=':R.OV.DATE:',L.STATUS.CHANGE::=':R.ST.CHNGE
+            GOSUB POST.OFS.MSG
+        END
+    END
+    IF L.AGING.STATUS EQ "" THEN
+        Y.ACC.DATA = "ACCOUNT,OVR/I/PROCESS,,":Y.AC.ID:",L.STATUS.CHANGE::=N"
+    END
+
+    RETURN
+
+*-----------------------------------------------------------------------------
+CHECK.L.AGING.STATUS.40:
+*-----------------------
+
+    IF Y.OD.DATE THEN
+        L.AGIN.DAYS = 'C'
+        CALL CDD('',Y.OD.DATE,R.DATES(EB.DAT.NEXT.WORKING.DAY),L.AGE.DAYS)
+        LOCATE '40' IN Y.ST.CODE<1,1> SETTING FR.POS THEN
+            Y.FOR.MAX.DAYS = R.CABK.OVERDUE.PARAMETER<OVER.PAR.MAX.DAYS,FR.POS>
+        END
+        IF L.AGE.DAYS LE Y.FOR.MAX.DAYS THEN
+            R.AGE.D = 'NULL'
+            R.AGE.STATUS = 'NULL'
+            R.OV.DATE = 'NULL'
+            R.PREV.STATUS = L.AGING.STATUS
+            R.ST.CHNGE = 'Y'
+            Y.ACC.DATA = 'ACCOUNT,OVR/I/PROCESS,,':Y.AC.ID:',L.AGING.DAYS::=':R.AGE.D:',L.STATUS.CHANGE::=':R.ST.CHNGE:',L.OVERDUE.DATE::=':R.OV.DATE:',L.AGING.STATUS::=':R.AGE.STATUS:',L.PREVS.STATUS::=':R.PREV.STATUS
+            GOSUB POST.OFS.MSG
+        END ELSE
+            R.AGE.D = 'NULL'
+            R.OV.DATE = 'NULL'
+            R.ST.CHNGE = "N"
+            R.PREV.STATUS = L.AGING.STATUS
+            Y.ACC.DATA = 'ACCOUNT,OVR/I/PROCESS,,':Y.AC.ID:',L.AGING.DAYS::=':R.AGE.D:',L.OVERDUE.DATE::=':R.OV.DATE:',L.STATUS.CHANGE::=':R.ST.CHNGE:',L.PREVS.STATUS::=':R.PREV.STATUS
+            GOSUB POST.OFS.MSG
+        END
+    END
+
+    RETURN
+
+*-----------------------------------------------------------------------------
+AGE.UPDATE:
+*----------
+
+    IF L.AGING.STATUS EQ 'PastDue1' THEN
+        GOSUB LIMIT.CHECK
+
+        IF LIMIT.TURN.FLAG NE 'Y' OR INT.SRV.FLAG NE 'Y' THEN
+
+            Y.OD.DATE = R.ACCOUNT<AC.LOCAL.REF,L.OV.DATE.POS>
+            Y.AGE.D = R.ACCOUNT<AC.LOCAL.REF,L.AG.D.POS>
+            L.AGIN.DAYS = 'C'
+            CALL CDD('',Y.OD.DATE,R.DATES(EB.DAT.NEXT.WORKING.DAY),L.AGIN.DAYS)
+            R.AGE.D = L.AGIN.DAYS
+            Y.ACC.DATA = 'ACCOUNT,OVR/I/PROCESS,,':Y.AC.ID:',L.AGING.DAYS::=':R.AGE.D:
+            ADAY = L.AGIN.DAYS
+            Y.FLAG = ''
+            GOSUB DAYS.CHECK
+            IF L.AGING.STATUS NE R.AGE.STATUS THEN
+                R.PREV.STATUS = L.AGING.STATUS
+                R.ST.CHNGE = 'Y'
+                Y.ACC.DATA:= ',L.PREVS.STATUS::=':R.PREV.STATUS:',L.STATUS.CHANGE::=':R.ST.CHNGE:
+            END ELSE
+                R.ST.CHNGE = 'N'
+                Y.ACC.DATA:= ',L.STATUS.CHANGE::=':R.ST.CHNGE:
+            END
+            GOSUB POST.OFS.MSG
+        END
+    END
+    IF L.AGING.STATUS EQ 'PastDue2' THEN
+        GOSUB LIMIT.CHECK
+        IF LIMIT.TURN.FLAG NE 'Y' OR INT.SRV.FLAG NE 'Y' THEN
+
+            Y.OD.DATE = R.ACCOUNT<AC.LOCAL.REF,L.OV.DATE.POS>
+            Y.AGE.D = R.ACCOUNT<AC.LOCAL.REF,L.AG.D.POS>
+            L.AGIN.DAYS = 'C'
+            CALL CDD('',Y.OD.DATE,R.DATES(EB.DAT.NEXT.WORKING.DAY),L.AGIN.DAYS)
+            R.AGE.D = L.AGIN.DAYS
+            Y.ACC.DATA = 'ACCOUNT,OVR/I/PROCESS,,':Y.AC.ID:',L.AGING.DAYS::=':R.AGE.D:
+            ADAY = L.AGIN.DAYS
+            Y.FLAG = ''
+            GOSUB DAYS.CHECK
+            IF L.AGING.STATUS NE R.AGE.STATUS THEN
+                R.PREV.STATUS = L.AGING.STATUS
+                R.ST.CHNGE = 'Y'
+                Y.ACC.DATA:= ',L.PREVS.STATUS::=':R.PREV.STATUS:',L.STATUS.CHANGE::=':R.ST.CHNGE:
+            END ELSE
+                R.ST.CHNGE = 'N'
+                Y.ACC.DATA:= ',L.STATUS.CHANGE::=':R.ST.CHNGE:
+            END
+            GOSUB POST.OFS.MSG
+        END
+    END
+    IF L.AGING.STATUS EQ 30 THEN
+        IF Y.EXP.DATE GE TODAY AND EXCESS.PER NE "" THEN
+*---li32 start
+            GOSUB STATUS.30.LIM.SERVE.CHECK
+*---li32 cr end
+        END
+        IF INT.SRV.FLAG NE 'Y' THEN
+
+            Y.OD.DATE = R.ACCOUNT<AC.LOCAL.REF,L.OV.DATE.POS>
+            Y.AGE.D = R.ACCOUNT<AC.LOCAL.REF,L.AG.D.POS>
+            L.AGIN.DAYS = 'C'
+            CALL CDD('',Y.OD.DATE,R.DATES(EB.DAT.NEXT.WORKING.DAY),L.AGIN.DAYS)
+            GOSUB DIRECT.STATUS.CHECK
+            R.AGE.D = L.AGIN.DAYS
+            Y.ACC.DATA = 'ACCOUNT,OVR/I/PROCESS,,':Y.AC.ID:',L.AGING.DAYS::=':R.AGE.D:
+            ADAY = L.AGIN.DAYS
+            Y.FLAG = ''
+            GOSUB DAYS.CHECK
+            IF L.AGING.STATUS NE R.AGE.STATUS THEN
+                R.PREV.STATUS = L.AGING.STATUS
+                R.ST.CHNGE = 'Y'
+                Y.ACC.DATA:= ',L.PREVS.STATUS::=':R.PREV.STATUS:',L.STATUS.CHANGE::=':R.ST.CHNGE:
+                GOSUB INT.NO.BOOK
+            END ELSE
+                R.ST.CHNGE = 'N'
+                Y.ACC.DATA:= ',L.STATUS.CHANGE::=':R.ST.CHNGE:
+            END
+            GOSUB POST.OFS.MSG
+        END
+    END
+    IF L.AGING.STATUS EQ 40 THEN
+        Y.OD.DATE = R.ACCOUNT<AC.LOCAL.REF,L.OV.DATE.POS>
+        IF Y.OD.DATE EQ "" THEN
+            GOSUB CHECK.FOR.MANAUL.UPDATE
+        END ELSE
+            Y.AGE.D = R.ACCOUNT<AC.LOCAL.REF,L.AG.D.POS>
+            L.AGIN.DAYS = 'C'
+            CALL CDD('',Y.OD.DATE,R.DATES(EB.DAT.NEXT.WORKING.DAY),L.AGIN.DAYS)
+            GOSUB DIRECT.STATUS.CHECK
+            R.AGE.D = L.AGIN.DAYS
+            Y.ACC.DATA = 'ACCOUNT,OVR/I/PROCESS,,':Y.AC.ID:',L.STATUS.CHANGE::=N,L.AGING.DAYS::=':R.AGE.D:
+            GOSUB INT.NO.BOOK
+        END
+        GOSUB POST.OFS.MSG
+    END
+    IF L.AGING.STATUS EQ 50 THEN
+        Y.OD.DATE = R.ACCOUNT<AC.LOCAL.REF,L.OV.DATE.POS>
+        IF Y.OD.DATE EQ "" THEN
+            GOSUB CHECK.FOR.MANAUL.UPDATE
+        END ELSE
+            Y.AGE.D = R.ACCOUNT<AC.LOCAL.REF,L.AG.D.POS>
+            L.AGIN.DAYS = 'C'
+            CALL CDD('',Y.OD.DATE,R.DATES(EB.DAT.NEXT.WORKING.DAY),L.AGIN.DAYS)
+            R.AGE.D = L.AGIN.DAYS
+            Y.ACC.DATA = 'ACCOUNT,OVR/I/PROCESS,,':Y.AC.ID:',L.STATUS.CHANGE::=N,L.AGING.DAYS::=':R.AGE.D:
+            GOSUB INT.NO.BOOK
+        END
+        GOSUB POST.OFS.MSG
+    END
+    IF L.AGING.STATUS EQ 60 THEN
+        Y.OD.DATE = R.ACCOUNT<AC.LOCAL.REF,L.OV.DATE.POS>
+        IF Y.OD.DATE EQ "" THEN
+            GOSUB CHECK.FOR.MANAUL.UPDATE
+        END ELSE
+            Y.AGE.D = R.ACCOUNT<AC.LOCAL.REF,L.AG.D.POS>
+            L.AGIN.DAYS = 'C'
+            CALL CDD('',Y.OD.DATE,R.DATES(EB.DAT.NEXT.WORKING.DAY),L.AGIN.DAYS)
+            R.AGE.D = L.AGIN.DAYS
+            Y.ACC.DATA = 'ACCOUNT,OVR/I/PROCESS,,':Y.AC.ID:',L.STATUS.CHANGE::=N,L.AGING.DAYS::=':R.AGE.D:
+            GOSUB INT.NO.BOOK
+        END
+        GOSUB POST.OFS.MSG
+    END
+
+    RETURN
+
+*-----------------------------------------------------------------------------
+STATUS.30.LIM.SERVE.CHECK:
+*---------------------------
+
+    Y.LIM.ST.DATE = R.LIMIT<LI.ONLINE.LIMIT.DATE>
+    Y.TODAY = TODAY
+    Y.L.FREQ = Y.LIM.ST.DATE:'M03':Y.LIM.ST.DATE[7,2]
+
+    COMI = Y.L.FREQ
+    CALL CFQ
+    Y.THR.LIM.START = COMI[1,8]
+
+    IF TODAY GE Y.THR.LIM.START THEN
+        GOSUB SUB.STATUS.30.LIM.SERVE.CHK
+    END
+
+    RETURN
+
+*-----------------------------------------------------------------------------
+SUB.STATUS.30.LIM.SERVE.CHK:
+*---------------------------
+
+    IF DEBIT.INT.FLAG EQ '2' AND Y.INT.COVER1 GT '0' AND Y.INT.COVER1 NE '' THEN
+        R.AGE.STATUS = '40'
+        ST.POS = ''
+        LOCATE '40' IN Y.ST.CODE<1,1> SETTING ST.POS THEN
+            Y.FOR.MIN.DAYS = R.CABK.OVERDUE.PARAMETER<OVER.PAR.MIN.DAYS,ST.POS>
+        END
+        R.AGE.D = Y.FOR.MIN.DAYS
+*--LI32 CR start
+*            R.OV.DATE = TODAY
+        R.OV.DATE = Y.40STAT.DATE
+*--LI32 CR end
+        R.ST.CHNGE = 'Y'
+        INT.SRV.FLAG = 'Y'
+        Y.ACC.DATA = 'ACCOUNT,OVR/I/PROCESS,,':Y.AC.ID:',L.AGING.DAYS::=':R.AGE.D:',L.STATUS.CHANGE::=':R.ST.CHNGE:',L.OVERDUE.DATE::=':R.OV.DATE:',L.AGING.STATUS::=':R.AGE.STATUS:',L.PREVS.STATUS::=':L.AGING.STATUS
+        GOSUB POST.OFS.MSG
+        GOSUB REWRITE.CABK.OVERDUE.OD.ACCOUNT
+    END
+
+    RETURN
+
+*---------------------------------------------------------------------------
+DIRECT.STATUS.CHECK:
+*-------------------
+
+    IF Y.AGE.D GT L.AGIN.DAYS THEN
+        DIFF.DAYS = 'C'
+        DIFF.TODAY = TODAY
+        CALL CDD('',DIFF.TODAY,R.DATES(EB.DAT.NEXT.WORKING.DAY),DIFF.DAYS)
+        L.AGIN.DAYS = Y.AGE.D + DIFF.DAYS
+    END
+
+    RETURN
+
+*---------------------------------------------------------------------------
+CHECK.FOR.MANAUL.UPDATE:
+*------------------------
+
+    R.AGE.D = 1
+    R.OV.DATE = TODAY
+    R.ST.CHNGE = 'Y'
+    R.PREV.STATUS = L.AGING.STATUS
+    Y.ACC.DATA = 'ACCOUNT,OVR/I/PROCESS,,':Y.AC.ID:',L.AGING.DAYS::=':R.AGE.D:',L.PREVS.STATUS::=':R.PREV.STATUS:',L.STATUS.CHANGE::=':R.ST.CHNGE:',L.OVERDUE.DATE::=':R.OV.DATE:
+    ADAY = 1
+    GOSUB DAYS.CHECK
+
+    RETURN
+
+*---------------------------------------------------------------------------
+INT.NO.BOOK:
+*-----------
+
+    Y.INT.BOOK = R.ACCOUNT<AC.INT.NO.BOOKING>
+    IF Y.INT.BOOK NE 'SUSPENSE' THEN
+        R.INT.BOOK = 'SUSPENSE'
+        Y.ACC.DATA:= ',INT.NO.BOOKING::=':R.INT.BOOK
+    END
+
+    RETURN
+
+*---------------------------------------------------------------------------
+REWRITE.CABK.OVERDUE.OD.ACCOUNT:
+*-------------------------------
+
+    CALL F.READ(FN.CABK.OVERDUE.OD.ACCOUNT,Y.AC.ID,R.CABK.OVERDUE.OD.ACCOUNT,F.CABK.OVERDUE.OD.ACCOUNT,CABK.OD.ERR)
+    IF R.CABK.OVERDUE.OD.ACCOUNT THEN
+        R.CABK.OVERDUE.OD.ACCOUNT<OVER.OD.INT.COVER> = Y.INT.COVER1
+        CALL F.WRITE(FN.CABK.OVERDUE.OD.ACCOUNT,Y.AC.ID,R.CABK.OVERDUE.OD.ACCOUNT)
+    END
+
+    RETURN
+
+*---------------------------------------------------------------------------
+POST.OFS.MSG:
+*-----------
+
+    IF Y.ACC.DATA THEN
+        CALL OFS.BULK.MANAGER(Y.ACC.DATA,OFS.OUT.MSG,'')
+    END
+
+    RETURN
+*--------------------------------------------------------------------------
+END

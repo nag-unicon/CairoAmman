@@ -1,0 +1,89 @@
+    SUBROUTINE CAB.B.WU.COVERAGE
+*-----------------------------------------------------------------------------
+*Modification Details:
+*=====================
+* Date        :  14 APR 2015
+* Modified by :  Nuha Tuhul
+* Description :  Amend Rouitne to be Compatible with DB2
+*-----------------------------------------------------------------------------
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.ACCOUNT
+    $INCLUDE T24.BP I_GTS.COMMON
+    $INCLUDE T24.BP I_BATCH
+    $INCLUDE T24.BP I_F.OFS.SOURCE
+    $INCLUDE BP I_F.CAB.WU.ACCTS
+
+    GOSUB INIT
+    GOSUB PROCESS
+    RETURN
+
+******
+INIT:
+******
+
+    OFS.ID = 'CABPOS'
+    Y.FLAG = BATCH.DETAILS<3,1>
+
+    FN.ACCOUNT = 'F.ACCOUNT'
+    F.ACCOUNT = ''
+    CALL OPF(FN.ACCOUNT,F.ACCOUNT)
+
+    F.CAB.WU.ACCTS = ''
+    FN.CAB.WU.ACCTS = 'F.CAB.WU.ACCTS'
+    CALL OPF(FN.CAB.WU.ACCTS,F.CAB.WU.ACCTS)
+
+    F.WU.INTERMID.ACCTS = ''
+    FN.WU.INTERMID.ACCTS = 'F.WU.INTERMID.ACCTS'
+    CALL OPF(FN.WU.INTERMID.ACCTS,F.WU.INTERMID.ACCTS)
+
+    CMD = 'CLEAR.FILE ' : FN.WU.INTERMID.ACCTS
+    EXECUTE CMD
+
+    RETURN
+********
+PROCESS:
+********
+    SEL.CMD = 'SELECT ' : FN.CAB.WU.ACCTS
+    CALL EB.READLIST ( SEL.CMD,SEL.LIST ,'',NO.OF.REC,RET.CODE)
+    LOOP
+        REMOVE WU.AGNT.ID FROM SEL.LIST SETTING POS
+    WHILE WU.AGNT.ID:POS
+        CALL F.READ(FN.CAB.WU.ACCTS,WU.AGNT.ID,R.CAB.WU.ACCTS,F.CAB.WU.ACCTS,UW.EER)
+        IF R.CAB.WU.ACCTS THEN
+            INTMD.ACCT = R.CAB.WU.ACCTS<CAB.UWAC.INTERMID.ACCT>
+            CURR.ACCT = R.CAB.WU.ACCTS<CAB.UWAC.CURRENT.ACCT>
+            IF INTMD.ACCT NE '' THEN
+                CALL F.READ(FN.WU.INTERMID.ACCTS,INTMD.ACCT,R.INTERM.ACCTS,F.WU.INTERMID.ACCTS,INTERMD.ERR)
+                IF R.INTERM.ACCTS EQ '' THEN
+                    WRITE INTMD.ACCT TO F.WU.INTERMID.ACCTS,INTMD.ACCT
+                    CALL F.READ(FN.ACCOUNT,INTMD.ACCT,R.ACCOUNT,F.ACCOUNT,ACCT.ERROR)
+                    IF R.ACCOUNT THEN
+                        ACCT.CURR = R.ACCOUNT<AC.CURRENCY>
+                        ACCT.BAL = R.ACCOUNT<AC.ONLINE.ACTUAL.BAL>
+
+                        IF Y.FLAG EQ 'SOD' AND ACCT.BAL GT 0 THEN
+                            Y.MESSAGE = 'FUNDS.TRANSFER,INP/I/PROCESS,,,TRANSACTION.TYPE::=AC,DEBIT.AMOUNT::=':ACCT.BAL:','
+                            Y.MESSAGE :='DEBIT.CURRENCY::=':ACCT.CURR:',':'DEBIT.ACCT.NO::=':INTMD.ACCT:',':'CREDIT.ACCT.NO::=':CURR.ACCT
+                            CALL OFS.POST.MESSAGE(Y.MESSAGE,MESSAGE.ID,OFS.ID,'')
+                        END
+                        IF Y.FLAG EQ 'EOD' THEN
+                            IF ACCT.BAL LT 0 THEN
+                                ACCT.BAL = ACCT.BAL * -1
+                                Y.MESSAGE = 'FUNDS.TRANSFER,INP/I/PROCESS,,,TRANSACTION.TYPE::=AC,DEBIT.AMOUNT::=':ACCT.BAL:','
+                                Y.MESSAGE :='DEBIT.CURRENCY::=':ACCT.CURR:',':'DEBIT.ACCT.NO::=':CURR.ACCT:',':'CREDIT.ACCT.NO::=':INTMD.ACCT
+                                CALL OFS.POST.MESSAGE(Y.MESSAGE,MESSAGE.ID,OFS.ID,'')
+                            END ELSE
+                                Y.MESSAGE = 'FUNDS.TRANSFER,INP/I/PROCESS,,,TRANSACTION.TYPE::=AC,DEBIT.AMOUNT::=':ACCT.BAL:','
+                                Y.MESSAGE :='DEBIT.CURRENCY::=':ACCT.CURR:',':'DEBIT.ACCT.NO::=':INTMD.ACCT:',':'CREDIT.ACCT.NO::=':CURR.ACCT
+                                CALL OFS.POST.MESSAGE(Y.MESSAGE,MESSAGE.ID,OFS.ID,'')
+                            END
+                        END
+                    END
+                END
+            END
+        END
+    REPEAT
+    RETURN
+END

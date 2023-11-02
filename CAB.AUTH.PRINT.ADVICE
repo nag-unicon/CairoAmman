@@ -1,0 +1,59 @@
+*-----------------------------------------------------------------------------
+* <Rating>-20</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AUTH.PRINT.ADVICE
+******************************************************************************************************************
+*Company   Name    : CAB
+*Developed By      : Abdul Rahman.J
+*Program   Name    : CAB.AUTH.PRINT.ADVICE
+*-----------------------------------------------------------------------------------------------------------------
+*Description       : Authorisation routine to print advice when Cheque status eq 90.
+*Linked With       :
+*ODR Number        : ODR-2011-10-0063
+*-----------------------------------------------------------------------------------------------------------------
+*Modification Details:
+*=====================
+*
+*-----------------------------------------------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.CHEQUE.ISSUE
+    $INSERT I_F.DEAL.SLIP.FORMAT
+*----------------------------------------------------------------------------------------------------------------
+
+    GOSUB OPEN.FILE
+    GOSUB PROCESS
+
+    RETURN
+*----------------------------------------------------------------------------------------------------------------
+OPEN.FILE:
+**********
+    FN.DEAL.SLIP.FORMAT = 'F.DEAL.SLIP.FORMAT'
+    F.DEAL.SLIP.FORMAT = ''
+    R.DEAL.SLIP = ''
+    CALL OPF(FN.DEAL.SLIP.FORMAT,F.DEAL.SLIP.FORMAT)
+
+    FN.CHEQUE.ISSUE = 'F.CHEQUE.ISSUE'
+    F.CHEQUE.ISSUE = ''
+    R.CHEQUE.ISSUE = ''
+    CALL OPF(FN.CHEQUE.ISSUE,F.CHEQUE.ISSUE)
+    RETURN
+*--------------------------------------------------------------------------------------------------------------------
+PROCESS:
+********
+
+    CHEQ.STATS = R.NEW(CHEQUE.IS.CHEQUE.STATUS)
+
+    IF CHEQ.STATS EQ '90' THEN
+        DEAL.SLIP.ID = 'DSF.CHQ.ISSUE'
+        CALL F.READ(FN.DEAL.SLIP.FORMAT,DEAL.SLIP.ID,R.DEAL.SLIP,F.DEAL.SLIP.FORMAT,ERR.DEAL)
+        REP.CONTROL.VAL = R.DEAL.SLIP<EB.DSF.REPORT.CONTROL.ID>
+        ZER.VAL = '0'
+        CALL PRINTER.ON(REP.CONTROL.VAL,ZER.VAL)
+        CALL PRODUCE.DEAL.SLIP(DEAL.SLIP.ID)
+        CALL PRINTER.OFF
+    END
+    RETURN
+*--------------------------------------------------------------------------------------------------------------------
+END

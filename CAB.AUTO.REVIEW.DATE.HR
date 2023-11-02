@@ -1,0 +1,50 @@
+    SUBROUTINE CAB.AUTO.REVIEW.DATE.HR
+*-----------------------------------------------------------------------------
+*Modification Details:
+*=====================
+* Date         Modified by       Description
+* 05-09-2022   Ayobami       dont check JO0091010
+*-----------------------------------------------------------------------------
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT T24.BP I_F.CUSTOMER
+
+    YR.MONTH  = 'M24'
+    BEGIN CASE
+    CASE R.NEW(EB.CUS.RISK.LEVEL) ='1'
+        YR.MONTH = 'M36'
+        GOSUB PROCESS
+    CASE R.NEW(EB.CUS.RISK.LEVEL) ='2'
+        YR.MONTH = 'M24'
+        GOSUB PROCESS
+    CASE R.NEW(EB.CUS.RISK.LEVEL) ='3'
+        YR.MONTH = 'M12'
+        GOSUB PROCESS
+    END  CASE
+    RETURN
+**********
+PROCESS:
+**********
+    IN.FREQ = ''
+    TEMP.COMI = ''
+
+    IF ID.COMPANY MATCHES 'JO0090001':VM:'JO0091013':VM:'JO0091017':VM:'JO0091012' THEN
+        Y.PROCEED.FLAG = ''
+    END ELSE
+        Y.PROCEED.FLAG = 1
+    END
+
+    IF Y.PROCEED.FLAG THEN
+        IN.FREQ = TODAY:YR.MONTH:TODAY[7,2]
+        R.NEW(EB.CUS.LAST.KYC.REVIEW.DATE) = TODAY
+        TEMP.COMI = COMI
+        COMI = IN.FREQ
+        IF COMI THEN
+            CALL CFQ
+        END
+        R.NEW(EB.CUS.AUTO.NEXT.KYC.REVIEW.DATE) = COMI[1,8]
+*        R.NEW(EB.CUS.LAST.KYC.REVIEW.DATE) = TODAY
+        COMI = TODAY
+    END
+    RETURN
+END

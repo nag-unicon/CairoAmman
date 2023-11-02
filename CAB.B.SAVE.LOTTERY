@@ -1,0 +1,162 @@
+    SUBROUTINE CAB.B.SAVE.LOTTERY(SEL.ID)
+*-----------------------------------------------------------------------------
+*Modification Details:
+*=====================
+* Modified by        Date              Description
+* Nuha Tuhul        06-3-2019         Display english name and arabic
+* Muthu             13-06-2019        Added a new column Min Flag to indicate the account which reached the min balance
+*                                     within the campaign date (Period between campaign date & Till last working date.
+*-----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.CUSTOMER
+    $INSERT I_F.ACCT.ACTIVITY
+    $INSERT I_F.EB.CONTRACT.BALANCES
+    $INSERT I_CAB.LOT.COMMON
+    $INSERT I_F.CAB.LOCAL.SERVICE.PARAM
+
+    GOSUB INIT
+    GOSUB PROCESS
+
+    RETURN
+INIT:
+*****
+    Y.ACCT.IN = 1 ; CR.TOT   = '';  NO.CR.TXN   = '';
+    MIN.BAL   = '' ; NO.OF.REC = '' ; BK.COUNT  = ''; CUST.TYPE = ''
+    MIN.BAL1  = '' ; MIN.BAL2 = '' ; CR.TOT     = ''; DISP.BAL  =''
+
+    RETURN
+PROCESS:
+********
+    CALL F.READ(FN.ACC,SEL.ID,R.ACC,F.ACC,ACC.ERR)
+    Y.CUST     = R.ACC<AC.CUSTOMER>
+    Y.CODE     = R.ACC<AC.CO.CODE>
+    Y.CAT      = R.ACC<AC.CATEGORY>
+    Y.CCY      = R.ACC<AC.CURRENCY>
+    Y.OP.DATE  = R.ACC<AC.OPENING.DATE>
+    Y.POS.REST = R.ACC<AC.POSTING.RESTRICT>
+    Y.DOR.STAT = R.ACC<AC.LOCAL.REF,Y.DOR.POS>
+
+    IF Y.DOR.STAT EQ 'YES' THEN
+        Y.ACT.STATUS = 'Dormant'
+    END ELSE
+        Y.ACT.STATUS = 'Active'
+    END
+
+    GOSUB FETCH.ACCT.ACTIVITY
+
+    IF Y.CCY EQ LCCY THEN
+        Y.CCY.CODE = '0'
+    END ELSE
+        Y.CCY.CODE = '1'
+    END
+
+    CALL CAB.SAVE.EXT.ACCT(SEL.ID,NO.CR.TXN,CR.AMOUNT)
+
+    IF Y.OP.DATE NE '' THEN
+        CALL EB.NO.OF.MONTHS(Y.OP.DATE,TODAY,Y.NO.MONTH)
+    END
+
+    CALL F.READ(FN.CUS,Y.CUST,R.CUS,F.CUS,CUS.ERR)
+    Y.SHORT.NAME   = R.CUS<EB.CUS.SHORT.NAME>
+    Y.NAME.EN      = Y.SHORT.NAME<1,1>
+    Y.NAME.AR      = Y.SHORT.NAME<1,2>
+    Y.SECTOR       = R.CUS<EB.CUS.SECTOR>
+    Y.CUS.POS.REST = R.CUS<EB.CUS.POSTING.RESTRICT>
+    IF Y.CUS.POS.REST MATCHES Y.CUS.POS.VAL THEN
+        Y.FLAG = 'Y'
+    END
+    IF Y.POS.REST MATCHES Y.POS.VAL AND Y.FLAG NE 'Y' THEN
+        Y.POSTING = Y.POS.REST
+        GOSUB CHK.SEC.VAL
+    END ELSE
+        IF Y.POS.REST EQ '' AND Y.FLAG NE 'Y' THEN
+            Y.POSTING = Y.POS.REST
+            GOSUB CHK.SEC.VAL
+        END
+    END
+
+    IF Y.DATA NE '' THEN
+        Y.FILE.NAME =  SEL.ID:'-':TODAY
+        CALL F.WRITE(FN.FLAT.FILE,Y.FILE.NAME,Y.DATA)
+    END
+    RETURN
+
+FETCH.ACCT.ACTIVITY:
+********************
+    CALL AC.GET.PERIOD.BALANCES(SEL.ID,'','',Y.START.DATE,Y.END.DATE,'',BAL.DETS,ERR)
+    Y.BAL.POS = BAL.DETS<IC.ACT.BALANCE>
+    DISP.BAL = MINIMUM(Y.BAL.POS)
+
+    RETURN
+
+
+CHK.SEC.VAL:
+************
+    LOCATE Y.SECTOR IN Y.SEC.VAL<1,1> SETTING SEC.POS ELSE
+        IF Y.SECTOR LT '2000' THEN
+            Y.CUST.TYPE = 'Retail'
+            GOSUB FORM.FINAL.ARRAY
+        END
+    END
+
+    RETURN
+
+FORM.FINAL.ARRAY:
+*****************
+
+    GOSUB GET.MIN.BAL.CAMPAIGN.PERIOD
+
+    LOCATE Y.CCY IN R.CAB.LOCAL.SERVICE.PARAM<CAB.LOC.PARAM.CURRENCY, 1> SETTING CCY.POS THEN
+
+        MIN.BAL = R.CAB.LOCAL.SERVICE.PARAM<CAB.LOC.PARAM.MIN.BAL, CCY.POS>
+
+    END ELSE
+        MIN.BAL = R.CAB.LOCAL.SERVICE.PARAM<CAB.LOC.PARAM.MIN.BAL, 2> ;* Consider always second one will be FCY
+    END
+
+    IF NOT(MIN.BAL) THEN
+        IF Y.CCY EQ LCCY THEN
+            MIN.BAL = "100"
+        END ELSE
+            MIN.BAL = "150"
+        END
+    END
+
+    IF DISP.BAL GE MIN.BAL THEN
+        Y.DATA<-1> = SEL.ID:',':Y.CODE:',':Y.CAT:',':Y.ACT.STATUS:',':Y.CCY.CODE:',':Y.NO.MONTH:',':DISP.BAL:',':NO.CR.TXN:',':Y.CUST.TYPE:',':Y.POSTING:',':Y.CUST:',':Y.NAME.EN:',':Y.NAME.AR :',': MIN.FLAG
+    END
+
+    RETURN
+
+GET.MIN.BAL.CAMPAIGN.PERIOD:
+
+    CAMPAIGN.DATE = R.CAB.LOCAL.SERVICE.PARAM<CAB.LOC.PARAM.CAMPAIGN.DATE>
+    DEF.MIN.BALANCE = R.CAB.LOCAL.SERVICE.PARAM<CAB.LOC.PARAM.MINIMUM.BALANCE>
+
+    CALL AC.GET.PERIOD.BALANCES(SEL.ID,'','',CAMPAIGN.DATE,Y.END.DATE,'',BAL.DETS,ERR)
+    Y.BAL.POS = BAL.DETS<IC.ACT.BALANCE>
+    MIN.BALANCE = MINIMUM(Y.BAL.POS)
+
+    IF Y.CCY NE LCCY THEN
+        BUY.AMT = ''
+        CCY.BUY = LCCY
+        CCY.MKT = 1
+        CCY.SELL = Y.CCY
+        SELL.AMT = MIN.BALANCE
+        BASE.CCY = ''
+        EXCHANGE.RATE =''
+        DIFFERENCE = ''
+        CALL EXCHRATE(CCY.MKT,CCY.BUY,BUY.AMT,CCY.SELL,SELL.AMT,BASE.CCY,EXCHANGE.RATE,DIFFERENCE,LCY.AMT,RETURN.CODE)
+        MIN.BALANCE = DROUND(BUY.AMT,3)
+    END
+
+    MIN.FLAG = 0
+    IF MIN.BALANCE LT DEF.MIN.BALANCE THEN
+        MIN.FLAG = 1
+    END
+
+    RETURN
+

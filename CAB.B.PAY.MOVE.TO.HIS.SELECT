@@ -1,0 +1,33 @@
+*-----------------------------------------------------------------------------
+* <Rating>-10</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.PAY.MOVE.TO.HIS.SELECT
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.B.PAY.MOVE.TO.HIS.SELECT
+*---------------------------------------------------------------
+*Description       : Multi threaded select routine that selects the payment details records
+*                  : of status paid and returned.
+*Linked With       : BATCH>BNK/CAB.B.PAY.MOVE.TO.HIS
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0064
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.TELLER
+    $INSERT I_F.FUNDS.TRANSFER
+    $INCLUDE CAB.BP I_F.PAYMENT.DETAILS
+    $INCLUDE CAB.BP I_CAB.B.PAY.MOVE.TO.HIS.COMMON
+
+    SEL.CMD = "SELECT ":FN.PAY.DET:" WITH PAYMENT.STATUS NE UNPAID AND NE DORMANT"
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,"",YNO,YERR)
+    CALL BATCH.BUILD.LIST(SEL.CMD,SEL.LIST)
+
+    RETURN
+END

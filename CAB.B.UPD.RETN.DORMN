@@ -1,0 +1,88 @@
+*-----------------------------------------------------------------------------
+* <Rating>-30</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.UPD.RETN.DORMN(PAY.DET.ID)
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.B.UPD.RETN.DORMN
+*---------------------------------------------------------------
+*Description       : Multi threded routine that updates the status of payment details records as
+*                  : dormant or returned based on the value in the action on end date field in the
+*                  : respective payment batches.
+*Linked With       : BATCH>BNK/CAB.B.UPD.RETN.DORMN
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0064
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INCLUDE CAB.BP I_F.PAYMENT.RETURNED
+    $INCLUDE CAB.BP I_F.PAYMENT.DETAILS
+    $INCLUDE CAB.BP I_F.PAYMENT.BATCHES
+    $INCLUDE CAB.BP I_F.CAB.FILE.PARAMETER
+    $INCLUDE CAB.BP I_CAB.B.UPD.RETN.DORMN.COMMON
+
+    CALL F.READ(FN.PAY.DET,PAY.DET.ID,R.PAY.DET,F.PAY.DET,PAY.DET.ERR)
+    IF R.PAY.DET THEN
+        BATCH.CODE = R.PAY.DET<PY.DET.BATCH.CODE>
+        CALL F.READ(FN.PAY.BAT,BATCH.CODE,R.PAY.BAT,F.PAY.BAT,BAT.ERR)
+        IF R.PAY.BAT THEN
+            BATCH.END.DATE = R.PAY.BAT<PAY.BAT.BATCH.END.DATE>
+            ACTION.ON.END.DATE = R.PAY.BAT<PAY.BAT.ACTION.ON.END.DATE>
+            IF BATCH.END.DATE EQ TODAY THEN
+                PAYMENT.STATUS = R.PAY.DET<PY.DET.PAYMENT.STATUS>
+                GOSUB CHECK.ACTION.ON.END.DATE
+            END
+        END
+    END
+
+    RETURN
+
+*************************
+CHECK.ACTION.ON.END.DATE:
+*************************
+
+    IF ACTION.ON.END.DATE EQ "" THEN
+        IF PAYMENT.STATUS NE "PAID" THEN
+            R.PAY.DET<PY.DET.PAYMENT.STATUS> = "DORMANT"
+            CALL F.WRITE(FN.PAY.DET,PAY.DET.ID,R.PAY.DET)
+        END
+    END
+    IF ACTION.ON.END.DATE EQ "RETURN" THEN
+        IF PAYMENT.STATUS NE "PAID" THEN
+            GOSUB POST.OFS.REQUESTS
+            GOSUB UPDATE.PAYMENT.RETURNED
+        END
+    END
+
+    RETURN
+
+******************
+POST.OFS.REQUESTS:
+******************
+
+    CALL F.READ(FN.CAB.FILE,"PAYMENTS",R.CAB.FILE,F.CAB.FILE,CAB.ERR)
+    IF R.CAB.FILE THEN
+        Y.OFS.SOURCE.ID = R.CAB.FILE<CAB.FIL.OFS.SOURCE>
+        Y.DET.DATA = 'PAYMENT.DETAILS,RET/I/PROCESS,,':PAY.DET.ID:',PAYMENT.STATUS::=RETURNED,PAY.RETURN.DATE::=':TODAY
+        CALL OFS.POST.MESSAGE(Y.DET.DATA,'',Y.OFS.SOURCE.ID,OPERATOR)
+    END
+
+    RETURN
+
+************************
+UPDATE.PAYMENT.RETURNED:
+************************
+
+    R.PAY.RET = R.PAY.DET
+    R.PAY.RET<PAY.RET.PAYMENT.STATUS> = "RETURNED"
+    R.PAY.RET<PAY.RET.PAY.RETURN.DATE> = TODAY
+    CALL F.WRITE(FN.PAY.RET,PAY.DET.ID,R.PAY.RET)
+
+    RETURN
+END

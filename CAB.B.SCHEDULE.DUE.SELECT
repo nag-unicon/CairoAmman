@@ -1,0 +1,50 @@
+*-----------------------------------------------------------------------------
+* <Rating>-20</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.SCHEDULE.DUE.SELECT
+*--------------------------------------------------------------------------------------------------------------
+* Date -
+* Desc - This routine is to generate the date wise disbursement activity for all Loans
+* by Branch wise.
+* Attached Enquiry -
+* Author -
+*
+*----------------------------------------------------------------------------------------------------------------
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT T24.BP I_BATCH.FILES
+    $INSERT TT.BP I_CAB.SCHEDULE.DUE.COMMON
+
+
+    GOSUB PROCESS.ENQ
+
+    RETURN
+***-------------------------------------------------------------------
+************
+PROCESS.ENQ:
+************
+    IF NOT(CONTROL.LIST) THEN
+        CONTROL.LIST<1> = "JO0090001"
+        CONTROL.LIST<2> = "BH0080002"
+    END
+
+    GOSUB PROCESS
+
+    RETURN
+
+********
+PROCESS:
+********
+    BEGIN CASE
+    CASE CONTROL.LIST<1,1> EQ "JO0090001"
+        SEL.CMD = "SELECT FBNK.AA.ARRANGEMENT WITH PRODUCT.LINE EQ LENDING AND (ARR.STATUS EQ CURRENT OR ARR.STATUS EQ EXPIRED)"
+    CASE CONTROL.LIST<1,1> EQ "BH0080002"
+        SEL.CMD = "SELECT FBHB.AA.ARRANGEMENT WITH PRODUCT.LINE EQ LENDING AND (ARR.STATUS EQ CURRENT OR ARR.STATUS EQ EXPIRED)"
+    END CASE
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+
+    LIST.PARAMETERS = ''
+    CALL BATCH.BUILD.LIST(LIST.PARAMETERS, SEL.LIST)
+
+    RETURN
+END

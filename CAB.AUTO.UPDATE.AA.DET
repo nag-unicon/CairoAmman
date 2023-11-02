@@ -1,0 +1,200 @@
+    SUBROUTINE CAB.AUTO.UPDATE.AA.DET
+***************************************************************************
+***  CAB AA Auto Disbursement API's will trigger Funds Transfer to Customer Drawdown
+***  Account available in Account property
+***
+***
+***  22-06-2015 : Increase Commitment activity enable user to do auto disbursement
+***                     Functionality has been extended to cover the increase commitment
+***
+***  29-06-2015 : Design and flow change for the auto disbursement
+***
+***
+***************************************************************************
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_AA.APP.COMMON
+    $INCLUDE T24.BP I_AA.ACTION.CONTEXT
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT.ACTIVITY
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT
+    $INCLUDE T24.BP I_F.AA.ACCOUNT
+    $INCLUDE T24.BP I_F.AA.CHARGE
+    $INCLUDE TT.BP I_F.AA.AUTO.DISBURSE
+    $INCLUDE T24.BP I_F.AA.INTEREST
+
+    GOSUB INIT
+
+    RETURN
+
+INIT:
+
+    PRO.STATUS = c_arrActivityStatus["-",1,1]
+    ARRANGEMENT.ID = AA$ARR.ID          ;* Arrangement contract Id
+    ACTIVITY.ID = AA$CURR.ACTIVITY
+
+    EFF.DATE = AA$ACTIVITY.EFF.DATE
+
+    PROPERTY.ID = ''
+    CALL AA.GET.ARRANGEMENT(ARRANGEMENT.ID, R.ARRANGEMENT, ARR.ERROR)
+
+    CALL AA.GET.PROPERTY.RECORD('', ARRANGEMENT.ID, PROPERTY.ID, EFFECTIVE.DATE, 'ACCOUNT', '', PROPERTY.RECORD, RET.ERR)
+    CALL AA.GET.PROPERTY.RECORD('', ARRANGEMENT.ID, 'PRINCIPALINT', EFFECTIVE.DATE, 'INTEREST', '', R.PRINCIPAL.REC, RET.ERR)
+*** During authorisation stage, system need to run this routine and update all file
+
+    R.REC =''
+
+    FN.AA.AUTO.DISBURSE = 'F.AA.AUTO.DISBURSE'
+    F.AA.AUTO.DISBURSE = ''
+    CALL OPF(FN.AA.AUTO.DISBURSE,F.AA.AUTO.DISBURSE)
+
+*** DrawDown Account is not present so no need to update auto disbursement file
+
+    CALL GET.LOC.REF('AA.ARR.ACCOUNT','DRAWACCOUNT',POS)
+    CREDIT.ACCT = PROPERTY.RECORD<AA.AC.LOCAL.REF,POS>
+
+    SET.CHANGE.FLOW = ''
+    R.ANN.RECORD =''
+    CALL AA.GET.PROPERTY.RECORD('', ARRANGEMENT.ID, 'ANNUALCOMM', EFFECTIVE.DATE, 'CHARGE', '', R.ANN.RECORD, RET.ERR)
+
+    CALL GET.LOC.REF('AA.ARR.CHARGE','ANNUAL.COMM',POS1)
+    USER.COMM = R.ANN.RECORD<AA.CHG.LOCAL.REF,POS1>
+
+    IF PRO.STATUS EQ "AUTH" THEN
+        GOSUB PROCESS
+        GOSUB PROCESS.NEXT
+    END
+
+    RETURN
+
+*********
+PROCESS:
+*********
+
+    BEGIN CASE
+    CASE ACTIVITY.ID EQ 'LENDING-NEW-ARRANGEMENT'
+        R.REC<CAB.TRIGGERED> ='NEW'
+        R.REC<CAB.ST.DATE.ACT> = EFF.DATE
+        GOSUB PROCESS.NEW
+
+    CASE ACTIVITY.ID EQ 'LENDING-RESCHEDULED-ARRANGEMENT'
+        R.REC<CAB.TRIGGERED> =''
+        R.REC<CAB.ST.DATE.ACT> = EFF.DATE
+        GOSUB FLOW.4
+    CASE 1
+        R.REC<CAB.TRIGGERED> =''
+        R.REC<CAB.ST.DATE.ACT> = EFF.DATE
+        GOSUB PROCESS.OTHER
+    END CASE
+
+    RETURN
+
+*************
+PROCESS.NEXT:
+*************
+
+    DISB.ARR.ID =  ARRANGEMENT.ID
+    GOSUB CHECK.PERIOD
+    CALL F.WRITE(FN.AA.AUTO.DISBURSE,DISB.ARR.ID,R.REC)
+
+    RETURN
+
+*************
+CHECK.PERIOD:
+*************
+
+***Addition check introduced to trigger interest
+
+    IF R.PRINCIPAL.REC<AA.INT.PERIODIC.INDEX> NE '' THEN
+        INS 'INTEREST' BEFORE R.REC<CAB.NEXT.ACTION,1>
+    END
+
+    RETURN
+
+***************
+PROCESS.OTHER:
+***************
+
+    BEGIN CASE
+    CASE USER.COMM EQ '1'
+        GOSUB FLOW.1
+    CASE USER.COMM EQ '2'
+        GOSUB FLOW.2
+    CASE USER.COMM EQ '3'
+        GOSUB FLOW.1
+    CASE USER.COMM EQ '4'
+        GOSUB FLOW.2
+    CASE USER.COMM EQ '5'
+        GOSUB FLOW.1
+    CASE 1
+        GOSUB FLOW.3
+    END CASE
+
+
+
+    RETURN
+
+*************
+PROCESS.NEW:
+*************
+
+    BEGIN CASE
+    CASE USER.COMM EQ '1'
+        GOSUB FLOW.1
+    CASE USER.COMM EQ '2'
+        GOSUB FLOW.1
+    CASE USER.COMM EQ '3'
+        GOSUB FLOW.1
+    CASE USER.COMM EQ '4'
+        GOSUB FLOW.1
+    CASE USER.COMM EQ '5'
+        GOSUB FLOW.1
+    CASE 1
+        GOSUB FLOW.3
+    END CASE
+
+    RETURN
+
+*******
+FLOW.2:
+********
+
+    INS 'SET.DUES' BEFORE R.REC<CAB.NEXT.ACTION,1>
+    INS 'REMOVE' BEFORE R.REC<CAB.NEXT.ACTION,1>
+    INS 'CALCULATE' BEFORE R.REC<CAB.NEXT.ACTION,1>
+    INS 'DISBURSE' BEFORE R.REC<CAB.NEXT.ACTION,1>
+
+    RETURN
+
+*******
+FLOW.4:
+*******
+
+    INS 'REMOVE' BEFORE R.REC<CAB.NEXT.ACTION,1>
+    INS 'CALCULATE' BEFORE R.REC<CAB.NEXT.ACTION,1>
+
+    RETURN
+
+*******
+FLOW.1:
+********
+*** Newly introduced line
+
+    INS 'SET.DUES' BEFORE R.REC<CAB.NEXT.ACTION,1>
+    INS 'REMOVE' BEFORE R.REC<CAB.NEXT.ACTION,1>
+    INS 'DISBURSE' BEFORE R.REC<CAB.NEXT.ACTION,1>
+    INS 'CALCULATE' BEFORE R.REC<CAB.NEXT.ACTION,1>
+
+    RETURN
+
+*******
+FLOW.3:
+********
+*** if Annual commission is not avaialble then system need to trigger general activity
+    INS 'SET.DUES' BEFORE R.REC<CAB.NEXT.ACTION,1>
+    INS 'DISBURSE' BEFORE R.REC<CAB.NEXT.ACTION,1>
+    INS 'CALCULATE' BEFORE R.REC<CAB.NEXT.ACTION,1>
+
+    RETURN
+
+END

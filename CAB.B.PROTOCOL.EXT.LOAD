@@ -1,0 +1,42 @@
+*-----------------------------------------------------------------------------
+* <Rating>0</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.PROTOCOL.EXT.LOAD
+*-----------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+*
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_BATCH.FILES
+    $INSERT I_F.COMPANY
+    $INSERT I_F.DATES
+    $INSERT I_F.PROTOCOL
+    $INSERT I_CAB.B.PROTOCOL.EXT.COMMON
+*-----------------------------------------------------------------------------
+*
+    FN.PROTOCOL = 'F.PROTOCOL'
+    F.PROT = ''
+    CALL OPF(FN.PROTOCOL,F.PROT)
+*
+    FN.REP.FILE = BATCH.DETAILS<3,1>
+    F.REP.FILE = ''
+    CALL OPF(FN.REP.FILE,F.REP.FILE)
+*
+    APPLN.LIST<1,1> = 'USER':VM:'USER.SMS.GROUP':VM:'BROWSER.PREFERENCES':VM:'PASSWORD.RESET':VM:'SIGN.ON':VM:'SIGN.OFF'
+    PROFILE.APPLN.LIST<1,1> = 'USER':VM:'USER.SMS.GROUP':VM:'BROWSER.PREFERENCES'
+*
+    RC.ID = 'CAB_PROTOCOL.EXTRACT.':TODAY:'-':C$T24.SESSION.NO
+*
+    OPENSEQ FN.REP.FILE,RC.ID TO F.REP.FILE ELSE
+        CREATE F.REP.FILE ELSE
+            TEXT = "Missing Download File Path"
+            CALL FATAL.ERROR("CAB.B.PROTOCOL.EXT.LOAD")
+        END
+    END
+*
+    RETURN
+*-----------------------------------------------------------------------------
+
+END

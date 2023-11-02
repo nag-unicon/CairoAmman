@@ -1,0 +1,58 @@
+*-----------------------------------------------------------------------------
+* <Rating>-20</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.UPD.RET.CHQ.LOAD
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.B.UPD.RET.CHQ.LOAD
+*---------------------------------------------------------------
+*Description       : This routine is a COB routine is to handle the
+*                    return cheques.
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2012-01-0044
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE 
+    $INCLUDE CAB.BP I_F.CAB.ECC.RET.CHEQUES
+    $INCLUDE CAB.BP I_F.CAB.INW.CLR.TXN
+    $INCLUDE CAB.BP I_F.CABK.CHEQUE.RETURNS
+    $INCLUDE CAB.BP I_CAB.B.UPD.RET.CHQ.COMMON
+
+    GOSUB INIT.FILES
+    GOSUB OPEN.FILES
+
+    RETURN
+
+***********
+INIT.FILES:
+***********
+
+    FN.ECC = "F.CAB.ECC.RET.CHEQUES"
+    F.ECC = ""
+
+    FN.INW.TXN = "F.CAB.INW.CLR.TXN"
+    F.INW.TXN = ""
+
+    FN.CAB.CHEQ = "F.CABK.CHEQUE.RETURNS"
+    F.CAB.CHEQ = ""
+
+    RETURN
+
+***********
+OPEN.FILES:
+***********
+
+    CALL OPF(FN.ECC,F.ECC)
+    CALL OPF(FN.INW.TXN,F.INW.TXN)
+    CALL OPF(FN.CAB.CHEQ,F.CAB.CHEQ)
+
+    RETURN
+
+END

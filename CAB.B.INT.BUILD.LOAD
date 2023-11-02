@@ -1,0 +1,120 @@
+*-----------------------------------------------------------------------------
+* <Rating>-40</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.INT.BUILD.LOAD
+*-----------------------------------------------------------------------------
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.B.INT.BUILD.LOAD
+*---------------------------------------------------------------
+*Description       : This Load routine is used to open the required files.
+*Linked With       : BATCH>BNK/CAB.B.INT.BUILD
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0066
+*---------------------------------------------------------------
+*-----------------------------------------------------------------------------
+* Modification History
+*---------------------
+*23-Nov-12 - ODR-2012-11-0042 - Change in select of accounts
+*22-May-13 - ac_21_cr
+*-----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT.CLASS
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.CURRENCY
+    $INSERT I_F.INTEREST.BASIS
+    $INSERT I_F.ACCT.ACTIVITY
+    $INCLUDE CAB.BP I_CAB.B.INT.BUILD.COMMON
+    $INCLUDE CAB.BP I_F.CAB.CCY.INT.RATE
+    $INCLUDE CAB.BP I_F.CAB.INTACCT.INT.ACCR
+    $INSERT I_F.COMPANY
+
+    GOSUB OPEN.FILES
+    RETURN
+*-----------------------------------------------------------------------------
+OPEN.FILES:
+*----------
+    FN.ACCT.ACTIVITY = 'F.ACCT.ACTIVITY'
+    F.ACCT.ACTIVITY = ''
+
+    FN.CAB.CCY.INT.RATE = 'F.CAB.CCY.INT.RATE'
+    F.CAB.CCY.INT.RATE = ''
+
+    FN.CAB.INTACCT.INT.ACCR = 'F.CAB.INTACCT.INT.ACCR'
+    F.CAB.INTACCT.INT.ACCR = ''
+
+    FN.CAB.L.INT.BUILD = 'F.CAB.L.INT.BUILD'
+    F.CAB.L.INT.BUILD = ''
+
+    FN.ACCOUNT = 'F.ACCOUNT'
+    F.ACCOUNT = ''
+
+    FN.FUNDS.TRANSFER = 'F.FUNDS.TRANSFER'
+    F.FUNDS.TRANSFER = ''
+
+    FN.EB.CONTRACT.BALANCES = 'F.EB.CONTRACT.BALANCES'
+    F.EB.CONTRACT.BALANCES = ''
+
+    FN.ACCOUNT.CLASS = 'F.ACCOUNT.CLASS'
+    F.ACCOUNT.CLASS = ''
+    Y.ACCOUNT.CLASS.ID = 'INTERCO'
+
+    FN.OFS.SOURCE = 'F.OFS.SOURCE'
+    F.OFS.SOURCE = ''
+
+    FN.COMPANY = 'F.COMPANY'
+    F.COMPANY = ''
+
+    FN.CURR = 'F.CURRENCY'
+    F.CURR = ''
+
+    FN.CAB.L.INT.BUILD = 'F.CAB.L.INT.BUILD'
+    F.CAB.L.INT.BUILD = ''
+    CALL OPF(FN.CAB.L.INT.BUILD,F.CAB.L.INT.BUILD)
+
+    FN.AC.SUB.ACCOUNT = 'F.AC.SUB.ACCOUNT'
+    F.AC.SUB.ACCOUNT = ''
+    CALL OPF(FN.AC.SUB.ACCOUNT,F.AC.SUB.ACCOUNT)
+
+    FN.INTEREST.BASIS = 'F.INTEREST.BASIS'
+    F.INTEREST.BASIS = ''
+
+    LOCAL.APPLICATION = 'FUNDS.TRANSFER'
+    LOCAL.FIELD = 'VERSION.NAME':VM:'PAY.NARRATIVE'
+    LOCAL.POS = ''
+    CALL MULTI.GET.LOC.REF(LOCAL.APPLICATION,LOCAL.FIELD,LOCAL.POS)
+    PAY.POS = LOCAL.POS<1,1>
+    PAY.NARR.POS = LOCAL.POS<1,2>
+
+    CALL OPF(FN.FUNDS.TRANSFER,F.FUNDS.TRANSFER)
+    CALL OPF(FN.EB.CONTRACT.BALANCES,F.EB.CONTRACT.BALANCES)
+    CALL OPF(FN.ACCOUNT.CLASS,F.ACCOUNT.CLASS)
+    CALL OPF(FN.CURR,F.CURR)
+    CALL OPF(FN.ACCT.ACTIVITY,F.ACCT.ACTIVITY)
+    CALL OPF(FN.CAB.INTACCT.INT.ACCR,F.CAB.INTACCT.INT.ACCR)
+    CALL OPF(FN.ACCOUNT,F.ACCOUNT)
+    CALL OPF(FN.CAB.CCY.INT.RATE,F.CAB.CCY.INT.RATE)
+    CALL OPF(FN.CAB.L.INT.BUILD,F.CAB.L.INT.BUILD)
+    CALL OPF(FN.INTEREST.BASIS,F.INTEREST.BASIS)
+    CALL OPF(FN.COMPANY,F.COMPANY)
+    CALL OPF(FN.OFS.SOURCE,F.OFS.SOURCE)
+    CALL OPF(FN.AC.SUB.ACCOUNT,F.AC.SUB.ACCOUNT)
+
+    CALL F.READ(FN.ACCOUNT.CLASS,Y.ACCOUNT.CLASS.ID,R.ACCOUNT.CLASS,F.ACCOUNT.CLASS,ERR.ACCOUNT.CLASS)
+    IF NOT(ERR.ACCOUNT.CLASS) THEN
+        Y.CATEGORY = R.ACCOUNT.CLASS<AC.CLS.CATEGORY,1>
+    END
+*ODR-2012-11-0042-S
+    TEMP.CTL.LIST = ''
+    TEMP.CTL.LIST = "SELECT ":FN.ACCOUNT:" WITH AL LIKE 3A":Y.CATEGORY:"...":" AND WITH CURRENCY EQ 'JOD'"
+    TEMP.CTL.LIST<-1> = "SELECT ":FN.ACCOUNT:" WITH AL LIKE 3A":Y.CATEGORY:"...":" AND WITH CURRENCY NE 'JOD'"
+
+    EXECUTE "CLEAR.FILE ":FN.CAB.L.INT.BUILD
+*ODR-2012-11-0042-E
+    RETURN
+*-----------------------------------------------------------------------------------------------------------------------------------
+END

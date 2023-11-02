@@ -1,0 +1,47 @@
+*-----------------------------------------------------------------------------
+* <Rating>-28</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AUTO.RUN.SERVICE.FIELDS
+*-----------------------------------------------------------------------------
+!** FIELD definitions FOR TEMPLATE
+*!
+* @ Gokul J
+* @stereotype fields
+* @uses C_METHODS
+* @uses C_PROPERTIES
+* @package infra.eb
+*----------------------------------------------------------------------------
+* Modification History:
+* Author -
+* Desc -
+* HD Ref No -
+* Date -
+*----------------------------------------------------------------------------- *
+* Description: This template is a common parameter table used for Counterparty
+* Beneficiary Parameter
+*-----------------------------------------------------------------------------
+*** <region name= Header>
+*** <desc>INCLUDE T24.BPs and control logic</desc>
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+
+*-----------------------------------------------------------------------------
+    CALL Table.defineId("SERVICE.ID", T24_String)    ;*Define Table id
+    ID.N = "35" ;  ID.T='A'  ; ID.T<2> = ""
+    ID.CHECKFILE = "TSA.SERVICE"
+
+    field.name = 'WORKING.DAYS'
+    field.type<2> = 'Y_N'
+    field.length = '2'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+
+    field.name = 'XX.TIME'
+    field.type = 'TIME'
+    field.length = '18'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+    CALL Table.setAuditPosition
+    RETURN
+
+END

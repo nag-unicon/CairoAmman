@@ -1,0 +1,51 @@
+*-----------------------------------------------------------------------------
+* <Rating>0</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.PAY.MOVE.TO.HIS.LOAD
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.B.PAY.MOVE.TO.HIS.LOAD
+*---------------------------------------------------------------
+*Description       : Multi threaded load routine.
+*Linked With       : BATCH>BNK/CAB.B.PAY.MOVE.TO.HIS
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0064
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.TELLER
+    $INSERT I_F.FUNDS.TRANSFER
+    $INCLUDE CAB.BP I_F.PAYMENT.DETAILS
+    $INCLUDE CAB.BP I_CAB.B.PAY.MOVE.TO.HIS.COMMON
+
+    FN.TELLER = "F.TELLER"
+    F.TELLER = ""
+    CALL OPF(FN.TELLER,F.TELLER)
+
+    FN.TELLER.HIS = "F.TELLER$HIS"
+    F.TELLER.HIS = ""
+    CALL OPF(FN.TELLER.HIS,F.TELLER.HIS)
+
+    FN.FT = "F.FUNDS.TRANSFER"
+    F.FT= ""
+    CALL OPF(FN.FT,F.FT)
+
+    FN.FTHIS = "F.FUNDS.TRANSFER$HIS"
+    F.FTHIS = ""
+    CALL OPF(FN.FTHIS,F.FTHIS)
+
+    FN.PAY.DET = "F.PAYMENT.DETAILS"
+    F.PAY.DET = ""
+    CALL OPF(FN.PAY.DET,F.PAY.DET)
+
+    FN.PAY.DET.HIS = "F.PAYMENT.DETAILS$HIS"
+    F.PAY.DET.HIS = ""
+    CALL OPF(FN.PAY.DET.HIS,F.PAY.DET.HIS)
+
+    RETURN
+END

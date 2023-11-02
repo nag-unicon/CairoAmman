@@ -1,0 +1,65 @@
+    SUBROUTINE CAB.B.INACTIVE.ACCTS
+*-----------------------------------------------------------------------------
+*Modification Details:
+*=====================
+* Modified by        Date              Description
+* Nuha Tuhul        30-1-2019      Send the Messge to E SIG MQ
+*-----------------------------------------------------------------------------
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    GOSUB INIT
+    GOSUB PROCESS
+    RETURN
+
+*****
+INIT:
+*****
+    F.ACCOUNT.INACTIVE = ''
+    FN.ACCOUNT.INACTIVE = 'F.ACCOUNT'
+    CALL OPF(FN.ACCOUNT.INACTIVE,F.ACCOUNT.INACTIVE)
+
+    FILE.PATH = 'Extract'
+    FILE.NAME = 'Dormant.txt.':TODAY
+    OPENSEQ FILE.PATH,FILE.NAME TO FILE.INACT ELSE
+        CREATE FILE.INACT ELSE
+            STOP
+        END
+    END
+    RETURN
+
+
+********
+PROCESS:
+********
+    CMD.ERR = '';NO.OF.R=''
+    Y.TIME = TIMEDATE()
+    Y.TIME =Y.TIME[1,8]
+
+
+    SEL.CMD = 'SELECT ' : FN.ACCOUNT.INACTIVE : ' WITH DORMANCY.DATE EQ ' : TODAY
+    CALL EB.READLIST ( SEL.CMD,SEL.LIST ,'',NO.OF.REC,RET.CODE)
+
+    LOOP
+        REMOVE INACT.ID FROM SEL.LIST SETTING POS
+    WHILE INACT.ID:POS
+        CALL F.READ(FN.ACCOUNT.INACTIVE,INACT.ID,R.ACCT.INACT,F.ACCOUNT.INACTIVE,INACT.ERROR)
+        IF R.ACCT.INACT THEN
+            ACCT.NO = INACT.ID
+            WRITESEQ ACCT.NO APPEND TO FILE.INACT ELSE END
+        END
+
+        YR.XML.OUT = ''
+        YR.XML.OUT = "<?xml version='1.0' encoding='utf-8'?><Root><PsSystem>PS-SIG</PsSystem>"
+        YR.XML.OUT:= "<RequestDate>":TODAY:"</RequestDate>"
+        YR.XML.OUT:= "<RequestTime>":Y.TIME:"</RequestTime><RequestCode>AccountStatus</RequestCode>"
+        YR.XML.OUT:= "<AccountNumber>":ACCT.NO:"</AccountNumber><StatusofAccount>2</StatusofAccount>"
+        YR.XML.OUT:= "</Root>"
+
+        MSG.ERR = ''
+        CALL CAB.SEND.EXT.MSG(YR.XML.OUT,"SIG",MSG.ERR)
+
+    REPEAT
+
+    RETURN
+END

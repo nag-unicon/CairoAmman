@@ -1,0 +1,47 @@
+*-----------------------------------------------------------------------------
+* <Rating>0</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.INT.BUILD.SELECT
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.B.INT.BUILD.SELECT
+*---------------------------------------------------------------
+*Description       : This select file is to select the IDs from the 'CATEG.INT.ACCT'
+*Linked With       : VERSION>TELLER,NON.CUST.CASH.PAYMENT
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0064
+*---------------------------------------------------------------
+*----------------------------------------------------------------
+* Modification History:
+*----------------------
+*23-Nov-12 - ODR-2012-11-0042 - Change in select of accounts by CONTROL.LIST
+*22-May-13 - AC_21 CR
+*----------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.COMPANY
+    $INSERT I_F.ACCOUNT
+    $INSERT I_BATCH.FILES
+    $INCLUDE CAB.BP I_CAB.B.INT.BUILD.COMMON
+*ODR-2012-11-0042-S
+    IF CONTROL.LIST EQ '' THEN
+        CONTROL.LIST = TEMP.CTL.LIST
+    END
+    SEL.CMD = CONTROL.LIST<1,1>
+
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',NO.OF.RECS,SEL.ERR)
+
+    IF SEL.LIST THEN
+        MORE.INFO.LIST = SPLICE('',CONTROL.LIST<1,1>:'_?_',SEL.LIST)
+    END ELSE
+        RETURN
+    END
+*ODR-2012-11-0042-E
+    CALL BATCH.BUILD.LIST('',MORE.INFO.LIST)
+
+    RETURN
+*-----------------------------------------------------------------
+END

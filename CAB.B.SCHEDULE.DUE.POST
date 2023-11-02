@@ -1,0 +1,62 @@
+*-----------------------------------------------------------------------------
+* <Rating>-80</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.SCHEDULE.DUE.POST
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_BATCH.FILES
+
+    GOSUB INIT
+    GOSUB BUILD.LIST
+
+    RETURN
+*****
+INIT:
+*****
+
+    FN.REP.FLAT = "F.REPAY.LIST"
+    F.REP.FLAT = ""
+    CALL OPF(FN.REP.FLAT,F.REP.FLAT)
+*
+    RECORD.LIST =''
+
+    RECORD.LIST<-1> = "Branch Name,Product Name,Category,Arrangement ID,Account No,Cur,Customer ID,C Status,Accr Status,"
+    RECORD.LIST    := "Overdue Status,Disb Date,Paym start D,Next Paym D,Maturity D,First Int A,First int D,GraceInt,"
+    RECORD.LIST    := "Second int A,Second int D,Sec-Firt int P,First Ac A,First Ac D,GraceAc,Second Ac D,Second Ac A,"
+    RECORD.LIST    := "Sec-First Ac P,FirstPay-Type,FirstBill-Type,Last Ac A,Last Ac D,BeforeLast Ac A,BeforeLast Ac D,"
+    RECORD.LIST    := "Last-Before Ac P,Last-Before Ac A,Last int D,Last int A,Before Last int D,Before Last int A,"
+    RECORD.LIST    := "Last-Before Int P,Last-First Ac A,Annualcom,Last-Disb P,Maturity-Disb P,NO.BILL AC,NO.BILL int,"
+    RECORD.LIST    := "PayType1,PayType2,PayType3,PayType4,PayType5,PayType6,PayType7,PayType8,PayType9,PayTypeOther,"
+    RECORD.LIST    := "PayMethod1,PayMethod2,PayProp1,PayProp2,PayProp3,PayProp4,PayPropOther,PaymentFreq"
+
+    RETURN
+
+***********
+BUILD.LIST:
+***********
+
+    SEL.CMD = '' ; SEL.ERR =''
+    SEL.CNT = ''
+    KEY.LIST = ''
+
+    SEL.CMD = 'SELECT ':FN.REP.FLAT
+    CALL EB.READLIST(SEL.CMD,KEY.LIST,'',SEL.CNT,SEL.ERR)
+    GOSUB WRITE.LIST
+
+    RETURN
+
+***********
+WRITE.LIST:
+***********
+    FOR I=1 TO SEL.CNT
+        CALL F.READ(FN.REP.FLAT,KEY.LIST<I>,Y.DATA,F.REP.FLAT,ERR)
+        RECORD.LIST<-1> = Y.DATA
+    NEXT I
+    IF RECORD.LIST THEN
+        KEY.FORMAT = "AA.SCHDULE.PAYMENT.csv"
+        WRITELIST RECORD.LIST TO KEY.FORMAT
+    END
+
+    RETURN
+END

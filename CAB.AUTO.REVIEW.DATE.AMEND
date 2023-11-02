@@ -1,0 +1,53 @@
+    SUBROUTINE CAB.AUTO.REVIEW.DATE.AMEND
+*-----------------------------------------------------------------------------
+*Modification Details:
+*=====================
+* Date         Modified by       Description
+* 20-03-2017   Nuha Tuhul        check KYC FLAG,if yes CALCAUTE Next Kyc DATE
+*-----------------------------------------------------------------------------
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT T24.BP I_F.CUSTOMER
+
+    GOSUB INIT
+    IF YR.KYC.FLAG = 'YES'  THEN
+        GOSUB PROCESS
+    END ELSE
+        R.NEW(EB.CUS.AUTO.NEXT.KYC.REVIEW.DATE)  = R.OLD(EB.CUS.AUTO.NEXT.KYC.REVIEW.DATE)
+        R.NEW(EB.CUS.LAST.KYC.REVIEW.DATE)       = R.OLD(EB.CUS.LAST.KYC.REVIEW.DATE)
+    END
+
+    RETURN
+
+INIT:
+    CALL MULTI.GET.LOC.REF("CUSTOMER","KYC.FLAG",LOC.POS)
+    KYC.FLAG.POS       = LOC.POS<1,1>
+    YR.KYC.FLAG        =R.NEW(EB.CUS.LOCAL.REF)<1,KYC.FLAG.POS>
+
+    RETURN
+
+PROCESS:
+    IN.FREQ = ''
+    TEMP.COMI = ''
+
+    IF ID.COMPANY MATCHES 'JO0090001':VM:'JO0091010':VM:'JO0091013':VM:'JO0091017':VM:'JO0091012' THEN
+        Y.PROCEED.FLAG = ''
+    END ELSE
+        Y.PROCEED.FLAG = 1
+    END
+
+    IF Y.PROCEED.FLAG THEN
+        IN.FREQ = TODAY:'M24':TODAY[7,2]
+
+        R.NEW(EB.CUS.LAST.KYC.REVIEW.DATE) = TODAY
+        TEMP.COMI = COMI
+        COMI = IN.FREQ
+        IF COMI THEN
+            CALL CFQ
+        END
+        R.NEW(EB.CUS.AUTO.NEXT.KYC.REVIEW.DATE) = COMI[1,8]
+*        R.NEW(EB.CUS.LAST.KYC.REVIEW.DATE) = TODAY
+        COMI = TODAY
+    END
+    RETURN
+END

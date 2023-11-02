@@ -1,0 +1,80 @@
+    SUBROUTINE CAB.B.SAVE.LOTTERY.LOAD
+
+*----------------------------------------------------------------------------------------------------------------------------------
+* Modification History:
+* Name              Date              Details
+*
+* Muthu             13-06-2019        1. Introduced a new parameter to define the minimum balance and file path to take the backup.
+*                                     2. Added a new column Min Flag to indicate the account which reached the min balance
+*                                        within the campaign date (Period between campaign date & Till last working date.
+*----------------------------------------------------------------------------------------------------------------------------------
+
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT T24.BP I_F.ACCOUNT
+    $INSERT T24.BP I_F.DATES
+    $INSERT T24.BP I_F.ACCT.ACTIVITY
+    $INSERT CAB.BP I_CAB.LOT.COMMON
+    GOSUB INIT
+
+    GOSUB GET.LOCAL.SERVICE.PARAM
+
+    RETURN
+
+GET.LOCAL.SERVICE.PARAM:
+
+    FN.CAB.LOCAL.SERVICE.PARAM = "F.CAB.LOCAL.SERVICE.PARAM"
+    F.CAB.LOCAL.SERVICE.PARAM = ""
+    CALL OPF(FN.CAB.LOCAL.SERVICE.PARAM, F.CAB.LOCAL.SERVICE.PARAM)
+
+    R.CAB.LOCAL.SERVICE.PARAM = ""
+    ERR.CAB.LOCAL.SERVICE.PARAM = ""
+    CALL CACHE.READ(FN.CAB.LOCAL.SERVICE.PARAM, "SYSTEM", R.CAB.LOCAL.SERVICE.PARAM, ERR.CAB.LOCAL.SERVICE.PARAM)
+
+    RETURN
+
+INIT:
+*****
+
+    FN.ACC = 'F.ACCOUNT'
+    F.ACC  = ''
+    CALL OPF(FN.ACC,F.ACC)
+
+    FN.ACCT.ACTIVITY = 'F.ACCT.ACTIVITY'
+    F.ACCT.ACTIVITY = ''
+    CALL OPF(FN.ACCT.ACTIVITY,F.ACCT.ACTIVITY)
+
+    FN.CUS = 'F.CUSTOMER'
+    F.CUS  = ''
+    CALL OPF(FN.CUS,F.CUS)
+
+    FN.ECB = 'F.EB.CONTRACT.BALANCES'
+    F.ECB  = ''
+    CALL OPF(FN.ECB,F.ECB)
+
+    FN.FLAT.FILE = 'F.CAB.LOT.FILE'
+    F.FLAT.FILE  = ''
+    CALL OPF(FN.FLAT.FILE,F.FLAT.FILE)
+
+
+    APP.NAME  = 'ACCOUNT'
+    APP.FIELD = 'DORMANCY.STATUS'
+    APP.POS   = ''
+    CALL MULTI.GET.LOC.REF(APP.NAME,APP.FIELD,APP.POS)
+
+    Y.DOR.POS = APP.POS<1,1>
+    Y.POS.VAL = '40':VM:'41'
+    Y.CUS.POS.VAL = '12':VM:'14'
+    Y.SEC.VAL = '1001':VM:'1009':VM:'1010'
+
+    ACTIVIT.ID.DATE = R.DATES(EB.DAT.LAST.WORKING.DAY)
+    CUR.DATE = ACTIVIT.ID.DATE[1,6]
+!!    YREGION = ''
+!!    YDAYS.ORIG = '1M'
+!!    CALL CALENDAR.DAY(CUR.DATE,'-',YDAYS.ORIG)
+!!    YYYYMM = YDAYS.ORIG
+!!    CALL GET.LAST.DOM(YYYYMM,START.DATE,START.DAY,MONTH.NAME)
+    Y.START.DATE = CUR.DATE:'01'
+    Y.END.DATE = ACTIVIT.ID.DATE
+
+    RETURN

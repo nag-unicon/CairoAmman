@@ -1,0 +1,67 @@
+*-----------------------------------------------------------------------------
+* <Rating>-25</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.PROTOCOL.EXT.POST
+*-----------------------------------------------------------------------------
+*
+*-----------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+*
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_BATCH.FILES
+    $INSERT I_F.DATES
+    $INSERT I_F.COMPANY
+*-----------------------------------------------------------------------------
+*
+    GOSUB INIT      ;*
+    GOSUB PROCESS   ;*
+*
+    RETURN
+*-----------------------------------------------------------------------------
+*** <region name= INIT>
+INIT:
+*** <desc> </desc>
+*
+    FN.REP.FILE = BATCH.DETAILS<3,1>
+    F.REP.FILE = ''
+    CALL OPF(FN.REP.FILE,F.REP.FILE)
+*
+    RC.ID = 'CAB_PROTOCOL.EXTRACT':'.':TODAY:'.csv'
+    SEL.RC.ID = 'CAB_PROTOCOL.EXTRACT':'.':TODAY:'-...'
+*
+    R.FINAL.DATA = ''
+    R.FINAL.DATA = "ID,PROCESS_DATE,DATE_VERSION,TIME,TIME_MSECS,TERMINAL_ID,PHANTOM_ID,COMPANY_ID,USER,APPLICATION,LEVEL_FUNCTION,OBJ_ID,REMARK,CLIENT_IP_ADDR,LOCAL_DATE_TIME,SELECTION_FIELD,SELECTION_OPERAND,SELECTION_VALUE,PW_ACTIVITY_TXN_ID,CHANNEL,CLASSIFICATION"
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------
+*** <region name= PROCESS>
+PROCESS:
+*** <desc> </desc>
+*
+    SEL.CMD = "SELECT ":FN.REP.FILE:" WITH @ID LIKE '":SEL.RC.ID:"'"
+    SEL.LIST = '' ; NO.OF.REC = '' ; SEL.ERR = ''
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',NO.OF.REC,SEL.ERR)
+*
+    LOOP
+        REMOVE SEL.ID FROM SEL.LIST SETTING POS
+    WHILE SEL.ID:POS
+        R.REC.DATA = ''
+        READ R.REC.DATA FROM F.REP.FILE,SEL.ID THEN
+            R.FINAL.DATA<-1> = R.REC.DATA
+            DELETE F.REP.FILE,SEL.ID
+        END
+    REPEAT
+*
+    WRITE R.FINAL.DATA TO F.REP.FILE,RC.ID ON ERROR
+        TEXT = "Unable to write to  file"
+        CALL FATAL.ERROR("CAB.B.PROTOCOL.EXT.POST")
+    END
+*
+    RETURN
+*-----------------------------------------------------------------------------
+
+END

@@ -1,0 +1,45 @@
+*-----------------------------------------------------------------------------
+* <Rating>0</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.UPD.RETN.DORMN.LOAD
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.B.UPD.RETN.DORMN.LOAD
+*---------------------------------------------------------------
+*Description       : Multi Threaded load routine
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0064
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INCLUDE CAB.BP I_F.PAYMENT.BATCHES
+    $INCLUDE CAB.BP I_F.PAYMENT.DETAILS
+    $INCLUDE CAB.BP I_F.PAYMENT.RETURNED
+    $INCLUDE CAB.BP I_F.CAB.FILE.PARAMETER
+    $INCLUDE CAB.BP I_CAB.B.UPD.RETN.DORMN.COMMON
+
+    FN.PAY.BAT = "F.PAYMENT.BATCHES"
+    F.PAY.BAT = ""
+    CALL OPF(FN.PAY.BAT,F.PAY.BAT)
+
+    FN.PAY.DET = "F.PAYMENT.DETAILS"
+    F.PAY.DET = ""
+    CALL OPF(FN.PAY.DET,F.PAY.DET)
+
+    FN.PAY.RET = "F.PAYMENT.RETURNED"
+    F.PAY.RET = ""
+    CALL OPF(FN.PAY.RET,F.PAY.RET)
+
+    FN.CAB.FILE = "F.CAB.FILE.PARAMETER"
+    F.CAB.FILE = ""
+    CALL OPF(FN.CAB.FILE,F.CAB.FILE)
+
+    RETURN
+END

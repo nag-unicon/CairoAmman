@@ -1,0 +1,61 @@
+*-----------------------------------------------------------------------------
+* <Rating>0</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.UPD.RET.CHQ(Y.ID)
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.B.OVERDRAWN.UPD.SELECT
+*---------------------------------------------------------------
+*Description       : This routine is a COB routine is to handle the
+*                    cheque returns
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2012-01-0044
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INCLUDE CAB.BP I_F.CAB.ECC.RET.CHEQUES
+    $INCLUDE CAB.BP I_F.CAB.INW.CLR.TXN
+    $INCLUDE CAB.BP I_F.CABK.CHEQUE.RETURNS
+    $INCLUDE CAB.BP I_CAB.B.UPD.RET.CHQ.COMMON
+
+    CALL F.READ(FN.ECC,Y.ID,R.ECC,F.ECC,ECC.ERR)
+    IF R.ECC THEN
+        Y.RETURNED.DATE = R.ECC<CAB.ECC.RET.CHEQUES.RETURNED.DATE>
+        Y.CHEQUE.AMOUNT = R.ECC<CAB.ECC.RET.CHEQUES.CHEQUE.AMOUNT>
+    END ELSE
+        MESSAGE.INFO<1> = 'CAB.B.UPD.RET.CHQ'
+        MESSAGE.INFO<4> = 'Cannot find the CAB.ECC.RET.CHQ record:':Y.ID
+        CALL FATAL.ERROR(MESSAGE.INFO)
+        RETURN
+    END
+    CLR.TXN.ID = FIELD(Y.ID,'-',2)
+    CALL F.READ(FN.INW.TXN,CLR.TXN.ID,R.INW.TXN,F.INW.TXN,TXN.ERR)
+    IF R.INW.TXN THEN
+        FUNDS.TRANS.ID = R.INW.TXN<CAB.INW.CLR.TXN.FUNDS.TRANS.ID>
+        REV.MARKER = R.INW.TXN<CAB.INW.CLR.TXN.REV.MARKER>
+    END
+    IF REV.MARKER EQ "Y" THEN
+        CHEQ.RET.ID = FIELD(Y.ID,'-',1):"-":TODAY[1,6]
+        CALL F.READU(FN.CAB.CHEQ,CHEQ.RET.ID,R.CAB.CHEQ,F.CAB.CHEQ,CHEQ.ERR,RETRY)
+        IF R.CAB.CHEQ THEN
+            REC.CNT = DCOUNT(R.CAB.CHEQ<CHEQ.RET.RET.TXN.ID>,VM) + 1
+            R.CAB.CHEQ<CHEQ.RET.RET.TXN.ID,REC.CNT> = FUNDS.TRANS.ID
+            R.CAB.CHEQ<CHEQ.RET.DATE,REC.CNT> = Y.RETURNED.DATE
+            R.CAB.CHEQ<CHEQ.RET.RET.AMOUNT,REC.CNT> = Y.CHEQUE.AMOUNT
+        END ELSE
+            R.CAB.CHEQ<CHEQ.RET.RET.TXN.ID> = FUNDS.TRANS.ID
+            R.CAB.CHEQ<CHEQ.RET.DATE> = Y.RETURNED.DATE
+            R.CAB.CHEQ<CHEQ.RET.RET.AMOUNT> = Y.CHEQUE.AMOUNT
+        END
+        CALL F.WRITE(FN.CAB.CHEQ,CHEQ.RET.ID,R.CAB.CHEQ)
+    END
+
+    RETURN
+END

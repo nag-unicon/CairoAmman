@@ -1,0 +1,103 @@
+    SUBROUTINE CAB.B.SAVE.LOTTERY.POST
+* -----------------------------------------------------------------------------
+*Modification Details:
+*=====================
+* Modified by        Date              Description
+* Nuha Tuhul        06-3-2019         Display english name and arabic
+* Muthu             13-06-2019        Added a new column Min Flag to indicate the account which reached the min balance
+*                                     within the campaign date (Period between campaign date & Till last working date.
+*-----------------------------------------------------------------------------
+
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT CAB.BP I_CAB.LOT.COMMON
+    $INSERT I_F.CAB.LOCAL.SERVICE.PARAM
+
+    GOSUB GET.REQUIRED.INFO
+    GOSUB PROCESS
+
+    IF R.CAB.LOCAL.SERVICE.PARAM<CAB.LOC.PARAM.FILE.PATHNAME> THEN
+        GOSUB DO.WRITE
+    END
+
+    RETURN
+
+GET.REQUIRED.INFO:
+
+    FN.CAB.LOCAL.SERVICE.PARAM = "F.CAB.LOCAL.SERVICE.PARAM"
+    F.CAB.LOCAL.SERVICE.PARAM = ""
+    CALL OPF(FN.CAB.LOCAL.SERVICE.PARAM, F.CAB.LOCAL.SERVICE.PARAM)
+
+    R.CAB.LOCAL.SERVICE.PARAM = ""
+    ERR.CAB.LOCAL.SERVICE.PARAM = ""
+    CALL CACHE.READ(FN.CAB.LOCAL.SERVICE.PARAM, "SYSTEM", R.CAB.LOCAL.SERVICE.PARAM, ERR.CAB.LOCAL.SERVICE.PARAM)
+
+    FN.FILE.PATH = R.CAB.LOCAL.SERVICE.PARAM<CAB.LOC.PARAM.FILE.PATHNAME>
+    F.FILE.PATH = ""
+
+    OPEN FN.FILE.PATH TO F.FILE.PATH ELSE
+        CREATE F.FILE.PATH ELSE
+            NULL
+        END
+    END
+
+    RETURN
+
+PROCESS:
+********
+    FN.FLAT.FILE = 'F.CAB.LOT.FILE'
+    F.FLAT.FILE = ''
+    CALL OPF(FN.FLAT.FILE,F.FLAT.FILE)
+
+    FN.SAVED.LISTS ='&SAVEDLISTS&'
+    F.SAVEDLISTS = ''
+
+    OPEN '','&SAVEDLISTS&' TO F.SAVEDLISTS ELSE
+        ERR.OPEN ='EB.RTN.CANT.OPEN.&SAVEDLISTS'
+    END
+
+    YR.DIR = 'RETAIL.LOTTERY'
+    OPEN YR.DIR TO YR.PATH ELSE
+        CREATE YR.PATH ELSE
+            YR.CMD = 'SH "mkdir "':YR.DIR
+            EXECUTE YR.CMD
+            OPEN YR.DIR TO YR.PATH ELSE NULL
+        END
+    END
+    Y.REPORT.LIST<-1> = "ACNO,BRN,PID,AcctStatus,CCY,DUR,BAL,ND,CustType,UDF,CustomerNo,English Name,Arabic Name,Min Flag"
+    SEL.POS.CMD = 'SELECT ': FN.FLAT.FILE :' WITH @ID LIKE ...': TODAY:'...'
+    CALL EB.READLIST(SEL.POS.CMD,SEL.POS.LIS,'',NO.REC,SEL.ERR)
+    IF SEL.POS.LIS NE '' THEN
+        GOSUB FINAL.OUTPUT
+    END
+
+    RETURN
+
+FINAL.OUTPUT:
+*************
+
+    LOOP
+        REMOVE Y.SEL.LIST FROM SEL.POS.LIS SETTING SEL.POS
+    WHILE Y.SEL.LIST:SEL.POS
+        R.FLAT.FILE = ''
+        CALL F.READ(FN.FLAT.FILE,Y.SEL.LIST,R.FLAT.FILE,F.FLAT.FILE,FLAT.ERR)
+        Y.REPORT.LIST<-1> = R.FLAT.FILE
+        CALL F.DELETE(FN.FLAT.FILE,Y.SEL.LIST)
+    REPEAT
+    IF Y.REPORT.LIST NE '' THEN
+*    CALL F.WRITE(FN.FLAT.FILE,Y.FLAT.ID,Y.REPORT.LIST)
+        Y.FLAT.ID = 'LOTTERY_': TODAY :'.csv'
+        WRITE Y.REPORT.LIST ON YR.PATH,Y.FLAT.ID ON ERROR NULL
+    END
+    RETURN
+
+DO.WRITE:
+
+    WRITE Y.REPORT.LIST ON F.FILE.PATH,Y.FLAT.ID ON ERROR
+        PRINT "UNABLE TO WRITE TO ":F.FILE.PATH
+    END
+
+    RETURN
+
+END
+

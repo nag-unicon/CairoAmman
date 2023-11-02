@@ -1,0 +1,30 @@
+*-----------------------------------------------------------------------------
+* <Rating>0</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.UPD.RET.CHQ.SELECT
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.B.UPD.RET.CHQ.SELECT
+*---------------------------------------------------------------
+*Description       : This routine is a COB routine is to handle the
+*                    cheque returns
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2012fi-01-0044
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INCLUDE CAB.BP I_CAB.B.UPD.RET.CHQ.COMMON
+
+    SEL.CMD = "SELECT ":FN.ECC:" WITH RETURNED.DATE EQ ":TODAY
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,"",YNO,YERR)
+    CALL BATCH.BUILD.LIST(SEL.CMD,SEL.LIST)
+
+    RETURN
+END

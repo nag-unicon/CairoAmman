@@ -1,0 +1,46 @@
+*-----------------------------------------------------------------------------
+* <Rating>0</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.OVERDRAWN.UPD.SELECT
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.B.OVERDRAWN.UPD.SELECT
+*---------------------------------------------------------------
+*
+*Description       : This routine is a COB routine is to handle the
+*                    overdrawn processing for accounts.
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2012fi-01-0044
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.DATES
+    $INSERT I_GTS.COMMON
+    $INSERT I_F.ACCOUNT
+    $INCLUDE CAB.BP I_CAB.B.OVERDRAWN.UPD.COMMON
+
+    CAT.CNT = DCOUNT(Y.OVER.CATEGORY,VM)
+    CNT = 1
+    LOOP
+    WHILE CNT LE CAT.CNT
+        IF CNT EQ "1" THEN
+            APPEND.ARR = " WITH CATEGORY EQ ":Y.OVER.CATEGORY<1,CNT>
+        END ELSE
+            APPEND.ARR:= " OR CATEGORY EQ ":Y.OVER.CATEGORY<1,CNT>
+        END
+        CNT = CNT + 1
+    REPEAT
+
+    SEL.CMD = "SELECT ":FN.ACC:APPEND.ARR
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,"",YNO,YERR)
+    CALL BATCH.BUILD.LIST(SEL.CMD,SEL.LIST)
+
+    RETURN
+END 

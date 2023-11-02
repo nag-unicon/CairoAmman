@@ -1,0 +1,34 @@
+*-----------------------------------------------------------------------------
+* <Rating>-10</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.CHQ.ISSUE.RES.SELECT
+*-------------------------------------------------------------------------------------------------------------------
+* Company   Name    : CABK Bank
+* Developed By      : Temenos Application Management
+* Reference         : ODR-2011-10-0063
+*-------------------------------------------------------------------------------------------------------------------
+* Program Name      : CAB.B.CHQ.ISSUE.RES
+* Author            : Abdul Rahman. J
+* Date              : 23 JAN 2012
+*-------------------------------------------------------------------------------------------------------------------
+* Description       :
+* Type              : BATCH Routine
+* Linked with       : Attached to the BATCH record
+* In  Parameter     : None
+* Out Parameter     : None
+*-------------------------------------------------------------------------------------------------------------------
+* Modification History
+* Reference     Date
+*
+*-------------------------------------------------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INCLUDE CAB.BP I_CAB.CHQ.RESERVED.COMMON
+
+    CALL EB.CLEAR.FILE(FN.CHEQUE.ISSUE.RESERVED,F.CHEQUE.ISSUE.RESERVED)
+    SEL.CMD = "SELECT ":FN.CHEQUE.ISSUE:" WITH CHEQUE.STATUS EQ 88"
+    CALL EB.READLIST(SEL.CMD,CHQ.RESERVD,'',NREC,RETURN.CODE)
+    CALL BATCH.BUILD.LIST("",CHQ.RESERVD)
+    RETURN
+
+END

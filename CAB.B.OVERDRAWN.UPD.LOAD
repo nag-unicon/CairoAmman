@@ -1,0 +1,106 @@
+*-----------------------------------------------------------------------------
+* <Rating>-40</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.OVERDRAWN.UPD.LOAD
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.B.OVERDRAWN.UPD.LOAD
+*---------------------------------------------------------------
+*
+*Description       : This routine is a COB routine is to handle the
+*                    overdrawn processing for accounts.
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2012-01-0044
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_GTS.COMMON
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.DATES
+    $INSERT I_F.OFS.SOURCE
+    $INCLUDE CAB.BP I_F.CAB.FILE.PARAMETER
+    $INCLUDE CAB.BP I_F.CABK.OVERDUE.LOCAL.CATEGORY
+    $INCLUDE CAB.BP I_F.CABK.OVERDUE.PARAMETER
+    $INCLUDE CAB.BP I_CAB.B.OVERDRAWN.UPD.COMMON
+
+    GOSUB INIT.FILES
+    GOSUB OPEN.FILES
+    GOSUB PROCESS
+
+    RETURN
+
+***********
+INIT.FILES:
+***********
+
+    FN.ACC = "F.ACCOUNT"
+    F.ACC = ""
+
+    FN.OFS.SOURCE = "F.OFS.SOURCE"
+    F.OFS.SOURCE = ""
+
+    FN.OVR.LCAT = "F.CABK.OVERDUE.LOCAL.CATEGORY"
+    F.OVR.LCAT = ""
+
+    FN.OVR.PARM = "F.CABK.OVERDUE.PARAMETER"
+    F.OVR.PARM = ""
+
+    FN.CAB.FILE = "F.CAB.FILE.PARAMETER"
+    F.CAB.FILE = ""
+
+    RETURN
+
+***********
+OPEN.FILES:
+***********
+
+    CALL OPF(FN.ACC,F.ACC)
+    CALL OPF(FN.OFS.SOURCE,F.OFS.SOURCE)
+    CALL OPF(FN.OVR.LCAT,F.OVR.LCAT)
+    CALL OPF(FN.OVR.PARM,F.OVR.PARM)
+    CALL OPF(FN.CAB.FILE,F.CAB.FILE)
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    LOCAL.APPLICATION = 'ACCOUNT'
+    LOCAL.FIELD = 'L.OVERDUE.DATE':VM:'L.AGING.DAYS':VM:'L.AGING.STATUS':VM:'L.STATUS.CHANGE':VM:'L.PREVS.STATUS'
+    LOCAL.POS = ''
+    CALL MULTI.GET.LOC.REF(LOCAL.APPLICATION,LOCAL.FIELD,LOCAL.POS)
+    L.OVERDUE.DATE.POS = LOCAL.POS<1,1>
+    L.AGING.DAYS.POS = LOCAL.POS<1,2>
+    L.AGING.STATUS.POS = LOCAL.POS<1,3>
+    L.STATUS.CHANGE.POS = LOCAL.POS<1,4>
+    L.PREVIOUS.STATUS.POS = LOCAL.POS<1,5>
+    CALL F.READ(FN.OVR.LCAT,"OVERDRAWN",R.OVR.LCAT,F.OVR.LCAT,LCAT.ERR)
+    IF R.OVR.LCAT THEN
+        Y.OVER.CATEGORY = R.OVR.LCAT<OVER.CAT.CATEGORY>
+    END
+    CALL F.READ(FN.OVR.PARM,"OVERDRAWN",R.OVR.PARM,F.OVR.PARM,PARM.ERR)
+    IF R.OVR.PARM THEN
+        Y.STATUS.CODE = R.OVR.PARM<OVER.PAR.STATUS.CODE>
+        Y.MIN.DAYS = R.OVR.PARM<OVER.PAR.MIN.DAYS>
+        Y.MAX.DAYS = R.OVR.PARM<OVER.PAR.MAX.DAYS>
+    END
+    CALL F.READ(FN.CAB.FILE,"LI32",R.CAB.FILE,F.CAB.FILE,CAB.FILE.ERR)
+    IF R.CAB.FILE THEN
+        OFS.SOURCE.ID = R.CAB.FILE<CAB.FIL.OFS.SOURCE>
+    END
+    OFS$SOURCE.ID = OFS.SOURCE.ID
+    CALL F.READ(FN.OFS.SOURCE,OFS.SOURCE.ID,R.OFS.SOURCE,F.OFS.SOURCE,OFS.SOURCE.READ.ERR)
+    IF R.OFS.SOURCE THEN
+        OFS$SOURCE.REC = R.OFS.SOURCE
+    END
+
+    RETURN
+END 

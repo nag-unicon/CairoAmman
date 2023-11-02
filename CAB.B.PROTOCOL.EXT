@@ -1,0 +1,101 @@
+*-----------------------------------------------------------------------------
+* <Rating>38</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.B.PROTOCOL.EXT(Y.ID)
+*-----------------------------------------------------------------------------
+* Company Name      : Cairo Amman Bank, Jordan
+* Developed By      : Saturn Solutions FZE
+* Development Ref   : T24 integration with new SEIM solution (SOC)
+*-----------------------------------------------------------------------------
+* Subroutine Type   : Batch/Service Routine.
+* Attached to       : BATCCH>BNK/FILE.TIDY.UP.
+* Attached as       : Start of day batch routine.
+*
+* Description       : Protocol extration.
+*
+*-----------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+*
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_BATCH.FILES
+    $INSERT I_F.DATES
+    $INSERT I_F.PROTOCOL
+    $INSERT I_CAB.B.PROTOCOL.EXT.COMMON
+*-----------------------------------------------------------------------------
+*
+    CALL OCOMO('Processing Record = ':Y.ID)
+*
+    IF NUM(Y.ID) THEN
+        R.PROTOCOL = '' ; YERR = '' ; SAVE.R.PROTOCOL = '' ; Y.CLASSIFICATION = 'SECURITY'
+        CALL F.READ(FN.PROTOCOL,Y.ID,R.PROTOCOL,F.PROT,YERR)
+*
+        Y.PROTOCOL.DATE = R.PROTOCOL<EB.PTL.PROCESS.DATE>
+        Y.PROTOCOL.APPLN = FIELD(R.PROTOCOL<EB.PTL.APPLICATION>,',',1)
+*
+        IF Y.PROTOCOL.DATE LT TODAY AND Y.PROTOCOL.APPLN MATCHES APPLN.LIST THEN
+            IF Y.PROTOCOL.APPLN MATCHES PROFILE.APPLN.LIST THEN       ;* For User and USER.SMS.GROUP, only extract locally updated PROTOCOL records.
+                IF INDEX(R.PROTOCOL<EB.PTL.REMARK>,'Profile Changes',1) THEN
+                    Y.CLASSIFICATION = 'AUDIT'
+                    GOSUB PROCESS
+                END
+            END ELSE
+                GOSUB PROCESS
+            END
+        END
+    END
+*
+    RETURN
+*-----------------------------------------------------------------------------
+PROCESS:
+*------*
+*
+    SAVE.R.PROTOCOL = R.PROTOCOL
+*
+    IF Y.PROTOCOL.DATE EQ '' THEN
+        Y.PROTOCOL.DATE = R.DATES(EB.DAT.LAST.WORKING.DAY)
+    END
+    SAVE.R.PROTOCOL<EB.PTL.PROCESS.DATE> = OCONV(ICONV(Y.PROTOCOL.DATE,"D"),'D4')
+*
+    SAVE.R.PROTOCOL<EB.PTL.TIME> = FMT(SAVE.R.PROTOCOL<EB.PTL.TIME>,'L##:##:##')
+*
+    IF SAVE.R.PROTOCOL<EB.PTL.DATE.VERSION> EQ '' THEN
+        SAVE.R.PROTOCOL<EB.PTL.DATE.VERSION> = 1
+    END
+*
+    IF SAVE.R.PROTOCOL<EB.PTL.LEVEL.FUNCTION> EQ '' THEN
+        SAVE.R.PROTOCOL<EB.PTL.LEVEL.FUNCTION> = 1
+    END
+*
+    IF SAVE.R.PROTOCOL<EB.PTL.COMPANY.ID> EQ '' THEN
+        SAVE.R.PROTOCOL<EB.PTL.COMPANY.ID> = 'JO0090001'
+    END
+*
+    IF SAVE.R.PROTOCOL<EB.PTL.LOCAL.TIME> EQ '' THEN
+        SAVE.R.PROTOCOL<14> = SAVE.R.PROTOCOL<EB.PTL.PROCESS.DATE>:' ':SAVE.R.PROTOCOL<EB.PTL.TIME.MSECS>
+    END ELSE
+        Y.LOCAL.DATE.TIME = TODAY[1,2]:SAVE.R.PROTOCOL<EB.PTL.LOCAL.TIME>
+        SAVE.R.PROTOCOL<EB.PTL.LOCAL.TIME> = OCONV(ICONV(Y.LOCAL.DATE.TIME[1,8],"D"),'D4'):' ':FMT(Y.LOCAL.DATE.TIME[9,99],'L##:##:##:###')
+    END
+*
+    IF SAVE.R.PROTOCOL<EB.PTL.CLASSIFICATION> EQ '' THEN
+        SAVE.R.PROTOCOL<20> = Y.CLASSIFICATION    ;* Hard coded due to field CLASSIFICATION is unavailable in T24 release.
+    END
+*
+    CHANGE ',' TO '#' IN SAVE.R.PROTOCOL
+    CHANGE FM TO ',' IN SAVE.R.PROTOCOL
+    SAVE.R.PROTOCOL = Y.ID:',':SAVE.R.PROTOCOL
+*
+    WRITESEQ SAVE.R.PROTOCOL APPEND TO F.REP.FILE THEN
+        CALL OCOMO('Processed Record = ':Y.ID)
+    END ELSE
+        TEXT = "Unable to write to  file"
+        CALL FATAL.ERROR("CAB.B.PROTOCOL.EXT")
+    END
+
+    RETURN
+*-----------------------------------------------------------------------------
+
+END
