@@ -1,0 +1,71 @@
+*-----------------------------------------------------------------------------
+* <Rating>-7</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE  CAB.ACH.DIRECT.DEBIT.IN.REJ.FIELDS
+*-----------------------------------------------------------------------------
+*<doc>
+* Template for field definitions routine YOURAPPLICATION.FIELDS
+* ----------------------------------------------------------------------------
+* Date        : 12-10-2016
+* Modified by : Nuha Tuhul
+* Description : this Template for incoming Direct Debit - When transcation is REJECTED 
+*-----------------------------------------------------------------------------
+*** <region name= Header>
+*** <desc>Inserts and control logic</desc>
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT T24.BP I_DataTypes
+*** </region>
+*-----------------------------------------------------------------------------
+    MAT F = "" ; MAT N = "" ; MAT T = ""
+    MAT CHECKFILE = "" ; MAT CONCATFILE = ""
+    ID.CHECKFILE = "" ; ID.CONCATFILE = ""
+    ID.F = "REF.NO" ; ID.N = "16.1" ; ID.T = "A"
+*    CALL Table.defineId("ID",IdType)       ;* Define Table id
+
+*-----------------------------------------------------------------------------
+*   CALL Table.addField(fieldName, fieldType, args, neighbour)        ;* Add a new fields
+*   CALL Field.setCheckFile(fileName)   ;* Use DEFAULT.ENRICH from SS or just field 1
+
+    CALL Table.addFieldDefinition("BATCH.REF","35", "A", "")
+    CALL Table.addFieldDefinition("INSTRUCTION.REF","35", "A", "")
+    fieldName = "BANK.OPER.CODE"
+    fieldtype = "BANK.OPER.CODE"
+    neighbour = ""
+
+*    CALL Table.addFieldDefinition("BANK.OPER.CODE","8", "":@FM:"ACH-CSCT_ACH-CSDD_ACH-MDDD_ACH-ONDD", "")     ;* Add a new field
+    CALL Table.addFieldWithEbLookup(fieldName, fieldtype , neighbour)
+    CALL Table.addFieldDefinition("TXN.TYPE.CODE","10", "A", "")      ;* Add a new field
+    CALL Table.addFieldDefinition("AMOUNT","15", "AMT", "")
+    CALL Table.addFieldDefinition("CURRENCY","3", "CCY", "")
+    CALL Field.setCheckFile("CURRENCY")
+    CALL Table.addFieldDefinition("VALUE.DATE","10", "D", "")
+    CALL Table.addFieldDefinition("ORIG.DOC.NO","35", "A", "")
+    CALL Table.addFieldDefinition("ORIG.DOC.DATE","10", "D", "")
+    CALL Table.addFieldDefinition("REMITTANCE.INFO","65", "A", "")
+*    CALL Table.addFieldDefinition("ACCOUNT","30", ".ALLACCVAL", "")
+    CALL Table.addFieldDefinition("CR.BANK.CODE","35", "A", "")
+    CALL Table.addFieldDefinition("CR.BANK.NAME","70", "A", "")
+    CALL Table.addFieldDefinition("CR.CUST.NAME","35", "A", "")
+    CALL Table.addFieldDefinition("CR.CUST.ACCT","30", "A", "")
+    CALL Table.addFieldDefinition("DR.BANK.CODE","35", "A", "")
+    CALL Table.addFieldDefinition("DR.BANK.NAME","70", "A", "")
+    CALL Table.addFieldDefinition("DR.CUST.NAME","35", "A", "")
+    CALL Table.addFieldDefinition("DR.CUST.ACCT","30", "A", "")
+    CALL Table.addFieldDefinition("MANDATE.REF","35", "A", "")
+    CALL Table.addFieldDefinition("CHARGE.BEARER","4", "":@FM:"DEBT_CRED_SHA", "")
+    CALL Table.addFieldDefinition("STATUS","8","A","")
+    CALL Table.addField("RESERVED.5",  T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.4",  T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.3",  T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.2",  T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.1",  T24_String, Field_NoInput,"")
+
+*   CALL Table.addFieldWithEbLookup(fieldName,virtualTableName,neighbour)       ;* Specify Lookup values
+*   CALL Field.setDefault(defaultValue) ;* Assign default value
+*-----------------------------------------------------------------------------
+    CALL Table.setAuditPosition         ;* Poputale audit information
+*-----------------------------------------------------------------------------
+    RETURN
+*-----------------------------------------------------------------------------
+END

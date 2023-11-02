@@ -1,0 +1,133 @@
+    SUBROUTINE CAB.ADDON.TAX.CALC.POST
+
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT CAB.BP I_F.CAB.CR.INT.ACCUMULATED
+    $INSERT CAB.BP I_F.CAB.CR.INT.ACCUMULATED.WRK
+    $INSERT T24.BP I_F.STMT.ENTRY
+
+    F.INT.ACCUM = ''
+    FN.INT.ACCUM = 'F.CAB.CR.INT.ACCUMULATED'
+    CALL OPF(FN.INT.ACCUM,F.INT.ACCUM)
+
+    F.INT.ACCUM.WRK = ''
+    FN.INT.ACCUM.WRK = 'F.CAB.CR.INT.ACCUMULATED.WRK'
+    CALL OPF(FN.INT.ACCUM.WRK,F.INT.ACCUM.WRK)
+
+    F.SED = ''
+    FN.SED = 'F.STMT.ENTRY.DETAIL'
+    CALL OPF(FN.SED,F.SED)
+
+    Y.POST.DATE = '' ; Y.END.DATE = ''
+    Y.CURRENT.YEAR = TODAY[1,4]
+    IF Y.CURRENT.YEAR = 2021 THEN
+        Y.POST.DATE = 20210531
+        Y.END.DATE = 20211231
+    END ELSE
+        Y.POST.DATE = TODAY[1,4]:'0101'
+        Y.END.DATE = Y.POST.DATE[1,4]:'1231'
+    END
+
+    Y.SEL.CMD = '' ; Y.SEL.LIST = ''
+    Y.SEL.CMD = 'SELECT ':FN.INT.ACCUM.WRK:' BY CUSTOMER.ID '
+    CALL EB.READLIST(Y.SEL.CMD,Y.SEL.LIST,'','','')
+
+    Y.CUST.IDS = '' ; Y.KEYS = ''
+
+    LOOP
+    UNTIL Y.SEL.LIST<1> = ''
+        Y.ID = '' ; Y.ID = Y.SEL.LIST<1>
+        Y.CUS.ID = '' ; Y.CUS.ID = FIELD(Y.ID,'.',1)
+        Y.POS = ''
+        LOCATE Y.CUS.ID IN Y.CUST.IDS<1> SETTING Y.POS ELSE Y.POS = ''
+        IF Y.POS = '' THEN
+            Y.CUST.IDS<-1> = Y.CUS.ID
+            Y.KEYS<-1> = Y.ID
+        END ELSE
+            Y.KEYS<Y.POS,-1> = Y.ID
+        END
+        DEL Y.SEL.LIST<1>
+    REPEAT
+    FOR Y.CNT = 1 TO DCOUNT(Y.CUST.IDS,@FM)
+        Y.CUS.ID = '' ; Y.CUS.ID = Y.CUST.IDS<Y.CNT>
+        Y.KEY = '' ; Y.KEY = Y.CUS.ID:'-':Y.END.DATE
+        Y.WRITE = 0
+        Y.TAX.KEYS = '' ; Y.ENTRY.IDS = '' ; Y.AMTS = '' ; Y.CONTRACT.IDS = ''
+        FOR Y.CNT1 = 1 TO DCOUNT(Y.KEYS<Y.CNT>,@VM)
+            R.WRK.FILE = '' ; Y.RD.ERR = ''
+            Y.KEY.ID = '' ; Y.KEY.ID = Y.KEYS<Y.CNT,Y.CNT1>
+            CALL F.READ(FN.INT.ACCUM.WRK,Y.KEY.ID,R.WRK.FILE,F.INT.ACCUM.WRK,Y.RD.ERR)
+            IF R.WRK.FILE NE '' THEN
+                FOR Y.CNT2 = 1 TO DCOUNT(R.WRK.FILE<CABCRINTWRK.ENTRY.ID>,@VM)
+                    Y.POS = ''
+                    LOCATE R.WRK.FILE<CABCRINTWRK.TAX.KEY,Y.CNT2> IN Y.TAX.KEYS<1> SETTING Y.POS ELSE Y.POS = ''
+                    IF Y.POS = '' THEN
+                        Y.TAX.KEYS<-1> = R.WRK.FILE<CABCRINTWRK.TAX.KEY,Y.CNT2>
+                        Y.ENTRY.IDS<-1> = R.WRK.FILE<CABCRINTWRK.ENTRY.ID,Y.CNT2>
+                        Y.ID.ENTRY = '' ; Y.ID.ENTRY = R.WRK.FILE<CABCRINTWRK.ENTRY.ID,Y.CNT2>
+                        R.SED = '' ; Y.RD.ERR = ''
+                        CALL F.READ(FN.SED,Y.ID.ENTRY,R.SED,F.SED,Y.RD.ERR)
+                        IF R.SED NE '' THEN
+                            Y.CONTRACT.IDS<-1> = R.SED<AC.STE.TRANS.REFERENCE>
+                        END ELSE
+                            Y.CONTRACT.IDS<-1> = FIELD(Y.KEY.ID,'.',2)
+                        END
+                        Y.AMTS<-1> = R.WRK.FILE<CABCRINTWRK.INT.POST.LCY,Y.CNT2>
+                    END ELSE
+                        Y.ENTRY.IDS<Y.POS,-1> = R.WRK.FILE<CABCRINTWRK.ENTRY.ID,Y.CNT2>
+                        Y.ID.ENTRY = '' ; Y.ID.ENTRY = R.WRK.FILE<CABCRINTWRK.ENTRY.ID,Y.CNT2>
+                        R.SED = '' ; Y.RD.ERR = ''
+                        CALL F.READ(FN.SED,Y.ID.ENTRY,R.SED,F.SED,Y.RD.ERR)
+                        IF R.SED NE '' THEN
+                            Y.CONTRACT.IDS<Y.POS,-1> = R.SED<AC.STE.TRANS.REFERENCE>
+                        END ELSE
+                            Y.CONTRACT.IDS<Y.POS,-1> = FIELD(Y.KEY.ID,'.',2)
+                        END
+                        Y.AMTS<Y.POS,-1> = R.WRK.FILE<CABCRINTWRK.INT.POST.LCY,Y.CNT2>
+                    END
+                NEXT Y.CNT2
+            END
+        NEXT Y.CNT1
+        R.INT.ACCUM = '' ; Y.RD.ERR = ''
+        CALL F.READ(FN.INT.ACCUM,Y.KEY,R.INT.ACCUM,F.INT.ACCUM,Y.RD.ERR)
+        IF R.INT.ACCUM = '' THEN
+            FOR Y.TAX.CNT = 1 TO DCOUNT(Y.TAX.KEYS,@FM)
+                R.INT.ACCUM<CABCRINT.TAX.KEY,Y.TAX.CNT> = Y.TAX.KEYS<Y.TAX.CNT>
+                FOR Y.ENTRY.CNT = 1 TO DCOUNT(Y.ENTRY.IDS<Y.TAX.CNT>,@VM)
+                    R.INT.ACCUM<CABCRINT.ENTRY.ID,Y.TAX.CNT,-1> = Y.ENTRY.IDS<Y.TAX.CNT,Y.ENTRY.CNT>
+                    R.INT.ACCUM<CABCRINT.CONTRACT.ID,Y.TAX.CNT,-1> = Y.CONTRACT.IDS<Y.TAX.CNT,Y.ENTRY.CNT>
+                    R.INT.ACCUM<CABCRINT.INT.POST.LCY,Y.TAX.CNT,-1> = Y.AMTS<Y.TAX.CNT,Y.ENTRY.CNT>
+                    Y.WRITE = 1
+                NEXT Y.ENTRY.CNT
+            NEXT Y.TAX.CNT
+        END ELSE
+            Y.COUNT = '' ; Y.COUNT = DCOUNT(R.INT.ACCUM<CABCRINT.TAX.KEY>,@VM)
+            FOR Y.TAX.CNT = 1 TO DCOUNT(Y.TAX.KEYS,@FM)
+                Y.POS = ''
+                LOCATE Y.TAX.KEYS<Y.TAX.CNT> IN R.INT.ACCUM<CABCRINT.TAX.KEY,1> SETTING Y.POS ELSE Y.POS = ''
+                IF Y.POS = '' THEN
+                    R.INT.ACCUM<CABCRINT.TAX.KEY,Y.COUNT+1> = Y.TAX.KEYS<Y.TAX.CNT>
+                    FOR Y.ENTRY.CNT = 1 TO DCOUNT(Y.ENTRY.IDS<Y.TAX.CNT>,@VM)
+                        R.INT.ACCUM<CABCRINT.ENTRY.ID,Y.COUNT+1,-1> = Y.ENTRY.IDS<Y.TAX.CNT,Y.ENTRY.CNT>
+                        R.INT.ACCUM<CABCRINT.CONTRACT.ID,Y.COUNT+1,-1> = Y.CONTRACT.IDS<Y.TAX.CNT,Y.ENTRY.CNT>
+                        R.INT.ACCUM<CABCRINT.INT.POST.LCY,Y.COUNT+1,-1> = Y.AMTS<Y.TAX.CNT,Y.ENTRY.CNT>
+                        Y.WRITE = 1
+                    NEXT Y.ENTRY.CNT
+                END ELSE
+                    FOR Y.ENTRY.CNT = 1 TO DCOUNT(Y.ENTRY.IDS<Y.TAX.CNT>,@VM)
+                        R.INT.ACCUM<CABCRINT.ENTRY.ID,Y.POS,-1> = Y.ENTRY.IDS<Y.TAX.CNT,Y.ENTRY.CNT>
+                        R.INT.ACCUM<CABCRINT.CONTRACT.ID,Y.POS,-1> = Y.CONTRACT.IDS<Y.TAX.CNT,Y.ENTRY.CNT>
+                        R.INT.ACCUM<CABCRINT.INT.POST.LCY,Y.POS,-1> = Y.AMTS<Y.TAX.CNT,Y.ENTRY.CNT>
+                        Y.WRITE = 1
+                    NEXT Y.ENTRY.CNT
+                END
+            NEXT Y.TAX.CNT
+        END
+        IF Y.WRITE THEN
+            WRITE R.INT.ACCUM TO F.INT.ACCUM,Y.KEY
+        END
+    NEXT Y.CNT
+
+    RETURN
+
+END

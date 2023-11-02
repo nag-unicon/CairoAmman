@@ -1,0 +1,85 @@
+    SUBROUTINE CAB.ADI.FIELDS
+*-----------------------------------------------------------------------------
+*Modification Details:
+*=====================
+* Date        : 24-2-2020
+* Modified by : Nuha Tuhul
+* Description : CAB.ADI.FIELDS
+*-----------------------------------------------------------------------------
+
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_DataTypes
+
+*-------------------------------------------------------------------------------------------------------------------
+    CALL Table.defineId("ID.ACC", T24_String)     ;* Define Table id
+    ID.N = "35" ; ID.T = "A"
+*-------------------------------------------------------------------------------------------------------------------
+    neighbour = '' ;
+    fieldName = 'CHARGE.KEY'                 ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'INTEREST.DAY.BASIS'        ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'TAX.KEY'                   ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'DR.BALANCE.TYPE'           ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'DR.CALCUL.TYPE'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+
+    fieldName = 'XX<DR.BASIC.RATE'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-DR.INT.RATE'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-DR.MARGIN.OPER'             ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-DR.MIN.RATE'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-DR.MARGIN.RATE'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-DR.LIMIT.AMT'             ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX>DR.MAX.RATE'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+
+
+    fieldName = 'DR2.BALANCE.TYPE'                ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'DR2.CALCUL.TYPE'             ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+
+    fieldName = 'XX<DR2.BASIC.RATE'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-DR2.INT.RATE'           ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-DR2.MARGIN.OPER'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX>DR2.MIN.RATE'              ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-DR2.MARGIN.RATE'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-DR2.LIMIT.AMT'          ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX>DR2.MAX.RATE'          ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+
+    fieldName = 'APR.REQUIRED'     ; fieldLength = '35' ;  fieldType = 'A' ;  GOSUB ADD.FIELDS
+    fieldName = 'MAX.LEGAL.RATE'  ; fieldLength = '35' ;  fieldType = 'A'   ;  GOSUB ADD.FIELDS
+    fieldName = 'LINK.TO.GROUP'         ; fieldLength = '35' ;  fieldType = 'A'   ;  GOSUB ADD.FIELDS
+    fieldName = 'MAX.DEBIT.CHG.RATE'    ; fieldLength = '35' ;  fieldType = 'A'   ;  GOSUB ADD.FIELDS
+    fieldName = 'DR.MIN.VALUE'          ; fieldLength = '35' ;  fieldType = 'A'   ;  GOSUB ADD.FIELDS
+    fieldName = 'DR.MIN.WAIVE'          ; fieldLength = '35' ;  fieldType = 'A'   ;  GOSUB ADD.FIELDS
+    fieldName = 'DR2.MIN.VALUE'         ; fieldLength = '35' ;  fieldType = 'A'   ;  GOSUB ADD.FIELDS
+    fieldName = 'DR2.MIN.WAIVE'         ; fieldLength = '35' ;  fieldType = 'A'   ;  GOSUB ADD.FIELDS
+    fieldName = 'COMPOUND.TYPE'         ; fieldLength = '35' ;  fieldType = 'A'   ;  GOSUB ADD.FIELDS
+    fieldName = 'RESERVED.4'            ; fieldLength = '35' ;  fieldType = 'A'   ;  GOSUB ADD.FIELDS
+    fieldName = 'RESERVED.3'            ; fieldLength = '35' ;  fieldType = 'A'   ;  GOSUB ADD.FIELDS
+    fieldName = 'RESERVED.2'            ; fieldLength = '35' ;  fieldType = 'A'   ;  GOSUB ADD.FIELDS
+    fieldName = 'RESERVED.1'            ; fieldLength = '35' ;  fieldType = 'A'   ;  GOSUB ADD.FIELDS
+
+
+    CALL Table.setAuditPosition         ;* Poputale audit information
+
+    RETURN
+*
+*--------------------------------------------------------------------------------------------------------------------
+********************
+ADD.RESERVED.FIELDS:
+********************
+*
+    CALL Table.addField(fieldName, fieldType, args, neighbour)        ;* Add a new fields
+*
+    RETURN
+*
+*-------------------------------------------------------------------------------------------------------------------
+*
+***********
+ADD.FIELDS:
+***********
+*
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour) ;* Add a new field
+*
+    RETURN
+*
+*---------------------------------------------------------------------------------------------------------------------
+END

@@ -1,0 +1,115 @@
+    SUBROUTINE CAB.ACH.DD.REPLY
+*-----------------------------------------------------------------------------
+*DEVELOPED BY:  Nuha Tuhul
+*DEVELOPED ON:  05-09-2016
+*DESCRIPTION : This Reply Messgae for Incoming Direct Debit .
+* Attache with before auth Version .
+*-----------------------------------------------------------------------------
+*Modification Details:
+*=====================
+* Date        :
+* Modified by :
+* Description :
+*-----------------------------------------------------------------------------
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE CAB.BP I_ACH.COMMON
+    $INCLUDE T24.BP I_F.FUNDS.TRANSFER
+    $INCLUDE CAB.BP I_F.CAB.ACH.DIRECT.DEBIT.IN
+    $INCLUDE CAB.BP I_F.CAB.ACH.PARAMETER
+    $INCLUDE CAB.BP I_F.CAB.ACH.DIRECT.DEBIT.IN.REJ
+
+
+    IF V$FUNCTION = 'A' THEN
+        YR.RESULT = 'OK'
+        GOSUB FT.PAR
+    END ELSE
+        IF V$FUNCTION ='D' OR V$FUNCTION ='R' THEN
+            YR.RESULT = "FAIL"
+            GOSUB WRITE.REJ
+            GOSUB XML.FORMAT
+        END
+    END
+    RETURN
+
+*************
+FT.PAR:
+*************
+
+    CALL MULTI.GET.LOC.REF("FUNDS.TRANSFER","BATCH.REF":@VM:"INSTUCTIONREF":@VM:"CREDITBANKCODE",POS)
+
+    B.POS = POS<1,1>
+    I.POS = POS<1,2>
+    C.POS = POS<1,3>
+
+    R.CAB.ACH.PARAMETER = '' ; ACH.PARAM = ''
+    CALL CACHE.READ("F.CAB.ACH.PARAMETER","SYSTEM",R.CAB.ACH.PARAMETER,ACH.PARAM)
+
+    YR.CCY = R.NEW(ACH.DD.CURRENCY)
+    LOCATE  YR.CCY  IN  R.CAB.ACH.PARAMETER<ACH.PARAM.CR.CURR,1> SETTING CURR.POS THEN
+        YR.CREDIT.ACCT = R.CAB.ACH.PARAMETER<ACH.PARAM.CR.ACCOUNT,CURR.POS>
+    END
+
+
+    R.FT<FT.TRANSACTION.TYPE>    = 'ACHN'
+    R.FT<FT.DEBIT.ACCT.NO>       = R.NEW(ACH.DD.DR.CUST.ACCT)
+    R.FT<FT.DEBIT.CURRENCY>      = R.NEW(ACH.DD.CURRENCY)
+    R.FT<FT.DEBIT.AMOUNT>        = R.NEW(ACH.DD.AMOUNT)
+
+* R.FT<FT.CREDIT.ACCT.NO>        = R.NEW(ACH.DD.CR.CUST.ACCT)
+    R.FT<FT.CREDIT.ACCT.NO>      =  YR.CREDIT.ACCT
+    R.FT<FT.LOCAL.REF,B.POS>     = R.NEW(ACH.DD.BATCH.REF)
+    R.FT<FT.LOCAL.REF,I.POS>     = R.NEW(ACH.DD.INSTRUCTION.REF)
+    R.FT<FT.LOCAL.REF,C.POS>     = R.NEW(ACH.DD.CR.BANK.CODE)
+    R.FT<FT.DEBIT.VALUE.DATE>    = R.NEW(ACH.DD.VALUE.DATE)
+    R.FT<FT.CREDIT.VALUE.DATE>   = R.NEW(ACH.DD.VALUE.DATE)
+
+
+* OFS.BODY = "DEBIT.ACCT.NO::=":YR.DEBIT.ACCT:",CREDIT.CURRENCY::=":YR.CCY:",CREDIT.AMOUNT::=":YR.AMOUNT:",
+* CREDIT.ACCT.NO::=":YR.CREDIT.ACCT:",TRANSACTION.TYPE::=":YR.TRANSACTION.TYPE:",BATCH.REF::=":YR.BATCH.REF:"
+* ,INSTUCTIONREF::=":YR.INS.REF:",CREDITBANKCODE::=":YR.CREDIT.BANK
+
+    IF VERSION.NAME EQ '' THEN
+        VERSION.NAME = "FUNDS.TRANSFER,ACH.DIRECT.DEBIT"
+    END
+    CALL OFS.BUILD.RECORD("FUNDS.TRANSFER","I","PROCESS",VERSION.NAME,"","","",R.FT,OFS.MSG)
+    CALL ofs.addLocalRequest(OFS.MSG,'APPEND',ERR)
+
+
+    RETURN
+*************
+XML.FORMAT:
+**************
+    YR.BATCH.REF  = R.NEW(ACH.DD.BATCH.REF)
+*YR.VALUE.DATE = R.NEW(ACH.DD.VALUE.DATE)
+    YR.DATE       =  R.NEW(ACH.DD.VALUE.DATE)
+    YR.VALUE.DATE  = YR.DATE[7,2]:'.':YR.DATE[5,2]:'.':YR.DATE[1,4]
+    YR.CREDIT.BANK = R.NEW(ACH.DD.CR.BANK.CODE)
+
+    T24.REF.ID    = ID.NEW
+    YR.INS.REF    = R.NEW(ACH.DD.INSTRUCTION.REF)
+
+    YR.XML.OUT = "<?xml version='1.0' encoding='utf-8'?><root><Result>":YR.RESULT:"</Result>"
+    YR.XML.OUT:= "<Description>Failure</Description><BatchReference>":YR.BATCH.REF:"</BatchReference>"
+    YR.XML.OUT:= "<InstructionReference>":YR.INS.REF:"</InstructionReference><ValueDate>":YR.VALUE.DATE:"</ValueDate>"
+    YR.XML.OUT:= "<CreditorBankCode>":YR.CREDIT.BANK:"</CreditorBankCode><CBSReference>":T24.REF.ID:"</CBSReference>"
+    YR.XML.OUT:= "</root>"
+
+    MSG.ERR = ''
+    CALL CAB.SEND.EXT.MSG(YR.XML.OUT,"ACH_REPLY":@FM:"N",MSG.ERR)
+
+    RETURN
+*************
+WRITE.REJ:
+**************
+    FN.ACH.REJ = "F.CAB.ACH.DIRECT.DEBIT.IN.REJ"
+    F.ACH.REJ  = ""
+    CALL OPF(FN.ACH.REJ,F.ACH.REJ)
+    CALL TRACE.DEBUG('ACH', ID.NEW)
+    R.ACH = ""
+    MATBUILD R.ACH  FROM R.NEW
+    CALL TRACE.DEBUG('ACH',R.ACH)
+    CALL F.WRITE(FN.ACH.REJ,ID.NEW,R.ACH)
+
+    RETURN
+END

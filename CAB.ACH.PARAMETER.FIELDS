@@ -1,0 +1,61 @@
+*-----------------------------------------------------------------------------
+* <Rating>-7</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.ACH.PARAMETER.FIELDS
+*-----------------------------------------------------------------------------
+*<doc>
+* Template for field definitions routine YOURAPPLICATION.FIELDS
+*
+* @author tcoleman@temenos.com
+* @stereotype fields template
+* @uses Table
+* @public Table Creation
+* @package infra.eb
+* </doc>
+*-----------------------------------------------------------------------------
+* Modification History :
+*
+* 19/10/07 - EN_10003543
+*            New Template changes
+*
+* 14/11/07 - BG_100015736
+*            Exclude routines that are not released
+*-----------------------------------------------------------------------------
+*** <region name= Header>
+*** <desc>Inserts and control logic</desc>
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_DataTypes
+*** </region>
+*-----------------------------------------------------------------------------
+    CALL Table.defineId("CAB.ACH.PARAMETER.ID", T24_String) ;* Define Table id
+    ID.N = "17" ;  ID.T=''  ; ID.T<2> = "SYSTEM"
+*-----------------------------------------------------------------------------
+*    CALL Table.addField(fieldName, fieldType, args, neighbour) ;* Add a new fields
+*    CALL Field.setCheckFile(fileName)        ;* Use DEFAULT.ENRICH from SS or just field 1
+
+    CALL Table.addFieldDefinition('XX<DR.CURR', '3', 'CCY', '')
+    CALL Table.addFieldDefinition('XX>DR.ACCOUNT', '13', '.ALLACCVAL', '')
+
+    CALL Table.addFieldDefinition('XX<CR.CURR', '3', 'CCY', '')
+    CALL Table.addFieldDefinition('XX>CR.ACCOUNT', '13', '.ALLACCVAL', '')
+
+    CALL Table.addFieldDefinition('XX<TXN.CODE', '8', 'A', '')
+    CALL Table.addFieldDefinition('XX>VERSION', '54', 'PV':@FM:'DHULW', '')
+    CALL Field.setCheckFile('VERSION')
+    CALL Table.addField("RESERVED.6",  T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.5",  T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.4",  T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.3",  T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.2",  T24_String, Field_NoInput,"")
+    CALL Table.addField("RESERVED.1",  T24_String, Field_NoInput,"")
+*    CALL Table.addFieldDefinition('XX>XX.RECON.ACCOUNT', '18', 'A', '')
+*    CALL Field.setCheckFile('ACCOUNT')
+*    CALL Table.addFieldWithEbLookup(fieldName,virtualTableName,neighbour) ;* Specify Lookup values
+*    CALL Field.setDefault(defaultValue) ;* Assign default value
+*-----------------------------------------------------------------------------
+    CALL Table.setAuditPosition         ;* Poputale audit information
+*-----------------------------------------------------------------------------
+    RETURN
+*-----------------------------------------------------------------------------
+END

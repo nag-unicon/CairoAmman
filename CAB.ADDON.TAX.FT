@@ -1,0 +1,467 @@
+    SUBROUTINE CAB.ADDON.TAX.FT(Y.KEY)
+
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT CAB.BP I_CAB.ADDON.TAX.CALC.POST.FT
+    $INSERT T24.BP I_F.ACCOUNT
+    $INSERT T24.BP I_F.CUSTOMER
+    $INSERT CAB.BP I_F.CAB.CR.INT.ACCUMULATED
+    $INSERT CAB.BP I_F.CAB.EXTRA.TAX.DETS
+    $INSERT T24.BP I_F.MM.MONEY.MARKET
+    $INSERT T24.BP I_F.FUNDS.TRANSFER
+    $INSERT CAB.BP I_F.CAB.ADDON.TAX
+    $INSERT CAB.BP I_F.CAB.EXTRA.TAX.NOT.POSTED
+    $INSERT T24.BP I_F.STMT.ENTRY
+    $INSERT T24.BP I_F.STMT.ACCT.CR
+
+    GOSUB GET.CUST.TAX.PERC
+    GOSUB PROCESS
+
+    RETURN
+
+GET.CUST.TAX.PERC:
+
+    Y.CUS.ID = ''
+    Y.TAX.PERC5 = '' ; Y.TAX.PERC6 = ''
+
+    Y.CUS.ID = FIELD(Y.KEY,'-',1)
+    R.CUS = '' ; Y.RD.ERR = ''
+    CALL F.READ(FN.CUS,Y.CUS.ID,R.CUS,F.CUS,Y.RD.ERR)
+
+    Y.RESIDENT = ''
+    IF R.CUS<EB.CUS.RESIDENCE> = 'JO' THEN
+        Y.RESIDENT = 'Y'
+    END
+    IF R.CUS<EB.CUS.RESIDENCE> NE 'JO' THEN
+        Y.RESIDENT = 'N'
+    END
+    Y.INDUSTRY = '' ; Y.INDUSTRY = R.CUS<EB.CUS.INDUSTRY>
+    Y.SECTOR = '' ; Y.SECTOR = R.CUS<EB.CUS.SECTOR>
+
+    GOSUB GET.TAX.PERC
+
+    RETURN
+
+GET.TAX.PERC:
+
+    IF Y.RESIDENT = 'Y' THEN
+        FOR Y.KEY.CNT = 1 TO DCOUNT(Y.RES.TAX.KEYS,@FM)
+            Y.IND = '' ; Y.SECT = ''
+            Y.IND = Y.RES.IND<Y.KEY.CNT> ; Y.SECT = Y.RES.SECT<Y.KEY.CNT>
+            CHANGE '*' TO VM IN Y.IND ; CHANGE '*' TO VM IN Y.SECT
+            IF Y.IND = '#' THEN Y.IND = ''
+            IF Y.SECT = '#' THEN Y.SECT = ''
+            IF Y.SECTOR MATCHES Y.SECT OR Y.INDUSTRY MATCHES Y.IND THEN
+                IF Y.RES.TAX.KEYS<Y.KEY.CNT> = 5 THEN
+                    Y.TAX.PERC5 = Y.RES.TAX.PERC<Y.KEY.CNT>
+                END
+                IF Y.RES.TAX.KEYS<Y.KEY.CNT> = 6 THEN
+                    Y.TAX.PERC6 = Y.RES.TAX.PERC<Y.KEY.CNT>
+                END
+            END
+        NEXT Y.KEY.CNT
+        IF Y.TAX.PERC5 = '' THEN Y.TAX.PERC5 = Y.DEF.RESI5.PERC
+        IF Y.TAX.PERC6 = '' THEN Y.TAX.PERC6 = Y.DEF.RESI6.PERC
+    END
+
+    IF Y.RESIDENT = 'N' THEN
+        FOR Y.KEY.CNT = 1 TO DCOUNT(Y.NRES.TAX.KEYS,@FM)
+            Y.IND = '' ; Y.SECT = ''
+            Y.IND = Y.NRES.IND<Y.KEY.CNT> ; Y.SECT = Y.NRES.SECT<Y.KEY.CNT>
+            CHANGE '*' TO VM IN Y.IND ; CHANGE '*' TO VM IN Y.SECT
+            IF Y.IND = '#' THEN Y.IND = ''
+            IF Y.SECT = '#' THEN Y.SECT = ''
+            IF Y.SECTOR MATCHES Y.SECT OR Y.INDUSTRY MATCHES Y.IND THEN
+                IF Y.NRES.TAX.KEYS<Y.KEY.CNT> = 5 THEN
+                    Y.TAX.PERC5 = Y.NRES.TAX.PERC<Y.KEY.CNT>
+                END
+                IF Y.NRES.TAX.KEYS<Y.KEY.CNT> = 6 THEN
+                    Y.TAX.PERC6 = Y.NRES.TAX.PERC<Y.KEY.CNT>
+                END
+            END
+        NEXT Y.KEY.CNT
+        IF Y.TAX.PERC5 = '' THEN Y.TAX.PERC5 = Y.DEF.NRESI5.PERC
+        IF Y.TAX.PERC6 = '' THEN Y.TAX.PERC6 = Y.DEF.NRESI6.PERC
+    END
+
+    IF Y.RESIDENT = '' THEN
+        FOR Y.KEY.CNT = 1 TO DCOUNT(Y.NULL.TAX.KEYS,@FM)
+            Y.IND = '' ; Y.SECT = ''
+            Y.IND = Y.NULL.IND<Y.KEY.CNT> ; Y.SECT = Y.NULL.SECT<Y.KEY.CNT>
+            CHANGE '*' TO VM IN Y.IND ; CHANGE '*' TO VM IN Y.SECT
+            IF Y.IND = '#' THEN Y.IND = ''
+            IF Y.SECT = '#' THEN Y.SECT = ''
+            IF Y.SECTOR MATCHES Y.SECT OR Y.INDUSTRY MATCHES Y.IND THEN
+                IF Y.NULL.TAX.KEYS<Y.KEY.CNT> = 5 THEN
+                    Y.TAX.PERC5 = Y.NULL.TAX.PERC<Y.KEY.CNT>
+                END
+                IF Y.NULL.TAX.KEYS<Y.KEY.CNT> = 6 THEN
+                    Y.TAX.PERC6 = Y.NULL.TAX.PERC<Y.KEY.CNT>
+                END
+            END
+        NEXT Y.KEY.CNT
+        IF Y.TAX.PERC5 = '' THEN Y.TAX.PERC5 = Y.DEF5.PERC
+        IF Y.TAX.PERC6 = '' THEN Y.TAX.PERC6 = Y.DEF6.PERC
+    END
+
+    RETURN
+
+PROCESS:
+
+    R.INT.ACCUM = '' ; Y.RD.ERR = ''
+    CALL F.READ(FN.INT.ACCUM,Y.KEY,R.INT.ACCUM,F.INT.ACCUM,Y.RD.ERR)
+    IF R.INT.ACCUM NE '' THEN
+        Y.TOT.AMT = 0 ; Y.ENTRY.POSTED = 0 ; Y.ENTRY.IDS = '' ; Y.CONTRACT.IDS = '' ; Y.AMTS = ''
+        FOR Y.KEY.CNT = 1 TO DCOUNT(R.INT.ACCUM<CABCRINT.TAX.KEY>,@VM)
+            IF R.INT.ACCUM<CABCRINT.TAX.KEY,Y.KEY.CNT> MATCHES 2:VM:3 THEN
+                Y.ENTRY.IDS<1,-1> = RAISE(R.INT.ACCUM<CABCRINT.ENTRY.ID,Y.KEY.CNT>)
+                Y.CONTRACT.IDS<1,-1> = RAISE(R.INT.ACCUM<CABCRINT.CONTRACT.ID,Y.KEY.CNT>)
+                Y.AMTS<1,-1> = RAISE(R.INT.ACCUM<CABCRINT.INT.POST.LCY,Y.KEY.CNT>)
+            END
+        NEXT Y.KEY.CNT
+        IF Y.ENTRY.IDS<1> NE '' THEN
+            Y.TAX.PERC = '' ; Y.TAX.PERC = Y.INDIV.TAX.PERC
+            Y.ID.TAX = '' ; Y.ID.TAX = FIELD(Y.KEY,'-',1):'-':Y.END.DATE:'-2*3'
+            CALL F.READ(FN.TAX.FT.DETS,Y.ID.TAX,R.TAX.DETS,F.TAX.FT.DETS,Y.RD.ERR)
+            Y.WRITE = 0
+            IF R.TAX.DETS = '' THEN
+                FOR Y.CNT1 = 1 TO DCOUNT(Y.ENTRY.IDS,@VM)
+                    Y.TOT.AMT += Y.AMTS<1,Y.CNT1>
+                    Y.AMT.FOR.TAX = ''
+                    IF Y.TOT.AMT GT Y.LIMIT.AMT AND NOT(Y.ENTRY.POSTED) THEN
+                        Y.AMT.FOR.TAX = Y.TOT.AMT - Y.LIMIT.AMT
+                    END
+                    IF Y.TOT.AMT GT Y.LIMIT.AMT AND Y.ENTRY.POSTED THEN
+                        Y.AMT.FOR.TAX = Y.AMTS<1,Y.CNT1>
+                    END
+                    IF Y.AMT.FOR.TAX GT 0 THEN
+                        Y.ENTRY.POSTED = 1
+                        Y.CONTRACT.ID = '' ; Y.CONTRACT.ID = Y.CONTRACT.IDS<1,Y.CNT1>
+                        Y.TAX.AMT = '' ; Y.TAX.AMT = Y.AMT.FOR.TAX*(Y.TAX.PERC/100)
+                        Y.TAX.AMT = FMT(Y.TAX.AMT,'R2')
+                        Y.ENTRY.ID = '' ; Y.ENTRY.ID = Y.ENTRY.IDS<1,Y.CNT1>
+                        IF Y.TAX.AMT = 0 THEN Y.TAX.AMT = 0.01
+                        IF Y.TAX.AMT GT 0 THEN
+                            GOSUB POST.FT
+                            R.TAX.DETS<CABXTRATAX.CUSTOMER.ID> = Y.CUS.ID
+                            R.TAX.DETS<CABXTRATAX.SECTOR.ID> = Y.SECTOR
+                            R.TAX.DETS<CABXTRATAX.INDUSTRY.ID> = Y.INDUSTRY
+                            R.TAX.DETS<CABXTRATAX.TAX.FOR.ENTRY,-1> = Y.ENTRY.IDS<1,Y.CNT1>
+                            R.TAX.DETS<CABXTRATAX.CONTRACT.ID,-1> = Y.CONTRACT.IDS<1,Y.CNT1>
+                            R.TAX.DETS<CABXTRATAX.INT.POST.LCY.AMT,-1> = Y.AMTS<1,Y.CNT1>
+                            R.TAX.DETS<CABXTRATAX.TOT.POST.LCY.AMT,-1> = Y.TOT.AMT
+                            R.TAX.DETS<CABXTRATAX.TAX.FOR.LCY.AMT,-1> = Y.AMT.FOR.TAX
+                            R.TAX.DETS<CABXTRATAX.EXTRA.TAX.PERC,-1> = Y.TAX.PERC
+                            IF Y.DB.ACC NE '' THEN
+                                R.TAX.DETS<CABXTRATAX.ACCOUNT.ID,-1> = Y.DB.ACC
+                            END ELSE
+                                R.TAX.DETS<CABXTRATAX.ACCOUNT.ID,-1> = 'NONE'
+                            END
+                            R.TAX.DETS<CABXTRATAX.ACLK.ID,-1> = 'NONE'
+                            R.TAX.DETS<CABXTRATAX.FT.POSTED,-1> = Y.FT.ID
+                            Y.WRITE = 1
+                        END
+                    END
+                NEXT Y.CNT1
+                IF Y.WRITE THEN
+                    CALL F.WRITE(FN.TAX.FT.DETS,Y.ID.TAX,R.TAX.DETS)
+                END
+
+            END ELSE
+
+                Y.ENTRY.CNT = '' ; Y.ENTRY.CNT = DCOUNT(R.TAX.DETS<CABXTRATAX.TAX.FOR.ENTRY>,@VM)
+                Y.LAST.ENTRY = '' ; Y.LAST.ENTRY = R.TAX.DETS<CABXTRATAX.TAX.FOR.ENTRY,Y.ENTRY.CNT>
+                Y.LAST.TOT = '' ; Y.LAST.TOT = R.TAX.DETS<CABXTRATAX.TOT.POST.LCY.AMT,Y.ENTRY.CNT>
+
+                Y.POS = ''
+                LOCATE Y.LAST.ENTRY IN Y.ENTRY.IDS<1,1> SETTING Y.POS ELSE Y.POS = ''
+                IF Y.POS NE '' THEN
+                    FOR Y.CNT1 = Y.POS+1 TO DCOUNT(Y.ENTRY.IDS,@VM)
+                        Y.AMT.FOR.TAX = '' ; Y.AMT.FOR.TAX = Y.AMTS<1,Y.CNT1>
+                        IF Y.AMT.FOR.TAX GT 0 THEN
+                            Y.LAST.TOT += Y.AMT.FOR.TAX
+                            Y.CONTRACT.ID = '' ; Y.CONTRACT.ID = Y.CONTRACT.IDS<1,Y.CNT1>
+                            Y.TAX.AMT = '' ; Y.TAX.AMT = Y.AMT.FOR.TAX*(Y.TAX.PERC/100)
+                            Y.TAX.AMT = FMT(Y.TAX.AMT,'R2')
+                            Y.ENTRY.ID = '' ; Y.ENTRY.ID = Y.ENTRY.IDS<1,Y.CNT1>
+                            IF Y.TAX.AMT = 0 THEN Y.TAX.AMT = 0.01
+                            IF Y.TAX.AMT GT 0 THEN
+                                GOSUB POST.FT
+                                R.TAX.DETS<CABXTRATAX.CUSTOMER.ID> = Y.CUS.ID
+                                R.TAX.DETS<CABXTRATAX.SECTOR.ID> = Y.SECTOR
+                                R.TAX.DETS<CABXTRATAX.INDUSTRY.ID> = Y.INDUSTRY
+                                R.TAX.DETS<CABXTRATAX.TAX.FOR.ENTRY,-1> = Y.ENTRY.IDS<1,Y.CNT1>
+                                R.TAX.DETS<CABXTRATAX.CONTRACT.ID,-1> = Y.CONTRACT.IDS<1,Y.CNT1>
+                                R.TAX.DETS<CABXTRATAX.INT.POST.LCY.AMT,-1> = Y.AMTS<1,Y.CNT1>
+                                R.TAX.DETS<CABXTRATAX.TAX.FOR.LCY.AMT,-1> = Y.AMT.FOR.TAX
+                                R.TAX.DETS<CABXTRATAX.TOT.POST.LCY.AMT,-1> = Y.LAST.TOT
+                                R.TAX.DETS<CABXTRATAX.EXTRA.TAX.PERC,-1> = Y.TAX.PERC
+                                IF Y.DB.ACC NE '' THEN
+                                    R.TAX.DETS<CABXTRATAX.ACCOUNT.ID,-1> = Y.DB.ACC
+                                END ELSE
+                                    R.TAX.DETS<CABXTRATAX.ACCOUNT.ID,-1> = 'NONE'
+                                END
+                                R.TAX.DETS<CABXTRATAX.ACLK.ID,-1> = 'NONE'
+                                R.TAX.DETS<CABXTRATAX.FT.POSTED,-1> = Y.FT.ID
+                                Y.WRITE = 1
+                            END
+                        END
+                    NEXT Y.CNT1
+                    IF Y.WRITE THEN
+                        CALL F.WRITE(FN.TAX.FT.DETS,Y.ID.TAX,R.TAX.DETS)
+                    END
+                END
+            END
+        END
+
+        FOR Y.CNT = 1 TO DCOUNT(R.INT.ACCUM<CABCRINT.TAX.KEY>,@VM)
+
+            IF NOT(R.INT.ACCUM<CABCRINT.TAX.KEY,Y.CNT> MATCHES 2:VM:3) THEN
+                Y.ID.TAX = '' ; Y.ID.TAX = FIELD(Y.KEY,'-',1):'-':Y.END.DATE:'-':R.INT.ACCUM<CABCRINT.TAX.KEY,Y.CNT>
+                CALL F.READ(FN.TAX.FT.DETS,Y.ID.TAX,R.TAX.DETS,F.TAX.FT.DETS,Y.RD.ERR)
+                Y.WRITE = 0 ; Y.TAX.PERC = '' ; Y.INT.FT = 0
+                IF R.INT.ACCUM<CABCRINT.TAX.KEY,Y.CNT> = 5 THEN
+                    Y.TAX.PERC = Y.TAX.PERC5
+                END
+                IF R.INT.ACCUM<CABCRINT.TAX.KEY,Y.CNT> = 6 THEN
+                    Y.TAX.PERC = Y.TAX.PERC6
+                END
+                IF R.INT.ACCUM<CABCRINT.TAX.KEY,Y.CNT> MATCHES 7:VM:8:VM:9:VM:10:VM:11:VM:12 THEN
+                    Y.INT.FT = 1
+                    Y.TAX.POS = '' ; Y.TAX6.POS = ''
+                    LOCATE R.INT.ACCUM<CABCRINT.TAX.KEY,Y.CNT> IN Y.CORP.KEYS<1> SETTING Y.TAX.POS ELSE Y.TAX.POS = ''
+                    IF Y.TAX.POS NE '' THEN
+                        LOCATE 6 IN Y.CORP.KEYS<1> SETTING Y.TAX6.POS ELSE Y.TAX6.POS = ''
+                        IF Y.TAX6.POS NE '' THEN
+                            Y.PERC.TAX = '' ; Y.PERC.TAX = Y.CORP.RATES<Y.TAX.POS>
+                            Y.PERC6 = '' ; Y.PERC6 = Y.CORP.RATES<Y.TAX6.POS>
+                            Y.DIFF = '' ; Y.DIFF = Y.PERC.TAX - Y.PERC6
+                            IF Y.DIFF GT 0 THEN
+                                Y.TAX.PERC = Y.DIFF
+                            END
+                        END
+                    END
+                END
+                IF R.TAX.DETS = '' THEN
+                    FOR Y.CNT1 = 1 TO DCOUNT(R.INT.ACCUM<CABCRINT.ENTRY.ID,Y.CNT>,@SM)
+                        Y.CONTRACT.ID = '' ; Y.CONTRACT.ID = R.INT.ACCUM<CABCRINT.CONTRACT.ID,Y.CNT,Y.CNT1>
+                        Y.AMT.FOR.TAX = '' ; Y.AMT.FOR.TAX = R.INT.ACCUM<CABCRINT.INT.POST.LCY,Y.CNT,Y.CNT1>
+                        Y.TAX.AMT = '' ; Y.TAX.AMT = R.INT.ACCUM<CABCRINT.INT.POST.LCY,Y.CNT,Y.CNT1>*(Y.TAX.PERC/100)
+                        Y.TAX.AMT = FMT(Y.TAX.AMT,'R2')
+                        Y.ENTRY.ID = '' ; Y.ENTRY.ID = R.INT.ACCUM<CABCRINT.ENTRY.ID,Y.CNT,Y.CNT1>
+                        IF Y.TAX.AMT = 0 THEN Y.TAX.AMT = 0.01
+                        IF Y.TAX.AMT GT 0 THEN
+                            GOSUB POST.FT
+                            R.TAX.DETS<CABXTRATAX.CUSTOMER.ID> = Y.CUS.ID
+                            R.TAX.DETS<CABXTRATAX.SECTOR.ID> = Y.SECTOR
+                            R.TAX.DETS<CABXTRATAX.INDUSTRY.ID> = Y.INDUSTRY
+                            R.TAX.DETS<CABXTRATAX.TAX.FOR.ENTRY,-1> = R.INT.ACCUM<CABCRINT.ENTRY.ID,Y.CNT,Y.CNT1>
+                            R.TAX.DETS<CABXTRATAX.CONTRACT.ID,-1> = R.INT.ACCUM<CABCRINT.CONTRACT.ID,Y.CNT,Y.CNT1>
+                            R.TAX.DETS<CABXTRATAX.INT.POST.LCY.AMT,-1> = R.INT.ACCUM<CABCRINT.INT.POST.LCY,Y.CNT,Y.CNT1>
+                            R.TAX.DETS<CABXTRATAX.TAX.FOR.LCY.AMT,-1> = R.INT.ACCUM<CABCRINT.INT.POST.LCY,Y.CNT,Y.CNT1>
+                            R.TAX.DETS<CABXTRATAX.EXTRA.TAX.PERC,-1> = Y.TAX.PERC
+                            IF Y.DB.ACC NE '' THEN
+                                R.TAX.DETS<CABXTRATAX.ACCOUNT.ID,-1> = Y.DB.ACC
+                            END ELSE
+                                R.TAX.DETS<CABXTRATAX.ACCOUNT.ID,-1> = 'NONE'
+                            END
+                            R.TAX.DETS<CABXTRATAX.ACLK.ID,-1> = 'NONE'
+                            R.TAX.DETS<CABXTRATAX.FT.POSTED,-1> = Y.FT.ID
+                            Y.WRITE = 1
+                        END
+                    NEXT Y.CNT1
+                    IF Y.WRITE THEN
+                        CALL F.WRITE(FN.TAX.FT.DETS,Y.ID.TAX,R.TAX.DETS)
+                    END
+                END ELSE
+                    FOR Y.CNT1 = 1 TO DCOUNT(R.INT.ACCUM<CABCRINT.ENTRY.ID,Y.CNT>,@SM)
+                        Y.POS = ''
+                        LOCATE R.INT.ACCUM<CABCRINT.ENTRY.ID,Y.CNT,Y.CNT1> IN R.TAX.DETS<CABXTRATAX.TAX.FOR.ENTRY,1> SETTING Y.POS ELSE Y.POS = ''
+                        IF Y.POS = '' THEN
+                            Y.CONTRACT.ID = '' ; Y.CONTRACT.ID = R.INT.ACCUM<CABCRINT.CONTRACT.ID,Y.CNT,Y.CNT1>
+                            Y.ENTRY.ID = '' ; Y.ENTRY.ID = R.INT.ACCUM<CABCRINT.ENTRY.ID,Y.CNT,Y.CNT1>
+                            Y.AMT.FOR.TAX = '' ; Y.AMT.FOR.TAX = R.INT.ACCUM<CABCRINT.INT.POST.LCY,Y.CNT,Y.CNT1>
+                            Y.TAX.AMT = '' ; Y.TAX.AMT = R.INT.ACCUM<CABCRINT.INT.POST.LCY,Y.CNT,Y.CNT1>*(Y.TAX.PERC/100)
+                            Y.TAX.AMT = FMT(Y.TAX.AMT,'R2')
+                            IF Y.TAX.AMT = 0 THEN Y.TAX.AMT = 0.01
+                            IF Y.TAX.AMT GT 0 THEN
+                                GOSUB POST.FT
+                                R.TAX.DETS<CABXTRATAX.CUSTOMER.ID> = Y.CUS.ID
+                                R.TAX.DETS<CABXTRATAX.SECTOR.ID> = Y.SECTOR
+                                R.TAX.DETS<CABXTRATAX.INDUSTRY.ID> = Y.INDUSTRY
+                                R.TAX.DETS<CABXTRATAX.TAX.FOR.ENTRY,-1> = R.INT.ACCUM<CABCRINT.ENTRY.ID,Y.CNT,Y.CNT1>
+                                R.TAX.DETS<CABXTRATAX.CONTRACT.ID,-1> = R.INT.ACCUM<CABCRINT.CONTRACT.ID,Y.CNT,Y.CNT1>
+                                R.TAX.DETS<CABXTRATAX.INT.POST.LCY.AMT,-1> = R.INT.ACCUM<CABCRINT.INT.POST.LCY,Y.CNT,Y.CNT1>
+                                R.TAX.DETS<CABXTRATAX.TAX.FOR.LCY.AMT,-1> = R.INT.ACCUM<CABCRINT.INT.POST.LCY,Y.CNT,Y.CNT1>
+                                R.TAX.DETS<CABXTRATAX.EXTRA.TAX.PERC,-1> = Y.TAX.PERC
+                                IF Y.DB.ACC NE '' THEN
+                                    R.TAX.DETS<CABXTRATAX.ACCOUNT.ID,-1> = Y.DB.ACC
+                                END ELSE
+                                    R.TAX.DETS<CABXTRATAX.ACCOUNT.ID,-1> = 'NONE'
+                                END
+                                R.TAX.DETS<CABXTRATAX.ACLK.ID,-1> = 'NONE'
+                                R.TAX.DETS<CABXTRATAX.FT.POSTED,-1> = Y.FT.ID
+                                Y.WRITE = 1
+                            END
+                        END
+                    NEXT Y.CNT1
+                    IF Y.WRITE THEN
+                        CALL F.WRITE(FN.TAX.FT.DETS,Y.ID.TAX,R.TAX.DETS)
+                    END
+                END
+            END
+        NEXT Y.CNT
+    END
+
+    RETURN
+
+POST.FT:
+
+    Y.DB.ACC = '' ; Y.DB.ACC.CCY = ''
+    IF Y.INT.FT THEN
+        IF Y.CONTRACT.ID[1,2] = 'MM' THEN
+            IF INDEX(Y.CONTRACT.ID,';',1) THEN
+                Y.CONTRACT.ID = FIELD(Y.CONTRACT.ID,';',1)
+            END
+        END
+        R.SED = '' ; Y.RD.ERR = ''
+        CALL F.READ(FN.SED,Y.ENTRY.ID,R.SED,F.SED,Y.RD.ERR)
+        IF R.SED NE '' THEN
+            Y.DB.ACC = R.SED<AC.STE.ACCOUNT.NUMBER>
+            Y.DB.ACC.CCY = LCCY
+        END
+    END ELSE
+        IF Y.CONTRACT.ID[1,2] = 'MM' THEN
+            IF INDEX(Y.CONTRACT.ID,';',1) THEN
+                Y.CONTRACT.ID = FIELD(Y.CONTRACT.ID,';',1)
+            END
+            R.MM = '' ; Y.RD.ERR = ''
+            CALL F.READ(FN.MM,Y.CONTRACT.ID,R.MM,F.MM,Y.RD.ERR)
+            IF R.MM = '' THEN
+                Y.MM.KEY = '' ; Y.MM.KEY = Y.CONTRACT.ID
+                CALL EB.READ.HISTORY.REC(F.MM.HIS,Y.MM.KEY,R.MM,Y.RD.ERR)
+            END
+            IF R.MM NE '' THEN
+                Y.INT.ACC = '' ; Y.INT.ACC = R.MM<MM.INT.LIQ.ACCT>
+                Y.PRIN.ACC = '' ; Y.PRIN.ACC = R.MM<MM.PRIN.LIQ.ACCT>
+                Y.DRAW.ACC = '' ; Y.DRAW.ACC = R.MM<MM.DRAWDOWN.ACCOUNT>
+                IF NUM(Y.INT.ACC) THEN
+                    R.ACC = '' ; Y.RD.ERR = ''
+                    CALL F.READ(FN.ACC,Y.INT.ACC,R.ACC,F.ACC,Y.RD.ERR)
+                    IF R.ACC NE '' THEN
+                        Y.DB.ACC = Y.INT.ACC
+                        Y.DB.ACC.CCY = R.ACC<AC.CURRENCY>
+                    END
+                END
+                IF Y.DB.ACC = '' THEN
+                    IF NUM(Y.PRIN.ACC) THEN
+                        R.ACC = '' ; Y.RD.ERR = ''
+                        CALL F.READ(FN.ACC,Y.PRIN.ACC,R.ACC,F.ACC,Y.RD.ERR)
+                        IF R.ACC NE '' THEN
+                            Y.DB.ACC = Y.PRIN.ACC
+                            Y.DB.ACC.CCY = R.ACC<AC.CURRENCY>
+                        END
+                    END
+                END
+                IF Y.DB.ACC = '' THEN
+                    IF NUM(Y.DRAW.ACC) THEN
+                        R.ACC = '' ; Y.RD.ERR = ''
+                        CALL F.READ(FN.ACC,Y.DRAW.ACC,R.ACC,F.ACC,Y.RD.ERR)
+                        IF R.ACC NE '' THEN
+                            Y.DB.ACC = Y.DRAW.ACC
+                            Y.DB.ACC.CCY = R.ACC<AC.CURRENCY>
+                        END
+                    END
+                END
+            END
+        END ELSE
+            R.STMT.ACCT.CR = '' ; Y.RD.ERR = ''
+            CALL F.READ(FN.STMT.CR,Y.CONTRACT.ID,R.STMT.ACCT.CR,F.STMT.CR,Y.RD.ERR)
+            IF R.STMT.ACCT.CR<IC.STMCR.LIQUIDITY.ACCOUNT> NE '' THEN
+                Y.DB.ACC = R.STMT.ACCT.CR<IC.STMCR.LIQUIDITY.ACCOUNT>
+            END ELSE
+                Y.DB.ACC = FIELD(Y.CONTRACT.ID,'-',1)
+            END
+            R.ACC = '' ; Y.RD.ERR = ''
+            CALL F.READ(FN.ACC,Y.DB.ACC,R.ACC,F.ACC,Y.RD.ERR)
+            IF R.ACC NE '' THEN
+                Y.DB.ACC.CCY = R.ACC<AC.CURRENCY>
+            END ELSE
+                Y.DB.ACC = ''
+            END
+        END
+    END
+    IF Y.DB.ACC NE '' AND Y.DB.ACC.CCY NE '' THEN
+        IF NOT(Y.FIRST.RUN) THEN
+            Y.FT.ID = ''
+            OFS.CUR.REC = ''
+            OFS.RECORD = ''
+            APP.NAME = 'FUNDS.TRANSFER'
+            OFS.FUNCTION = 'I'
+            VERSION.NAME = Y.VERS
+            NO.OF.AUTH = '0'
+            OFS.CUR.REC<FT.TRANSACTION.TYPE> = Y.TXN.TYPE
+            OFS.CUR.REC<FT.DEBIT.ACCT.NO> = Y.DB.ACC
+            OFS.CUR.REC<FT.DEBIT.CURRENCY> = Y.DB.ACC.CCY
+            Y.TAX.AMT = '' ; Y.TAX.AMT = Y.AMT.FOR.TAX*(Y.TAX.PERC/100)
+            IF Y.DB.ACC.CCY = LCCY THEN
+                Y.TAX.AMT = FMT(Y.TAX.AMT,'R3')
+                IF Y.TAX.AMT = 0 THEN
+                    Y.TAX.AMT = 0.001
+                END
+            END ELSE
+                Y.TAX.AMT = FMT(Y.TAX.AMT,'R2')
+                IF Y.TAX.AMT = 0 THEN
+                    Y.TAX.AMT = 0.01
+                END
+            END
+            OFS.CUR.REC<FT.DEBIT.AMOUNT> = Y.TAX.AMT
+            OFS.CUR.REC<FT.CREDIT.ACCT.NO> = Y.CR.ACC
+            OFS.CUR.REC<FT.CREDIT.CURRENCY> = LCCY
+            OFS.CUR.REC<FT.COMMISSION.CODE> = 'WAIVE'
+            OFS.CUR.REC<FT.CHARGE.CODE> = 'WAIVE'
+            OFS.CUR.REC<FT.PAYMENT.DETAILS,1> = Y.ENTRY.ID
+            OFS.CUR.REC<FT.PAYMENT.DETAILS,2> = Y.CONTRACT.ID
+            OFS.CUR.REC<FT.PAYMENT.DETAILS,3> = Y.ID.TAX
+            CHANGE '*' TO '-' IN OFS.CUR.REC<FT.PAYMENT.DETAILS,3>
+
+            Y.RATE = ''
+            IF Y.DB.ACC.CCY NE LCCY THEN
+                Y.OUT.AMT = '' ; Y.LCY.AMT = '' ; Y.RET.CODE = ''
+                CALL EXCHRATE(1,LCCY,Y.TAX.AMT,Y.DB.ACC.CCY,Y.OUT.AMT,"",Y.RATE,"",Y.LCY.AMT,Y.RET.CODE)
+                OFS.CUR.REC<FT.DEBIT.AMOUNT> = Y.OUT.AMT
+                Y.RATE = FMT(Y.RATE,'R9')
+            END
+            Y.DEB.REF = '' ; Y.CRE.REF = ''
+            IF Y.RATE NE '' THEN
+                OFS.CUR.REC<FT.TREASURY.RATE> = Y.RATE
+            END
+
+            CALL OFS.BUILD.RECORD(APP.NAME,OFS.FUNCTION,'PROCESS',VERSION.NAME,'',NO.OF.AUTH,'',OFS.CUR.REC,OFS.RECORD)
+
+            THE.RESPONSE  = ""
+            TXN.COMMITTED = ""
+            OPTIONS  = ''
+            OPTIONS<1> = "CAB.TAX"
+
+            CALL OFS.CALL.BULK.MANAGER(OPTIONS,OFS.RECORD,THE.RESPONSE,TXN.COMMITTED)
+            IF TXN.COMMITTED = 1 THEN
+                Y.FT.ID = FIELD(THE.RESPONSE,'/',1)
+            END ELSE
+                Y.FT.ID = 'ERROR.IN.FT'
+            END
+        END ELSE
+            Y.FT.ID = 'NONE'
+        END
+    END ELSE
+        Y.FT.ID = 'ACCOUNT.NOT.FOUND'
+        R.NOT.POSTED = ''
+        R.NOT.POSTED<CABXTRANOT.CUSTOMER.ID> = Y.CUS.ID
+        R.NOT.POSTED<CABXTRANOT.CONTRACT.ID> = Y.CONTRACT.ID
+        R.NOT.POSTED<CABXTRANOT.TAX.DETS.ID> = Y.ID.TAX
+        CALL F.WRITE(FN.NOT.POSTED,Y.ENTRY.ID,R.NOT.POSTED)
+    END
+
+    RETURN
+
+END

@@ -1,0 +1,128 @@
+    SUBROUTINE CAB.ADVICE.DFP.MAPPING(MAT R.HANDOFF, ERR.MSG)
+*-----------------------------------------------------------------------------
+* Company Name   : Cario Ammam Bank
+* Developed By   : ag@temenos.com
+* Routine Name   : CAB.ADVICE.DFP.MAPPING
+* Date           : 14 Nov 2012
+*-----------------------------------------------------------------------------
+* Description:
+*------------
+* This routine is hooked in DE.MAPPING is used to call to populate the DE.FORMAT.PRINT
+* reference in the user defined cell (row 9) in the HANDOFF record.  And the position
+* value of the field APP.FORMAT to be changed to 9,1 in the corresponding DE.MAPPING
+* record.
+*
+*-----------------------------------------------------------------------------
+*
+* Modification History :
+* ----------------------
+*  Date         Author                  Modification Description
+*
+* 11-Mar-2014   Tememos                 To update concate file
+*-----------------------------------------------------------------------------
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_DEOCOM
+    $INCLUDE T24.BP I_F.MM.MONEY.MARKET
+
+    $INCLUDE CAB.BP I_F.CAB.PRINT.ADVICES
+    $INCLUDE CAB.BP I_F.CAB.MM.DE.LIST.TODAY
+
+    GOSUB INIT.PARA
+    GOSUB UPD.DFP.REFERENCE
+
+    IF NOT(CAB.DFP) THEN
+        CAB.DFP = CORE.DFP    ;* Default the CORE Application Format Code.
+    END
+
+    R.HANDOFF(9)<1> = CAB.DFP ;* Update the DFP reference
+
+    RETURN
+
+*-----------------------------------------------------------------------------
+INIT.PARA:
+**********
+
+    FN.CAB.PRINT.ADVICES = "F.CAB.PRINT.ADVICES"
+    F.CAB.PRINT.ADVICES  = ""
+    CALL OPF(FN.CAB.PRINT.ADVICES, F.CAB.PRINT.ADVICES)
+
+    FN.CAB.MM.DE.LIST.TODAY = "F.CAB.MM.DE.LIST.TODAY"      ;* 20140311 START
+    F.CAB.MM.DE.LIST.TODAY  = " "
+    CALL OPF(FN.CAB.MM.DE.LIST.TODAY,F.CAB.MM.DE.LIST.TODAY)          ;*20140311 END
+
+* Seems the core passes the DE.MAPPING key reference in 10th row of HANDOFF array.
+    MAPPING.KEY = R.HANDOFF(10)
+    MESSAGE.TYPE  = FIELD(MAPPING.KEY, ".", 1)
+    ACTIVITY.TYPE = FIELD(MAPPING.KEY, ".", 3)
+
+    CORE.DFP  = R.HANDOFF(3)<3>         ;* Core tops the APP.FORMAT in location 3rd row 3rd column in Handoff Array for MM
+
+    CAB.PRT.ADV.ID = APPLICATION:PGM.VERSION
+
+    IF CAB.PRT.ADV.ID[1,2] EQ 'MM' THEN ;*20140211 START
+
+        MM.DE.REF.REC = ''
+        Y.DEL.REF.ID = ''
+        CAB.MM.DE.LIST.TODAY.ID = ''
+        R.CAB.MM.DE.LIST.TODAY = ''
+        ERR.CAB.MM.DE.LIST.TODAY =''
+        Y.CUR.APP = APPLICATION
+        Y.DATETIME = TIMEDATE()
+        Y.TIME = Y.DATETIME[1,8]
+        CUR.DATE = OCONV(DATE(),"D4/E")
+        Y.TODAY = CUR.DATE[7,4]:CUR.DATE[4,2]:CUR.DATE[1,2]
+        MM.DE.REF.REC = R.HANDOFF(2)
+        Y.DEL.REF.ID = R.HANDOFF(3)<1>
+        CAB.MM.DE.LIST.TODAY.ID = MM.DE.REF.REC<MM.CO.CODE>:".":Y.TODAY
+
+        CALL F.READU(FN.CAB.MM.DE.LIST.TODAY, CAB.MM.DE.LIST.TODAY.ID, R.CAB.MM.DE.LIST.TODAY,F.CAB.MM.DE.LIST.TODAY,ERR.CAB.MM.DE.LIST.TODAY,'')
+        IF R.CAB.MM.DE.LIST.TODAY THEN
+            R.CAB.MM.DE.LIST.TODAY<DE.LIST.DESCRIPTION> = Y.TODAY
+            R.CAB.MM.DE.LIST.TODAY<DE.LIST.TXN.DATE> = Y.TODAY
+            R.CAB.MM.DE.LIST.TODAY<DE.LIST.COM.CODE> = MM.DE.REF.REC<MM.CO.CODE>
+            R.CAB.MM.DE.LIST.TODAY<DE.LIST.MMID.DE.REF,-1> = Y.DEL.REF.ID
+        END ELSE
+            R.CAB.MM.DE.LIST.TODAY<DE.LIST.DESCRIPTION> = Y.TODAY
+            R.CAB.MM.DE.LIST.TODAY<DE.LIST.TXN.DATE> = Y.TODAY
+            R.CAB.MM.DE.LIST.TODAY<DE.LIST.COM.CODE> = MM.DE.REF.REC<MM.CO.CODE>
+            R.CAB.MM.DE.LIST.TODAY<DE.LIST.MMID.DE.REF> = Y.DEL.REF.ID
+        END
+        CALL F.WRITE(FN.CAB.MM.DE.LIST.TODAY,CAB.MM.DE.LIST.TODAY.ID,R.CAB.MM.DE.LIST.TODAY)
+        CALL F.RELEASE(FN.CAB.MM.DE.LIST.TODAY,CAB.MM.DE.LIST.TODAY.ID,F.CAB.MM.DE.LIST.TODAY)
+    END   ;* 20140311 END
+**    IF NOT(CAB.PRT.ADV.ID) OR NOT(CAB.PRT.ADV.ID[1,2] EQ "MM") THEN  ;* If not drive from VERSION or in case if not MM Version
+    IF NOT(PGM.VERSION) OR NOT(CAB.PRT.ADV.ID[1,2] EQ "MM") THEN
+        APPL.NAME  = "MM.MONEY.MARKET"
+        FIELD.NAME = "VERSION.NAME"
+        FIELD.POS  = ""
+        CALL MULTI.GET.LOC.REF(APPL.NAME,FIELD.NAME,FIELD.POS)
+
+        MM.RECORD = R.HANDOFF(2)        ;* Core stored the MM image in 2nh row in HANDOFF array.
+**        CAB.PRT.ADV.ID = MM.RECORD<MM.LOCAL.REF, FIELD.POS>
+        YR.PGM.VERSION = MM.RECORD<MM.LOCAL.REF, FIELD.POS>
+        CAB.PRT.ADV.ID = APPLICATION:YR.PGM.VERSION
+    END
+
+    RETURN
+*-----------------------------------------------------------------------------
+
+UPD.DFP.REFERENCE:
+******************
+
+    CALL CACHE.READ(FN.CAB.PRINT.ADVICES, CAB.PRT.ADV.ID, R.CAB.VERSION, ERR.CAB.VERSION)
+    IF R.CAB.VERSION THEN
+        ACTIVITY.LIST = R.CAB.VERSION<CAB.PRT.ADV.ACTIVITY>
+        LOCATE ACTIVITY.TYPE IN ACTIVITY.LIST<1,1> SETTING ACT.POS THEN
+            CAB.DFP = R.CAB.VERSION<CAB.PRT.ADV.FORMAT.ID, ACT.POS>
+            IF CAB.DFP[1,1] EQ "@" THEN ;* Call routine to decide CAB.DFP
+                ROUTINE.NAME = CAB.DFP[2,LEN(CAB.DFP)]
+                CALL @ROUTINE.NAME(MAT R.HANDOFF, CAB.DFP)
+            END
+        END
+    END
+
+    RETURN
+*-----------------------------------------------------------------------------
+END

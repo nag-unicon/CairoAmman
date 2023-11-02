@@ -1,0 +1,104 @@
+*-----------------------------------------------------------------------------
+* <Rating>-131</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.ACCT.FEE.VALIDATE.MSG(OUT.MSG)
+*********************************************************************************************************
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.ACCT.FEE.VALIDATE.MSG
+*--------------------------------------------------------------------------------------------------------
+*Description       :
+*Linked With       :
+*In  Parameter     :
+*Out Parameter     :
+*Files  Used       : ACCOUNT                     As        I  Mode
+*--------------------------------------------------------------------------------------------------------
+*Modification Details:
+*=====================
+*25/08/2010 - ODR-2010-XX-XXXX
+*             Development For ECC
+*********************************************************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.ACCOUNT
+    $INCLUDE CAB.BP I_CAB.CUST.INFO.MSG.COMMON
+*--------------------------------------------------------------------------------------------------------
+**********
+MAIN.PARA:
+**********
+    GOSUB OPEN.PARA
+    GOSUB PROCESS.PARA
+
+    RETURN
+*--------------------------------------------------------------------------------------------------------
+**********
+OPEN.PARA:
+**********
+    FN.ACCOUNT = 'FBNK.ACCOUNT'
+    F.ACCOUNT = ''
+*    CALL OPF(FN.ACCOUNT,F.ACCOUNT)
+    OPEN FN.ACCOUNT TO F.ACCOUNT ELSE
+        CRT 'UNABLE TO OPEN'
+    END
+    RETURN
+*--------------------------------------------------------------------------------------------------------
+*************
+PROCESS.PARA:
+*************
+*   ACCOUNT.ID   = ACCT.FEE.ACCT.NO
+    ACCOUNT.ID   = ACCT.FEE.ACCT.NO[2,LEN(ACCT.FEE.ACCT.NO)]
+
+    GOSUB READ.ACCOUNT
+    CHEQ.ACCT.CUST = R.ACCOUNT<AC.CUSTOMER>
+
+*   ACCOUNT.ID   = ACCT.FEE.FEE.ACCT.NO
+    ACCOUNT.ID   = ACCT.FEE.FEE.ACCT.NO[2,LEN(ACCT.FEE.FEE.ACCT.NO)]
+    GOSUB READ.ACCOUNT
+    FEE.ACCT.CUST = R.ACCOUNT<AC.CUSTOMER>
+
+    IF CHEQ.ACCT.CUST EQ FEE.ACCT.CUST THEN
+        Y.VALID.FLAG = '1'
+        ACCT.FEE.RESPONZ.STATUS = 'S'
+        ACCT.FEE.RESPONZ.DESC   = 'Success'
+    END ELSE
+        Y.VALID.FLAG = '0'
+        ACCT.FEE.RESPONZ.STATUS = 'F'
+        ACCT.FEE.RESPONZ.DESC   = 'Failed'
+    END
+
+    GOSUB FORM.RESPONZ.MSG
+
+    RETURN
+*--------------------------------------------------------------------------------------------------------
+*****************
+FORM.RESPONZ.MSG:
+*****************
+    R.RESPONZ     = '<?xml version="1.0" encoding="UTF-8"?>'
+    R.RESPONZ<-1> = '<Root>'
+    R.RESPONZ<-1> = '<PsSystem>'                     :ACCT.FEE.PS.SYSTEM              :'</PsSystem>'
+    R.RESPONZ<-1> = '<RequestDate>'                  :ACCT.FEE.REQ.DATE               :'</RequestDate>'
+    R.RESPONZ<-1> = '<RequestTime>'                  :ACCT.FEE.REQ.TIME               :'</RequestTime>'
+    R.RESPONZ<-1> = '<ResponseCode>'                 :ACCT.FEE.REQ.CODE               :'</ResponseCode>'
+    R.RESPONZ<-1> = '<TransSeq>'                     :ACCT.FEE.TRANS.SEQ              :'</TransSeq>'
+    R.RESPONZ<-1> = '<ValidFlag>'                    :Y.VALID.FLAG                    :'</ValidFlag>'
+    R.RESPONZ<-1> = '<ResponseStatus>'               :ACCT.FEE.RESPONZ.STATUS         :'</ResponseStatus>'
+    R.RESPONZ<-1> = '<ResponseDescription>'          :ACCT.FEE.RESPONZ.DESC           :'</ResponseDescription>'
+    R.RESPONZ<-1> = '</Root>'
+
+    CONVERT FM TO '' IN R.RESPONZ
+    Y.ACCT.FEE.RESP = R.RESPONZ
+*   CALL CAB.ECC.OUT.MSG(OUT.MSG)
+
+    RETURN
+*--------------------------------------------------------------------------------------------------------
+*************
+READ.ACCOUNT:
+*************
+    R.ACCOUNT   = ''
+    ACCOUNT.ERR = ''
+*    CALL F.READ(FN.ACCOUNT,ACCOUNT.ID,R.ACCOUNT,F.ACCOUNT,ACCOUNT.ERR)
+    READ R.ACCOUNT FROM F.ACCOUNT,ACCOUNT.ID ELSE ACCOUNT.ERR = "RECORD NOT FOUND"
+
+    RETURN
+*--------------------------------------------------------------------------------------------------------
+END

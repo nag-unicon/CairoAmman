@@ -1,0 +1,252 @@
+*-----------------------------------------------------------------------------
+*Modification Details:
+*=====================
+* Date        :  30 sep 2015
+* Modified by :  Nuha Tuhul
+* Description :  post ft Commission pl to treasury branch
+*-----------------------------------------------------------------------------
+*-----------------------------------------------------------------------------
+
+    SUBROUTINE CAB.ACM
+******************************************************
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT T24.BP I_F.CUSTOMER
+    $INSERT T24.BP I_F.CUSTOMER.ACCOUNT
+    $INSERT T24.BP I_F.ACCOUNT
+    $INSERT T24.BP I_F.OFS.SOURCE
+    $INSERT T24.BP I_GTS.COMMON
+    $INSERT T24.BP I_BATCH
+    $INCLUDE BP I_F.CAB.ACM.PARAM
+******************************************************
+
+    GOSUB OPEN.FILES
+    IF NOT(FILE.ERR) THEN
+        GOSUB UPDATE.BALANCE
+        SEL.DEL = 'DELETE ' : F.ACM.FILE.PATH :' ': F.ACM.FILE.NAME
+        EXECUTE SEL.DEL
+        IF NOT(FILE.ERR1) THEN
+            GOSUB PL.TRANS
+            GOSUB PL.OFS
+            SEL.DEL = 'DELETE ' : F.ACM.FILE.PATH :' ': F.ACM.FILE.NAME
+            EXECUTE SEL.DEL
+            SEL.DEL = 'DELETE ' : F.ACM.PL.PATH :' ': F.ACM.PL.NAME
+            EXECUTE SEL.DEL
+        END
+    END
+!!    GOSUB CLOSE.PARA
+    RETURN
+************
+OPEN.FILES:
+************
+    KIN.INT.ACC = ''
+    PROCESS.TYPE = BATCH.DETAILS<3,1>
+    FN.CUSTOMER = 'F.CUSTOMER'
+    F.CUSTOMER = ''
+    FN.CUSTOMER.ACCOUNT = 'F.CUSTOMER.ACCOUNT'
+    F.CUSTOMER.ACCOUNT = ''
+    FN.ACCOUNT = 'F.ACCOUNT'
+    F.ACCOUNT = ''
+    FN.OFS.SOURCE = 'F.OFS.SOURCE'
+    F.OFS.SOURCE = ''
+    CALL OPF(FN.CUSTOMER.ACCOUNT,F.CUSTOMER.ACCOUNT)
+    CALL OPF(FN.ACCOUNT,F.ACCOUNT)
+    CALL OPF(FN.OFS.SOURCE,F.OFS.SOURCE)
+    FN.CAB.ACM.PARAM = 'F.EB.CAB.ACM.PARAM'
+    F.CAB.ACM.PARAM = ''
+    CALL OPF(FN.CAB.ACM.PARAM,F.CAB.ACM.PARAM)
+    CALL F.READ(FN.CAB.ACM.PARAM,'SYSTEM',ACM.PARAM.REC,F.CAB.ACM.PARAM,ACM.ERR)
+    INT.ACCT.NO = ACM.PARAM.REC<EB.CAB37.INT.MID.ACCT>
+    DEB.CURR = INT.ACCT.NO[1,3]
+    OFS.SOURCE.ID = ACM.PARAM.REC<EB.CAB37.OFS.SOURCE>
+    F.ACM.FILE.PATH = 'ACM'
+    F.ACM.FILE.NAME = 'Equity.txt'
+    F.ACM.ERROR.PATH = 'ACM/LOG'
+    F.ACM.ACCEPT.PATH = 'ACM/LOG'
+    F.KIN.ACM = 'KinAcm.txt.':TODAY:'.':PROCESS.TYPE
+    F.ACM.ERROR.NAME = 'Acm_Error.txt.':TODAY:'.':PROCESS.TYPE
+    F.ACM.ACCEPT.NAME = 'Acm_Accept.txt.':TODAY:'.':PROCESS.TYPE
+    F.ACM.LOG.FILE = ''
+    F.ACM.ACCEPT.FILE = ''
+    KIN.ACC = '0256202072400'
+    SYS.DATE = TODAY[3,6]
+    NAR = '5055 PROFIT /LOSS & INT  '
+    OPENSEQ F.ACM.ACCEPT.PATH,F.ACM.ACCEPT.NAME TO F.ACM.ACCEPT.FILE ELSE
+        CREATE F.ACM.ACCEPT.FILE ELSE
+            STOP
+        END
+    END
+
+    OPENSEQ F.ACM.ERROR.PATH,F.ACM.ERROR.NAME TO F.ACM.LOG.FILE ELSE
+        CREATE F.ACM.LOG.FILE ELSE
+            STOP
+        END
+    END
+    OPENSEQ F.ACM.FILE.PATH,F.KIN.ACM TO F.KINDLE.LOG ELSE
+        CREATE F.KINDLE.LOG ELSE
+            STOP
+        END
+    END
+    FV.ACM.FILE = ''
+    FILE.ERR = ''
+    FILE.ERR1 = ''
+    OPENSEQ F.ACM.FILE.PATH,F.ACM.FILE.NAME TO FV.ACM.FILE ELSE FILE.ERR = 'UNABLE TO OPEN EQUITY FILE'
+
+    F.ACM.PL.PATH = 'ACM'
+    F.ACM.PL.NAME = 'Commissions.txt'
+    FV.ACM.PL = ''
+    KIN.TOT = ''
+    OPENSEQ F.ACM.PL.PATH,F.ACM.PL.NAME TO FV.ACM.PL ELSE FILE.ERR1 = 'UNABLE TO OPEN PL FILE'
+    RETURN
+***************
+UPDATE.BALANCE:
+**************
+! read the text file of the Equity date
+    EOF=0
+    LOOP
+        READSEQ INREC FROM FV.ACM.FILE ELSE EOF=1
+
+    WHILE NOT(EOF)
+
+        CUSTOMER.ID= INREC[1,8]
+        IF CUSTOMER.ID[1,2] EQ '00' THEN
+            CUSTOMER.ID[1,2] = '90'
+        END
+
+        I = '' ; REC.COUNT = '' ; FIND.FLAG = '' ; SIGN = ''
+        SIGN= '' ; ACM.BAL = '' ; ACCT.BAL = '' ; ACCT.TOT = ''
+        DEBIT.ACCT = '' ; CREDIT.ACCT = '' ; ORD.CUST = ''
+        CALL F.READ(FN.CUSTOMER.ACCOUNT,CUSTOMER.ID,CUSTOMER.ACCOUNT.REC,F.CUSTOMER.ACCOUNT,CUS.ERROR)
+        IF CUSTOMER.ACCOUNT.REC EQ '' THEN
+            WRITESEQ INREC APPEND TO F.ACM.LOG.FILE ELSE
+            END
+        END
+        ELSE
+            LOOP
+                REMOVE ACCT.ID FROM CUSTOMER.ACCOUNT.REC SETTING ACCT.NO.POS
+            WHILE ACCT.ID:ACCT.NO.POS
+                CALL F.READ(FN.ACCOUNT,ACCT.ID,ACCOUNT.REC,F.ACCOUNT,ACCT.ERROR)
+                IF ACCOUNT.REC THEN
+                    IF (ACCOUNT.REC<AC.CATEGORY> EQ '1503' ) AND (ACCOUNT.REC<AC.CURRENCY> EQ 'USD' ) THEN
+                        ACM.BAL = INREC[166,18]
+*****                   SIGN = ACM.BAL[1,1]
+                        ACM.BAL = ACM.BAL[2,17]
+                        ACCT.BAL = ACCOUNT.REC<AC.ONLINE.ACTUAL.BAL>
+                        IF ACM.BAL GT ACCT.BAL THEN
+                            DEBIT.ACCT = INT.ACCT.NO
+                            CREDIT.ACCT = ACCT.ID
+                            ORD.CUST = 'ACM ORDERING'
+                            ACCT.TOT = ACCT.BAL - ACM.BAL
+                            SIGN = '-'
+                            KIN.TOT +=ACCT.TOT
+                        END ELSE
+                            DEBIT.ACCT = ACCT.ID
+                            CREDIT.ACCT = INT.ACCT.NO
+                            ORD.CUST = ''
+                            ACCT.TOT = ACCT.BAL - ACM.BAL
+                            KIN.TOT +=ACCT.TOT
+                            SIGN = '+'
+                        END
+                        ACCT.TOT = ABS(ACCT.TOT)
+                        FIND.FLAG = 'Y'
+                        MESSAGE.ID = ''
+                        Y.MESSAGE = ''
+                        KIN.REC = ''
+                        FMT.AMNT = ''  ; FMT.AMNT1 = ''
+                        IF ACCT.TOT NE '0' THEN
+
+                            Y.MESSAGE='FUNDS.TRANSFER,INP/I/':PROCESS.TYPE:',,,TRANSACTION.TYPE::=AC,DEBIT.AMOUNT::=':ACCT.TOT:','
+                            Y.MESSAGE:= 'DEBIT.CURRENCY::=':DEB.CURR:',DEBIT.ACCT.NO::=':DEBIT.ACCT:',CREDIT.ACCT.NO::=':CREDIT.ACCT:',ORDERING.CUST::=':ORD.CUST
+
+                            CALL OFS.POST.MESSAGE(Y.MESSAGE,MESSAGE.ID,OFS.SOURCE.ID,'')
+                            ACCEPT.REC = ACCT.ID: ',' :CUSTOMER.ID: ',' : ACM.BAL : ',' : ACCT.BAL : ',' : ACCT.TOT
+                            WRITESEQ ACCEPT.REC APPEND TO F.ACM.ACCEPT.FILE ELSE
+                            END
+                        END ELSE
+                            WRITESEQ INREC APPEND TO F.ACM.LOG.FILE ELSE
+                            END
+                        END
+
+                    END
+                END
+            REPEAT
+            IF FIND.FLAG EQ '' THEN
+                WRITESEQ INREC APPEND TO F.ACM.LOG.FILE ELSE
+                END
+            END
+        END
+    REPEAT
+
+    IF KIN.TOT GT 0 THEN
+        DEBIT.ACCT = ACM.PARAM.REC<EB.CAB37.INT.MID.ACCT>
+        CREDIT.ACCT = ACM.PARAM.REC<EB.CAB37.ACM.ACCT>
+    END ELSE
+        KIN.TOT = KIN.TOT * -1
+        CREDIT.ACCT = ACM.PARAM.REC<EB.CAB37.INT.MID.ACCT>
+        DEBIT.ACCT = ACM.PARAM.REC<EB.CAB37.ACM.ACCT>
+    END
+    ORD.CUST = 'ACM CLOSING'
+    Y.MESSAGE='FUNDS.TRANSFER,INP/I/':PROCESS.TYPE:',,,TRANSACTION.TYPE::=AC,DEBIT.AMOUNT::=':KIN.TOT:','
+    Y.MESSAGE:= 'DEBIT.CURRENCY::=':DEB.CURR:',DEBIT.ACCT.NO::=':DEBIT.ACCT:',CREDIT.ACCT.NO::=':CREDIT.ACCT:',ORDERING.CUST::=':ORD.CUST
+
+    CALL OFS.POST.MESSAGE(Y.MESSAGE,MESSAGE.ID,OFS.SOURCE.ID,'')
+
+
+    RETURN
+**********
+PL.TRANS:
+**********
+    EOF = 0 ; TOTAL.PL = ''
+    LOOP
+        READSEQ INREC FROM FV.ACM.PL ELSE EOF=1
+    WHILE NOT(EOF)
+        PL.AMOUNT = INREC[145,17]
+        TOTAL.PL += PL.AMOUNT
+    REPEAT
+    RETURN
+*******
+PL.OFS:
+*******
+    ACM.ACCT = ''
+    ACM.ACCT = ACM.PARAM.REC<EB.CAB37.ACM.ACCT>
+!!    ACM.PL.CAT = 'PL52035'
+    Y.BNK = 'JO0090001'
+
+    ACM.PL.CAT = ACM.PARAM.REC<EB.CAB37.PL.CATEG>
+    MESSAGE.ID = '' ; ORD.CUST = ''
+    ORD.CUST = 'ACM PL'
+    Y.MESSAGE = ''
+    SIGN = ''
+    Y.MESSAGE='FUNDS.TRANSFER,INP/I/':PROCESS.TYPE:',//JO0090001,,TRANSACTION.TYPE::=AC,DEBIT.AMOUNT::=':TOTAL.PL:','
+    Y.MESSAGE:= 'DEBIT.CURRENCY::=':DEB.CURR:',DEBIT.ACCT.NO::=':ACM.ACCT:',CREDIT.ACCT.NO::=':ACM.PL.CAT:',ORDERING.CUST::=':ORD.CUST
+    CALL OFS.POST.MESSAGE(Y.MESSAGE,MESSAGE.ID,OFS.SOURCE.ID,'')
+    CALL JOURNAL.UPDATE(MSG.ID)
+    RETURN
+***********
+CLOSE.PARA:
+***********
+    IF KIN.TOT LT 0 THEN
+        KIN.TOT = KIN.TOT * -1
+        SIGN = '+'
+    END ELSE
+        SIGN = '-'
+    END
+    FMT.AMNT = ''
+    FMT.AMNT = FIELD(KIN.TOT,'.',1):FMT(FIELD(KIN.TOT,'.',2),'L%2')
+    FMT.AMNT = FMT(FMT.AMNT,'R%14')
+    KIN.REC = KIN.INT.ACC : FMT.AMNT : SIGN : '46' : SYS.DATE : NAR
+    WRITESEQ KIN.REC APPEND TO F.KINDLE.LOG ELSE
+    END
+    IF SIGN EQ '-' THEN
+        SIGN = '+'
+    END ELSE
+        SIGN = '-'
+    END
+    KIN.REC = KIN.ACC : FMT.AMNT : SIGN : '46' : SYS.DATE : NAR
+    WRITESEQ KIN.REC APPEND TO F.KINDLE.LOG ELSE
+    END
+    CLOSESEQ FV.ACM.FILE
+    CLOSESEQ F.ACM.LOG.FILE
+    CLOSESEQ F.ACM.ACCEPT.FILE
+    RETURN
+END

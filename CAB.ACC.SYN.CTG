@@ -1,0 +1,60 @@
+*-----------------------------------------------------------------------------
+* <Rating>-10</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.ACC.SYN.CTG(IN.TAG.VAL,T24.FLD.NM,T24.FLD.NO,T24.OUT.VAL)
+*-----------------------------------------------------------------------------
+* Company  Name     : CAB BANK
+* Developed By      : Temenos Application Management
+* Subroutine Type   : CALL routine
+* Attached to       :
+*                   :
+* Attached as       : Subroutine
+* Primary Purpose   :
+*                   :
+*-----------------------------------------------------------------------------
+* Incoming:
+* ---------
+* N/A
+*
+* Outgoing:
+* ---------
+* N/A
+*
+* Error Variables:
+* ----------------
+*
+*-----------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* 01/05/2011    - DHARVESH J
+* ODR NO      - ODR-2011-02-0202
+* DEVELOPMENT - Development to form the unique reference for the customer creation from T24 to
+* send external system
+*-----------------------------------------------------------------------------
+
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT T24.BP I_F.CATEGORY
+
+    GOSUB INIT
+
+    CALL F.READ(FN.CATEG,T24.FLD.NM,R.CATEG,F.CATEG,CATEG.ERR)
+    IF R.CATEG<EB.CAT.AC.CONTINGENT> EQ 'CONTINGENT' THEN
+        T24.OUT.VAL = 'Y'
+    END
+    ELSE
+        T24.OUT.VAL = 'N'
+    END
+
+    RETURN
+
+INIT:
+*****
+    FN.CATEG = 'F.CATEGORY'
+    F.CATEG = ''
+    R.CATEG = ''
+    CALL OPF(FN.CATEG,F.CATEG)
+
+    RETURN
+
+END

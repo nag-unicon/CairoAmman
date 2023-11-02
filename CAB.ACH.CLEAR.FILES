@@ -1,0 +1,38 @@
+    SUBROUTINE  CAB.ACH.CLEAR.FILES
+*-----------------------------------------------------------------------------
+*DEVELOPED BY:  Nuha Tuhul
+*DEVELOPED ON:  17 Oct 2016
+*DESCRIPTION :  service on daily basis to clear CAB.ACH.DIRECT.DEBIT.IN$nau
+*-----------------------------------------------------------------------------
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+
+
+    FN.CAB.ACH = 'F.CAB.ACH.DIRECT.DEBIT.IN$NAU'
+    F.CAB.ACH  = ''
+
+    FN.ACH.REJ  = 'F.CAB.ACH.DIRECT.DEBIT.IN.REJ'
+    F.ACH.REJ   =''
+
+    CALL OPF(FN.CAB.ACH,F.CAB.ACH)
+    CALL OPF(FN.ACH.REJ,F.ACH.REJ)
+
+    R.ACH = "" ;SEL.LIST = '';NO.OF.REC = ''
+
+    SEL.CMD = 'SELECT ' :  FN.CAB.ACH
+    CALL EB.READLIST ( SEL.CMD,SEL.LIST ,'',NO.OF.REC,RET.CODE)
+    LOOP
+        REMOVE SEL.ID FROM SEL.LIST SETTING POS
+    WHILE SEL.ID:POS
+        CALL F.READ(FN.CAB.ACH,SEL.ID,R.ACH,F.CAB.ACH,ACH.EER)
+
+        CALL F.WRITE(FN.ACH.REJ,SEL.ID,R.ACH)
+
+    REPEAT
+
+    EXECUTE "CLEAR.FILE ":FN.CAB.ACH
+
+
+    RETURN
+END

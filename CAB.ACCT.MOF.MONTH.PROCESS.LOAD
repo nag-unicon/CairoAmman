@@ -1,0 +1,96 @@
+*-----------------------------------------------------------------------------------
+* <Rating>-12</Rating>
+*-----------------------------------------------------------------------------------
+    SUBROUTINE CAB.ACCT.MOF.MONTH.PROCESS.LOAD
+*-----------------------------------------------------------------------------------
+* Subroutine Type : BATCH ROUTINE
+* Attached to     :
+* Attached as     :
+* Primary Purpose :
+*
+* Incoming:
+* ---------
+*
+*
+* Outgoing:
+* ---------
+*
+*
+* Error Variables:
+* ----------------
+*
+*
+*-----------------------------------------------------------------------------------
+* Modification History:
+*Ayobami     19-1-2023                 set month flag =1 , to take clear bal
+*-----------------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_GTS.COMMON
+    $INSERT I_F.FUNDS.TRANSFER
+    $INSERT I_F.CAB.MOF.ACCT.PARAM
+    $INSERT I_F.CAB.MOF.PARAMETER
+    $INSERT I_F.ACCOUNT
+    $INSERT I_CAB.ACCT.MOF.MONTH.PROCESS.COMMON
+    $INSERT I_F.EB.FREE.MESSAGE
+    $INSERT I_F.CAB.MOF.ACCT.LOG.TODAY
+    $INSERT I_F.DATES
+    GOSUB PROCESS
+
+    GOSUB READ.PARAM
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    FN.CAB.MOF.ACCT.PARAM = 'F.CAB.MOF.ACCT.PARAM'
+    F.CAB.MOF.ACCT.PARAM = ''
+    CALL OPF(FN.CAB.MOF.ACCT.PARAM,F.CAB.MOF.ACCT.PARAM)
+
+    FN.ACCOUNT = 'F.ACCOUNT'
+    F.ACCOUNT  = ''
+    CALL OPF(FN.ACCOUNT,F.ACCOUNT)
+
+    FN.CAB.MOF.PARAMETER = 'F.CAB.MOF.PARAMETER'
+    F.CAB.MOF.PARAMETER  = ''
+    CALL OPF(FN.CAB.MOF.PARAMETER,F.CAB.MOF.PARAMETER)
+
+    FN.CAB.MOF.ACCT.LOG.TODAY = 'F.CAB.MOF.ACCT.LOG.TODAY'
+    F.CAB.MOF.ACCT.LOG.TODAY = ''
+    CALL OPF(FN.CAB.MOF.ACCT.LOG.TODAY,F.CAB.MOF.ACCT.LOG.TODAY)
+
+    FN.ACCOUNT = 'F.ACCOUNT'
+    F.ACCOUNT = ''
+    CALL OPF(FN.ACCOUNT,F.ACCOUNT)
+    PURPOSE.POS = ''
+    CALL GET.LOC.REF("FUNDS.TRANSFER","FT.PURPOSE",PURPOSE.POS)
+
+    RETURN
+
+************
+READ.PARAM:
+************
+    R.CAB.MOF.PARAMETER = ''
+    E.CAB.MOF.PARAMETER = ''
+    CALL F.READ(FN.CAB.MOF.PARAMETER,'SYSTEM',R.CAB.MOF.PARAMETER,F.CAB.MOF.PARAMETER,E.CAB.MOF.PARAMETER)
+
+    Y.MOF.PARAM.ACCOUNT = R.CAB.MOF.PARAMETER<MOF.ACCT.PARAM.CBJ.ACCOUNT>
+    Y.MOF.PARAM.CURRENCY = R.CAB.MOF.PARAMETER<MOF.ACCT.PARAM.CBJ.CURRENCY>
+    Y.MOF.PARAM.OFS.USER =  R.CAB.MOF.PARAMETER<MOF.ACCT.PARAM.OFS.USER>
+    Y.MOF.PARAM.OFS.PASSWORD =   R.CAB.MOF.PARAMETER<MOF.ACCT.PARAM.OFS.PASSWORD>
+    Y.MOF.PARAM.OFS.VERSION =  R.CAB.MOF.PARAMETER<MOF.ACCT.PARAM.OFS.VERSION>
+    Y.MOF.PARAM.OFS.SOURCE  =  R.CAB.MOF.PARAMETER<MOF.ACCT.PARAM.OFS.SOURCE>
+    Y.MOF.PARAM.OFS.COMPANY =  R.CAB.MOF.PARAMETER<MOF.ACCT.PARAM.OFS.COMPANY>
+    Y.MOF.PARAM.ACCOUNT.TYPE =  R.CAB.MOF.PARAMETER<MOF.ACCT.PARAM.ACCOUNT.TYPE>
+    Y.MOF.PARAM.TRANSACTION.TYPE =  R.CAB.MOF.PARAMETER<MOF.ACCT.PARAM.TRANSACTION.TYPE>
+
+    ACCT.ERR = ''
+    R.CBJ.ACCOUNT =''
+    CALL F.READ(FN.ACCOUNT,Y.MOF.PARAM.ACCOUNT,R.CBJ.ACCOUNT,F.ACCOUNT,ACCT.ERR)
+    Y.MOF.CUSTOMER = R.CBJ.ACCOUNT<AC.CUSTOMER>
+    Y.MONTHEND.FLAG = 1
+    RETURN
+
+END

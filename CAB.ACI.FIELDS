@@ -1,0 +1,94 @@
+    SUBROUTINE CAB.ACI.FIELDS
+*-----------------------------------------------------------------------------
+*Modification Details:
+*=====================
+* Date        : 24-2-2020
+* Modified by : Nuha Tuhul
+* Description : CAB.ACI.FIELDS
+*-----------------------------------------------------------------------------
+
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_DataTypes
+
+*-------------------------------------------------------------------------------------------------------------------
+    CALL Table.defineId("ID.ACC", T24_String)     ;* Define Table id
+    ID.N = "35" ; ID.T = "A"
+*-------------------------------------------------------------------------------------------------------------------
+    neighbour = '' ;
+    fieldName = 'INTEREST.DAY.BASIS'        ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'TAX.KEY'                   ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'CR.BALANCE.TYPE'           ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'CR.CALCUL.TYPE'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'CR.MINIMUM.BAL'               ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'CR.OFFSET.ONLY'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+
+    fieldName = 'XX<CR.BASIC.RATE'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-CR.INT.RATE'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-CR.MARGIN.OPER'             ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-CR.MAX.RATE'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-CR.MARGIN.RATE'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-CR.LIMIT.AMT'             ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-CR.MIN.RATE'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-CR2.BALANCE.TYPE'                ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-CR2.CALCUL.TYPE'             ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-CR2.MINIMUM.BAL'                 ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX>CR2.OFFSET.ONLY'             ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+
+    fieldName = 'XX<CR2.BASIC.RATE'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-CR2.INT.RATE'           ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-CR2.MARGIN.OPER'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-CR2.MAX.RATE'          ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-CR2.MARGIN.RATE'            ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX-CR2.LIMIT.AMT'          ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'XX>CR2.MIN.RATE'              ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+
+    fieldName = 'INTEREST.TAX.MIN'             ;  fieldLength = '35' ; fieldType = 'A'          ;  GOSUB ADD.FIELDS
+    fieldName = 'NET.TAX'     ; fieldLength = '35' ;  fieldType = 'A'   ;  GOSUB ADD.FIELDS
+
+    fieldName = 'CR.MIN.BAL.ST.DTE'  ; fieldLength = '12' ;  fieldType = 'A'   ;  GOSUB ADD.FIELDS
+
+    fieldName = 'CR.MIN.BAL.ED.DTE'     ; fieldLength = '12' ;  fieldType = 'A' ;  GOSUB ADD.FIELDS
+    fieldName = 'CR.ACCR.OPEN.AC'  ; fieldLength = '12' ;  fieldType = 'A'   ;  GOSUB ADD.FIELDS
+    fieldName = 'CR.ACCR.CLOSE.AC' ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'CR2.MIN.BAL.ST.DTE' ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'CR2.MIN.BAL.ED.DTE' ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'CR2.ACCR.OPEN.AC' ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'CR2.ACCR.CLOSE.AC' ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'CR.MIN.VALUE' ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'CR.MIN.WAIVE' ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'CR2.MIN.VALUE' ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'CR2.MIN.WAIVE' ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'CR.ZERO.INT.BAL' ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'CR.ZERO.INT.OC' ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'CR2.ZERO.INT.BAL' ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'CR2.ZERO.INT.OC' ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'NEGATIVE.RATES' ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+    fieldName = 'COMPOUND.TYPE' ; fieldLength = '35' ;     fieldType = 'A'      ;  GOSUB ADD.FIELDS
+
+    CALL Table.setAuditPosition         ;* Poputale audit information
+
+    RETURN
+*
+*--------------------------------------------------------------------------------------------------------------------
+********************
+ADD.RESERVED.FIELDS:
+********************
+*
+    CALL Table.addField(fieldName, fieldType, args, neighbour)        ;* Add a new fields
+*
+    RETURN
+*
+*-------------------------------------------------------------------------------------------------------------------
+*
+***********
+ADD.FIELDS:
+***********
+*
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour) ;* Add a new field
+*
+    RETURN
+*
+*---------------------------------------------------------------------------------------------------------------------
+END

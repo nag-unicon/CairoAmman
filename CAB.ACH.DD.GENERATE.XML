@@ -1,0 +1,75 @@
+    SUBROUTINE CAB.ACH.DD.GENERATE.XML
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE CAB.BP I_F.CAB.ACH.DIRECT.DEBIT
+    $INCLUDE CAB.BP I_F.CAB.EXT.MQ.PARAM
+
+    GOSUB OPEN.FILES
+    GOSUB PROCESS
+    RETURN
+
+OPEN.FILES:
+    EXT.ERR = ''
+    R.CAB.EXT.MQ.PARAM = ''
+    CALL CACHE.READ("F.CAB.EXT.MQ.PARAM","SYSTEM",R.CAB.EXT.MQ.PARAM,EXT.ERR)
+
+    YR.ERR = ''
+    YR.MSG.TYPE<1> = "ACH"
+    YR.MSG.TYPE<2> = "N"
+    RETURN
+
+PROCESS:
+
+    YR.ORDER.CODE = R.NEW(ACH.DD.BANK.OPER.CODE)
+    CHANGE "-" TO "_" IN YR.ORDER.CODE
+    YR.VALUE.DATE = R.NEW(ACH.DD.VALUE.DATE)
+    YR.VALUE.DATE = YR.VALUE.DATE[7,2]:'.':YR.VALUE.DATE[5,2]:'.':YR.VALUE.DATE[1,4]
+    YR.ORIG.DOC.DATE = R.NEW(ACH.DD.ORIG.DOC.DATE)
+    YR.ORIG.DOC.DATE = YR.ORIG.DOC.DATE[7,2]:'.':YR.ORIG.DOC.DATE[5,2]:'.':YR.ORIG.DOC.DATE[1,4]
+    YR.XML = '<?xml version="1.0" encoding="utf-8"?>'
+    YR.XML:= '<Payment>'
+    YR.XML:= '<BankOperationCode>':YR.ORDER.CODE:'</BankOperationCode>'
+    YR.XML:= '<TransactionTypeCode>':R.NEW(ACH.DD.TXN.TYPE.CODE):'</TransactionTypeCode>'
+    YR.XML:= '<Amount>':R.NEW(ACH.DD.AMOUNT):'</Amount>'
+    YR.XML:= '<CurrencyCode>':R.NEW(ACH.DD.CURRENCY):'</CurrencyCode>'
+    YR.XML:= '<ValueDate>':YR.VALUE.DATE:'</ValueDate>'
+    YR.XML:= '<OrigDocNumber>':R.NEW(ACH.DD.ORIG.DOC.NO):'</OrigDocNumber>'
+    YR.XML:= '<OrigDocDate>':YR.ORIG.DOC.DATE:'</OrigDocDate>'
+    YR.XML:= '<RemittanceInformation>':R.NEW(ACH.DD.REMITTANCE.INFO):'</RemittanceInformation>'
+    YR.XML:= '<CreditorBankCode>':R.NEW(ACH.DD.CR.BANK.CODE):'</CreditorBankCode>'
+    YR.XML:= '<CreditorBankName>':R.NEW(ACH.DD.CR.BANK.NAME):'</CreditorBankName>'
+    YR.XML:= '<CreditorCustomerName>':R.NEW(ACH.DD.CR.CUST.NAME):'</CreditorCustomerName>'
+    YR.XML:= '<CreditorCustomerAccount>':R.NEW(ACH.DD.CR.CUST.ACCT):'</CreditorCustomerAccount>'
+    YR.XML:= '<DebtorBankCode>':R.NEW(ACH.DD.DR.BANK.CODE):'</DebtorBankCode>'
+    YR.XML:= '<DebtorBankName>':R.NEW(ACH.DD.DR.BANK.NAME):'</DebtorBankName>'
+    YR.XML:= '<DebtorCustomerName>':R.NEW(ACH.DD.DR.CUST.NAME):'</DebtorCustomerName>'
+    YR.XML:= '<DebtorCustomerAccount>':R.NEW(ACH.DD.DR.CUST.ACCT):'</DebtorCustomerAccount>'
+    YR.XML:= '<MandateReference>':R.NEW(ACH.DD.MANDATE.REF):'</MandateReference>'
+    YR.XML:= '<ChargeBearer>':R.NEW(ACH.DD.CHARGE.BEARER):'</ChargeBearer>'
+    YR.XML:= '</Payment>'
+    YR.XML.MSG = YR.XML
+
+    CALL CAB.SEND.EXT.MSG(YR.XML.MSG,YR.MSG.TYPE,YR.ERR)
+    IF YR.ERR THEN
+        E = 'AI-PAYPAL.CONFIGURATION'
+        CALL ERR
+        RETURN
+    END
+
+    OUT.MSG = YR.XML.MSG
+
+    IF INDEX(YR.XML.MSG,"FAILURE",1) THEN
+        E = 'AI-PAYPAL.CONFIGURATION'
+        CALL ERR
+        RETURN
+    END
+
+    YR.RESULT = FIELD(FIELD(OUT.MSG,'</Result>',1),'<Result>',2)
+
+    IF YR.RESULT EQ "FAIL" THEN
+        YR.DESC = FIELD(FIELD(OUT.MSG,'</Description>',1),'<Description>',2)
+        E = YR.DESC
+        CALL ERR
+        RETURN
+    END
+    RETURN

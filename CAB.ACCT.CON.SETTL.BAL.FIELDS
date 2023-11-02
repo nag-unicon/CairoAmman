@@ -1,0 +1,61 @@
+*-----------------------------------------------------------------------------
+* <Rating>-28</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.ACCT.CON.SETTL.BAL.FIELDS
+*-----------------------------------------------------------------------------
+!** FIELD definitions FOR TEMPLATE
+*!
+* @ Gokul J
+* @stereotype fields
+* @uses C_METHODS
+* @uses C_PROPERTIES
+* @package infra.eb
+*----------------------------------------------------------------------------
+* Modification History:
+* Author -
+* Desc -
+* HD Ref No -
+* Date -
+*----------------------------------------------------------------------------- *
+* Description: This template is a common parameter table used for Counterparty
+* Beneficiary Parameter
+*-----------------------------------------------------------------------------
+*** <region name= Header>
+*** <desc>INCLUDE T24.BPs and control logic</desc>
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+
+*-----------------------------------------------------------------------------
+    CALL Table.defineId("ACCT.ID", T24_String)    ;*Define Table id
+    ID.N = "16" ;  ID.T='A'  ; ID.T<2> = ""
+    ID.CHECKFILE = "ACCOUNT"
+
+    field.name = 'SETTL.AMNT'
+    field.type = 'A'
+    field.length = '18'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+    field.name = 'SUSP.AMNT'
+    field.type = 'A'
+    field.length = '18'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+    field.name = 'ACCT.CCY'
+    field.type = 'A'
+    field.length = '18'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+    field.name = 'ACCT.CUST'
+    field.type = 'A'
+    field.length = '18'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+    field.name = 'ACCT.CATEG'
+    field.type = 'A'
+    field.length = '18'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+    CALL Table.setAuditPosition
+    RETURN
+
+END

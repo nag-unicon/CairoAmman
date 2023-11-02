@@ -1,0 +1,149 @@
+    SUBROUTINE CAB.ACCT.UPD
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.ACCOUNT.OVERDRAWN
+    $INCLUDE T24.BP I_F.ACCOUNT
+    $INCLUDE T24.BP I_F.LIMIT
+
+    GOSUB INIT
+*    GOSUB PROCESS
+
+    RETURN
+*****
+INIT:
+*****
+    DEBUG
+    FN.ACCOUNT.OVERDRAWN = "F.ACCOUNT.OVERDRAWN"
+    F.ACCOUNT.OVERDRAWN = ""
+    CALL OPF(FN.ACCOUNT.OVERDRAWN,F.ACCOUNT.OVERDRAWN)
+
+    FN.ACCOUNT = "F.ACCOUNT"
+    F.ACCOUNT = ""
+    CALL OPF(FN.ACCOUNT,F.ACCOUNT)
+
+    FN.LIMIT = "F.LIMIT"
+    F.LIMIT = ""
+    CALL OPF(FN.LIMIT,F.LIMIT)
+    CALL ALLOCATE.UNIQUE.TIME(TIME.ENT)
+    ENT.ID = 'ENT':TIME.ENT
+
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    SELECT.CMD = ''; ACCT.OD.IDS =''; ID.COUNT = ''; Y.OD.ID =''  ; Y.MANUAL.UPDATE = ''  ; Y.FINAL.ARRAY = ''
+    Y.FINAL.ARRAY<1> = "Account Overdrawn id":",":"Account number":",":"First overdrawn date":",":"Today":",":"Date Difference":",":"Od balance":",":"Account Balance":",":"Open Actual Balance":",":"Excess Percentage"
+    Y.MANUAL.UPDATE<1> = "Account Overdrawn id":",":"Account number":",":"Categoty"
+    R.ACCOUNT.OVERDRAWN = '' ;  ACCOUNT.OVERDRAWN.ERR = '' ;  Y.DATE.FIRST.OD = '' ; Y.DATE.TODAY = '' ; DIFF.DATE = '' ; Y.ACCOUNT.ID = '' ; Y.ONLINE.BAL = '' ;
+    SELECT.CMD = 'SELECT ':FN.ACCOUNT.OVERDRAWN:' WITH MOVED.NARR NE CLEARED'
+    CALL EB.READLIST(SELECT.CMD,ACCT.OD.IDS,'',ID.COUNT,'')
+    OD.CNT =1
+    LOOP
+        REMOVE Y.OD.ID FROM ACCT.OD.IDS SETTING Y.OD.ID.POS
+    WHILE Y.OD.ID:Y.OD.ID.POS
+        Y.ACC.DATA = ''
+        CALL F.READ(FN.ACCOUNT.OVERDRAWN,Y.OD.ID,R.ACCOUNT.OVERDRAWN,F.ACCOUNT.OVERDRAWN,ACCOUNT.OVERDRAWN.ERR)
+        Y.DATE.FIRST.OD = '' ; Y.DATE.TODAY = '' ; DIFF.DATE = ''  ; Y.ACCOUNT.IDS = ''
+        Y.DATE.FIRST.OD = R.ACCOUNT.OVERDRAWN<AC.OD.DATE.FIRST.OD>
+        Y.DATE.TODAY = TODAY
+        Y.DATE.LEN = LEN(Y.DATE.FIRST.OD)
+        IF Y.DATE.LEN EQ 8 AND NUM(Y.DATE.FIRST.OD) THEN
+            PROCEED.FLAG = 1
+        END  ELSE
+            PROCEED.FLAG = ''
+        END
+        IF PROCEED.FLAG THEN
+            CALL CDD('',Y.DATE.FIRST.OD,Y.DATE.TODAY,DIFF.DATE)
+            R.LIMIT = '' ; LIMIT.ERR = ''
+            CALL F.READ(FN.LIMIT,Y.OD.ID,R.LIMIT,F.LIMIT,LIMIT.ERR)
+            IF R.LIMIT THEN
+                Y.ACCOUNT.IDS = ''
+                Y.ACCT.COUNT = ''
+                Y.ACCOUNT.IDS = R.LIMIT<LI.ACCOUNT>
+                Y.ACCT.COUNT = DCOUNT(Y.ACCOUNT.IDS,VM)
+                FOR Y.AC.CNT = 1 TO Y.ACCT.COUNT
+                    Y.ACCOUNT.ID = R.LIMIT<LI.ACCOUNT,Y.AC.CNT>
+                    GOSUB READ.ACCOUNT
+                NEXT Y.AC.CNT
+            END ELSE
+                Y.ACCOUNT.ID = Y.OD.ID
+                GOSUB READ.ACCOUNT
+            END
+        END
+        PRINT "ACCOUNT.OVERDRAWN.ID ":OD.CNT:" ) ":Y.OD.ID
+        OD.CNT +=  1
+    REPEAT
+    Y.TIME=''
+    CUR.DATE=''
+    Y.TODAY =''
+    Y.DATETIME = TIMEDATE()
+    Y.TIME = Y.DATETIME[1,8]
+    CONVERT ":" TO "_" IN Y.TIME
+    CUR.DATE = OCONV(DATE(),"D4/E")
+    Y.TODAY = CUR.DATE[7,4]:CUR.DATE[4,2]:CUR.DATE[1,2]
+    WRITELIST Y.FINAL.ARRAY TO "OVERDRAFT":Y.TODAY:"_":Y.TIME:".csv"
+    WRITELIST Y.MANUAL.UPDATE TO "OVERDRAFT_MANUAL":Y.TODAY:"_":Y.TIME:".csv"
+
+    CALL JOURNAL.UPDATE('')
+
+    RETURN
+
+*************
+OD.ARRAY.UPD:
+*************
+    Y.ONLINE.BAL = R.ACCOUNT<AC.ONLINE.ACTUAL.BAL>
+    Y.CATEGORY = R.ACCOUNT<AC.CATEGORY>
+    IF Y.CATEGORY EQ 1010 THEN
+        Y.FINAL.ARRAY<-1> = Y.OD.ID:",":Y.ACCOUNT.ID:",":R.ACCOUNT.OVERDRAWN<AC.OD.DATE.FIRST.OD>:",":TODAY:",":DIFF.DATE:",":R.ACCOUNT.OVERDRAWN<AC.OD.ACT.BAL.TOT.OUT>:",":Y.ONLINE.BAL:",":R.ACCOUNT<AC.OPEN.ACTUAL.BAL>:",":Y.EXCESS.PER
+        R.AGE.D = DIFF.DATE
+        R.AGE.STATUS = 'NULL'
+        R.OV.DATE = R.ACCOUNT.OVERDRAWN<AC.OD.DATE.FIRST.OD>
+        R.PREV.STATUS = "NULL"
+        R.ST.CHNGE = "NULL"
+        Y.ACC.DATA = 'ACCOUNT,OVR/I/PROCESS,TEST555/a1234567+,':Y.ACCOUNT.ID:',L.AGING.DAYS::=':R.AGE.D:',L.STATUS.CHANGE::=':R.ST.CHNGE:',L.OVERDUE.DATE::=':R.OV.DATE:',L.AGING.STATUS::=':R.AGE.STATUS:',L.PREVS.STATUS::=':R.PREV.STATUS
+        GOSUB POST.OFS.MSG
+    END
+    Y.ACCOUNT.ID = '' ; Y.ONLINE.BAL = '' ;
+
+    RETURN
+
+*---------------------------------------------------------------------------
+POST.OFS.MSG:
+*-----------
+    IF Y.ACC.DATA THEN
+        OFS.MSG.ID = ''
+        Y.OPTIONS = ''
+        OFS.SOURCE.ID = "CAB.PAYMENTS"
+        CALL OFS.POST.MESSAGE(Y.ACC.DATA,Y.OFS.MSG.ID ,OFS.SOURCE.ID, Y.OPTIONS)
+        CALL JOURNAL.UPDATE('')
+    END
+
+    RETURN
+
+*--------------------------------------------------------------------------
+*************
+READ.ACCOUNT:
+*************
+    R.ACCOUNT = '' ; ACCOUNT.ERR = ''
+    CALL F.READ(FN.ACCOUNT,Y.ACCOUNT.ID,R.ACCOUNT,F.ACCOUNT,ACCOUNT.ERR)
+    IF R.ACCOUNT THEN
+        Y.EXCESS.PER = ''
+        IF R.ACCOUNT<AC.CATEGORY> EQ 1010 AND Y.ACCT.COUNT EQ 1 THEN
+            CALL CAB.CALL.EXCESS.OD(Y.ACCOUNT.ID,Y.EXCESS.PER)
+            IF Y.EXCESS.PER AND Y.EXCESS.PER LT 10 ELSE
+                GOSUB OD.ARRAY.UPD
+            END
+        END ELSE
+            IF R.ACCOUNT<AC.CATEGORY> EQ 1010 THEN
+                Y.MANUAL.UPDATE<-1> = Y.OD.ID:",":Y.ACCOUNT.ID:",":R.ACCOUNT<AC.CATEGORY>
+            END
+        END
+    END
+
+    RETURN
+
+END

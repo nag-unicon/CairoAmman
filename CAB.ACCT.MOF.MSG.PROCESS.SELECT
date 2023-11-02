@@ -1,0 +1,67 @@
+*-----------------------------------------------------------------------------------
+* <Rating>-12</Rating>
+*-----------------------------------------------------------------------------------
+    SUBROUTINE CAB.ACCT.MOF.MSG.PROCESS.SELECT
+*-----------------------------------------------------------------------------------
+* Subroutine Type : BATCH ROUTINE
+* Attached to     :
+* Attached as     :
+* Primary Purpose :
+*
+* Incoming:
+* ---------
+*
+*
+* Outgoing:
+* ---------
+*
+*
+* Error Variables:
+* ----------------
+*
+*
+*-----------------------------------------------------------------------------------
+* Modification History:
+*
+*-----------------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_GTS.COMMON
+    $INSERT I_F.FUNDS.TRANSFER
+    $INSERT I_F.CAB.MOF.ACCT.PARAM
+    $INSERT I_F.CAB.MOF.PARAMETER
+    $INSERT I_F.ACCOUNT
+    $INSERT I_CAB.ACCT.MOF.MSG.PROCESS.COMMON
+    $INSERT I_F.EB.FREE.MESSAGE
+    $INSERT I_F.CAB.MOF.ACCT.LOG.TODAY
+    $INSERT I_F.DATES
+
+    SEL.CMD = "SELECT ":FN.CAB.MOF.ACCT.PARAM
+    SEL.LIST = ''
+    NO.REC = ''
+    ERR.REC = ''
+    Y.DATETIME=''
+    Y.TIME=''
+    CUR.DATE=''
+    Y.TODAY =''
+    Y.DATETIME = TIMEDATE()
+    Y.TIME = Y.DATETIME[1,8]
+    CUR.DATE = OCONV(DATE(),"D4/E")
+    Y.TODAY = CUR.DATE[7,4]:CUR.DATE[4,2]:CUR.DATE[1,2]
+    Y.MONTHEND.FLAG = ''
+    IF TODAY EQ Y.TODAY THEN
+        IF (TODAY[1,6] NE R.DATES(EB.DAT.NEXT.WORKING.DAY)[1,6]) THEN
+* Y.MONTHEND.FLAG = 1
+            SEL.LIST = ''
+        END ELSE
+            CALL EB.READLIST(SEL.CMD,SEL.LIST,'',NO.REC,ERR.REC)
+        END
+    END ELSE
+        SEL.LIST = ''
+    END
+    CALL BATCH.BUILD.LIST("",SEL.LIST)
+
+    RETURN
+
+
+END

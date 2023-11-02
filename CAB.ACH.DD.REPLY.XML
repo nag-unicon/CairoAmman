@@ -1,0 +1,56 @@
+    SUBROUTINE CAB.ACH.DD.REPLY.XML
+*-----------------------------------------------------------------------------
+*DEVELOPED BY:  Nuha Tuhul
+*DEVELOPED ON:  05-09-2016
+*DESCRIPTION : This Reply Messgae for Incoming Direct Debit .
+* Attache with before auth Version .
+*-----------------------------------------------------------------------------
+*Modification Details:
+*=====================
+* Date        :
+* Modified by :
+* Description :
+*-----------------------------------------------------------------------------
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE CAB.BP I_ACH.COMMON
+    $INCLUDE T24.BP I_F.FUNDS.TRANSFER
+    $INCLUDE CAB.BP I_F.CAB.ACH.DIRECT.DEBIT.IN
+
+*    IF V$FUNCTION EQ "A" THEN
+    GOSUB XML.FORMAT
+*    END
+
+    RETURN
+*************
+XML.FORMAT:
+**************
+    YR.RESULT     = 'OK'
+    CALL MULTI.GET.LOC.REF("FUNDS.TRANSFER","BATCH.REF":@VM:"INSTUCTIONREF":@VM:"CREDITBANKCODE",POS)
+
+    B.POS = POS<1,1>
+    I.POS = POS<1,2>
+    C.POS = POS<1,3>
+
+
+    YR.BATCH.REF  = R.NEW(FT.LOCAL.REF)<1,B.POS>
+    YR.DATE       =  R.NEW(FT.DEBIT.VALUE.DATE)
+    YR.VALUE.DATE  = YR.DATE[7,2]:'.':YR.DATE[5,2]:'.':YR.DATE[1,4]
+
+
+    T24.REF.ID     = ID.NEW
+    YR.INS.REF     =  R.NEW(FT.LOCAL.REF)<1,I.POS>
+    YR.CREDIT.BANK =  R.NEW(FT.LOCAL.REF)<1,C.POS>
+    YR.STATUS.DESC = ID.NEW
+
+    YR.XML.OUT = "<?xml version='1.0' encoding='utf-8'?><root><Result>":YR.RESULT:"</Result>"
+    YR.XML.OUT:= "<Description>":YR.STATUS.DESC:"</Description><BatchReference>":YR.BATCH.REF:"</BatchReference>"
+    YR.XML.OUT:= "<InstructionReference>":YR.INS.REF:"</InstructionReference><ValueDate>":YR.VALUE.DATE:"</ValueDate>"
+    YR.XML.OUT:= "<CreditorBankCode>":YR.CREDIT.BANK:"</CreditorBankCode><CBSReference>":T24.REF.ID:"</CBSReference>"
+    YR.XML.OUT:= "</root>"
+
+    MSG.ERR = ''
+    CALL CAB.SEND.EXT.MSG(YR.XML.OUT,"ACH_REPLY":@FM:"N",MSG.ERR)
+
+    RETURN
+END

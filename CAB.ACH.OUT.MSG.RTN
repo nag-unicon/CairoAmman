@@ -1,0 +1,39 @@
+    SUBROUTINE CAB.ACH.OUT.MSG.RTN(OUT.MSG)
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE CAB.BP I_ACH.COMMON
+
+
+    STATUS.MSG = FIELD(OUT.MSG,',',1)
+    STATUS.MSG = FIELD(STATUS.MSG,'/',3)
+    T24.RESP.MSG=FIELD(OUT.MSG,',',2)
+    T24.REF.ID=FIELD(OUT.MSG,'/',1)
+    YR.NEW.VALUE.DATE  = YR.VALUE.DATE[7,2]:'.':YR.VALUE.DATE[5,2]:'.':YR.VALUE.DATE[1,4]
+
+
+    BEGIN CASE
+
+    CASE INDEX(STATUS.MSG,'-1',1)
+
+        YR.STATUS.DESC = FIELD(T24.RESP.MSG,"=",2)
+        YR.RESULT = "FAIL"
+
+    CASE INDEX(STATUS.MSG,'-2',1)
+
+        YR.STATUS.DESC = FIELD(T24.RESP.MSG,"HOLD - ",2)
+        YR.RESULT = "FAIL"
+
+    CASE STATUS.MSG EQ '1'
+        YR.STATUS.DESC = T24.REF.ID
+        YR.RESULT = "PENDING"
+
+    END CASE
+
+    YR.XML.OUT = "<?xml version='1.0' encoding='utf-8'?><root><Result>":YR.RESULT:"</Result>"
+    YR.XML.OUT:= "<Description>":YR.STATUS.DESC:"</Description><BatchReference>":YR.BATCH.REF:"</BatchReference>"
+    YR.XML.OUT:= "<InstructionReference>":YR.INS.REF:"</InstructionReference><ValueDate>":YR.NEW.VALUE.DATE:"</ValueDate>"
+    YR.XML.OUT:= "<CreditorBankCode>":YR.CREDIT.BANK:"</CreditorBankCode><CBSReference>":T24.REF.ID:"</CBSReference>"
+    YR.XML.OUT:= "</root>"
+    OUT.MSG = YR.XML.OUT
+
+    RETURN

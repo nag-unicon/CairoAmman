@@ -1,0 +1,253 @@
+* Version 2 02/06/00  GLOBUS Release No. G10.2.02 29/03/00
+*-----------------------------------------------------------------------------
+* <Rating>-90</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.ACCT.ENTRY.LIST(ACCOUNT.NUMBER,FROM.DATE,END.DATE,YSTMT.LIST,YID.LIST,ER)
+*
+* Passed Parameters.
+*
+* ACCOUNT.NUMBER   :-  Account for which balance & entries is to be returned.
+* FROM.DATE        :-  Start date for opening balance and entries.
+* END.DATE         :-  The last date to be considered as given date or TODAY
+*
+* Outgoing :
+* ==========
+*
+* YSTMT.LIST       :-  List of statement entry ids.
+* YID.LIST         :-  List of FT & TT ids.
+* ER               :-  Any errors found
+*
+*-----------------------Modifcation log----------------------------
+* 25/10/05 - BG_100009585
+*            As STMT.PRINTED is updated online , no need for ACCT.STMT.ENTRY
+*
+* 06/02/06 - EN_10002803
+*            change to F.READ etc
+*
+* 28/06/06 - CI_10042229
+*            Double entries are displayed in enquiries calling this routine due to
+*            redundant selection of ids from STMT.PRINTED and ACCT.ENT.TODAY..So
+*            selection of ids from ACCT.ENT.TODAY needs to be removed.
+*
+*
+* 12/05/08 - EN_10003635
+*            EB.ACCT.ENTRY.LIST is modified to retrieve entries reflected in
+*            ACCT.ENT.TODAY and ACCT.ENT.LWORK.DAY.
+*            Incoming :
+*            ACCOUNT.NUMBER        : field 1 : ACCOUNT.NUMBER
+*                                    field 2 : PROCESS = Return entries whose processing date falls
+*                                              within the window.
+*                                              VALUE = Return entries whose value-date
+*                                              falls within the window.
+*                                              BOOK = Return entries whose booking date falls within
+*                                              the window.
+*
+* 09/04/09 - BG_100023164
+*            If forward value dated entries is required then in variable AC.NO
+*            values should be passed as below
+*            Incoming :
+*            ACCOUNT.NUMBER        : field 1   : ACCOUNT.NUMBER
+*                                    field 3,1 : "FWD.VD.ENTRY"
+*
+* 25/08/09 - CI_10065777
+*            When NOSTRO.FWD.BAL enquiry run for an account with no transactions GE TODAY,
+*            does not work properly.
+*
+* 31/3/2021 - VIJAY - Changes For Corp Los Utility.
+* Read data from $ARC Files only for JORDAN Company.
+*------------------------Inserts-----------------------------------
+*
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT T24.BP I_ENQUIRY.COMMON
+    $INSERT T24.BP I_F.STMT.ENTRY
+*---------------------------Check Parameters------------------------------
+*
+
+    GOSUB INITIALISE
+
+    IF NOT(ACCOUNT.NUMBER) THEN
+        ER = "ACCOUNT NUMBER REQUIRED"
+        RETURN
+    END
+*
+    IF NOT(FROM.DATE) THEN
+        ER = "START DATE REQUIRED"
+        RETURN
+    END
+*
+    IF NOT(END.DATE) THEN
+        END.DATE = TODAY
+    END
+
+*
+*----------------------- Initialisation --------------------------------
+*
+    YSTMT.LIST = ""
+    YACCT.VALUES = ""
+    YACCT.VALUES =  ACCOUNT.NUMBER<1>
+    YDATE.VALUE =  FROM.DATE
+*
+*----------------------- Central Control -------------------------------
+*ACCT.STMT.PRINT
+*===============
+*
+    YR.ARC.STMT = ''
+    CALL F.READ(FN.ACCT.STMT.PRINT,YACCT.VALUES,YR.ACCT.STMT,F.ACCT.STMT.PRINT,ER)
+    IF ID.COMPANY[1,2] = 'JO' THEN
+        CALL F.READ(FN.ACCT.STMT.PRINT.ARC,YACCT.VALUES,YR.ARC.STMT,F.ACCT.STMT.PRINT.ARC,ARC.ER)
+    END
+    IF YR.ARC.STMT EQ '' THEN
+        Y.ACT.STMT.DATE = YR.ACCT.STMT
+    END ELSE
+        Y.ACT.STMT.DATE = YR.ARC.STMT:FM:YR.ACCT.STMT
+    END
+    IF Y.ACT.STMT.DATE THEN
+        YSTMT.DATES = FIELDS(Y.ACT.STMT.DATE,"/",1,1)
+        YCOUNT = DCOUNT(YSTMT.DATES,@FM)
+    END
+
+    LOCATE YDATE.VALUE IN YSTMT.DATES<1> BY "AR" SETTING YPOS ELSE
+        IF YPOS GT YCOUNT THEN
+            YPOS = YCOUNT
+        END
+    END
+*
+    FOR I = YPOS TO YCOUNT
+        YR.ENTRY.FILE = ''
+        YDATE.VALUE = YSTMT.DATES<I>
+        STMT.PRINT.ID = YACCT.VALUES:'-':YDATE.VALUE
+
+        CALL F.READ(FN.STMT.PRINTED,STMT.PRINT.ID,YR.ENTRY.FILE,F.STMT.PRINTED,ER)
+
+        IF YR.ENTRY.FILE EQ '' THEN
+            IF ID.COMPANY[1,2] = 'JO' THEN
+                CALL F.READ(FN.STMT.PRINTED.ARC,STMT.PRINT.ID,YR.ENTRY.FILE,F.STMT.PRINTED.ARC,ER)
+            END
+        END
+
+        IF NOT(ER) THEN
+            GOSUB PROCESS.RTN
+        END
+
+        IF YDATE.VALUE GT END.DATE THEN
+            GOSUB CHECK.NULL  ;* check for null values
+            RETURN  ;* Finished
+        END
+    NEXT I
+*
+    RETURN
+
+INITIALISE:
+*------------------------------------------------
+
+    DATE.TO.PROCESS = ""
+
+    BEGIN CASE
+    CASE ACCOUNT.NUMBER<2> EQ "PROCESS"
+
+        DATE.TO.PROCESS = "PROCESS"
+
+    CASE ACCOUNT.NUMBER<2> EQ "VALUE"
+
+        DATE.TO.PROCESS = "VALUE"
+
+    CASE 1
+
+        DATE.TO.PROCESS = "BOOK"
+
+    END CASE
+
+    ACCT.NO = ACCOUNT.NUMBER<1>
+
+    FN.STMT.ENTRY = 'F.STMT.ENTRY'
+    F.STMT.ENTRY = ''
+    CALL OPF(FN.STMT.ENTRY,F.STMT.ENTRY)
+
+    FN.STMT.ENTRY.DETAIL = 'F.STMT.ENTRY.DETAIL'
+    F.STMT.ENTRY.DETAIL  = ''
+    CALL OPF(FN.STMT.ENTRY.DETAIL,F.STMT.ENTRY.DETAIL)
+
+    IF ID.COMPANY[1,2] = 'JO' THEN
+
+        FN.STMT.ENTRY.ARC  = 'F.STMT.ENTRY$ARC'
+        F.STMT.ENTRY.ARC   = ''
+        CALL OPF(FN.STMT.ENTRY.ARC,F.STMT.ENTRY.ARC)
+
+    END
+
+
+    FN.ACCT.STMT.PRINT = 'F.ACCT.STMT.PRINT'
+    F.ACCT.STMT.PRINT  = ''
+    CALL OPF(FN.ACCT.STMT.PRINT,F.ACCT.STMT.PRINT)
+
+
+    IF ID.COMPANY[1,2] = 'JO' THEN
+
+        FN.ACCT.STMT.PRINT.ARC = 'F.ACCT.STMT.PRINT$ARC'
+        F.ACCT.STMT.PRINT.ARC  = ''
+        CALL OPF(FN.ACCT.STMT.PRINT.ARC,F.ACCT.STMT.PRINT.ARC)
+
+    END
+
+    FN.STMT.PRINTED = 'F.STMT.PRINTED'
+    F.STMT.PRINTED  = ''
+    CALL OPF(FN.STMT.PRINTED,F.STMT.PRINTED)
+
+    IF ID.COMPANY[1,2] = 'JO' THEN
+
+        FN.STMT.PRINTED.ARC = 'F.STMT.PRINTED$ARC'
+        F.STMT.PRINTED.ARC  = ''
+        CALL OPF(FN.STMT.PRINTED.ARC,F.STMT.PRINTED.ARC)
+
+    END
+
+    RETURN
+
+
+PROCESS.RTN:
+**********
+    LOOP
+        REMOVE YENTRY.ID FROM YR.ENTRY.FILE SETTING YCODE
+    WHILE YENTRY.ID:YCODE
+        CALL F.READ(FN.STMT.ENTRY,YENTRY.ID,R.STMT.ENTRY,F.STMT.ENTRY,ST.DT.ERR)
+
+        IF R.STMT.ENTRY EQ '' THEN
+            CALL F.READ(FN.STMT.ENTRY.DETAIL,YENTRY.ID,R.STMT.ENTRY,F.STMT.ENTRY.DETAIL,ST.DT.ERR)
+        END
+
+        IF R.STMT.ENTRY EQ '' THEN
+            IF ID.COMPANY[1,2] = 'JO' THEN
+                CALL F.READ(FN.STMT.ENTRY.ARC,YENTRY.ID,R.STMT.ENTRY,F.STMT.ENTRY.ARC,ST.DT.ERR)
+            END
+        END
+
+        Y.BOOKING.DATE = R.STMT.ENTRY<AC.STE.BOOKING.DATE>
+
+        IF Y.BOOKING.DATE GE FROM.DATE AND Y.BOOKING.DATE LE END.DATE THEN
+            YSTMT.LIST<-1> = YENTRY.ID
+
+            IF R.STMT.ENTRY<AC.STE.SYSTEM.ID> EQ 'FT' THEN
+                YID.LIST<-1> = R.STMT.ENTRY<AC.STE.TRANS.REFERENCE>
+            END
+
+            IF R.STMT.ENTRY<AC.STE.SYSTEM.ID> EQ 'TT' THEN
+                YID.LIST<-1> = R.STMT.ENTRY<AC.STE.TRANS.REFERENCE>
+            END
+        END
+
+    REPEAT
+
+    RETURN
+
+*************************************************************************
+CHECK.NULL:
+***********************************************
+
+    IF YSTMT.LIST<1> EQ "" THEN
+        DEL YSTMT.LIST<1>
+    END
+    RETURN
+
+*******************************************************************************************
+END

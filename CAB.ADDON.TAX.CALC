@@ -1,0 +1,182 @@
+    SUBROUTINE CAB.ADDON.TAX.CALC(Y.KEY)
+
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT CAB.BP I_CAB.ADDON.TAX.CALC
+    $INSERT T24.BP I_F.MM.MONEY.MARKET
+    $INSERT T24.BP I_F.ACCOUNT
+    $INSERT T24.BP I_F.CUSTOMER
+    $INSERT T24.BP I_ENQUIRY.COMMON
+    $INSERT T24.BP I_F.STMT.ENTRY
+    $INSERT T24.BP I_F.RE.CONSOL.SPEC.ENTRY
+    $INSERT CAB.BP I_F.CAB.CR.INT.ACCUMULATED
+    $INSERT T24.BP I_F.STMT.ACCT.CR
+    $INSERT CAB.BP I_F.CAB.CR.INT.ACCUMULATED.WRK
+
+    Y.CUS = ''
+
+    IF Y.KEY[1,2] = 'MM' THEN
+
+        R.MM = '' ; Y.RD.ERR = ''
+        CALL F.READ(FN.MM,Y.KEY,R.MM,F.MM,Y.RD.ERR)
+        IF R.MM = '' THEN
+            Y.RD.ERR = ''
+            Y.HIS.KEY = '' ; Y.HIS.KEY = Y.KEY:';1'
+            CALL F.READ(FN.MM.HIS,Y.HIS.KEY,R.MM,F.MM.HIS,Y.RD.ERR)
+        END
+
+        IF R.MM NE '' THEN
+
+            Y.CUS = R.MM<MM.CUSTOMER.ID>
+
+            R.INT.ACCUM = '' ; Y.RD.ERR = ''
+            CALL F.READ(FN.INT.ACCUM,Y.CUS:'-':Y.END.DATE,R.INT.ACCUM,F.INT.ACCUM,Y.RD.ERR)
+
+            D.FIELDS = '' ; D.RANGE.AND.VALUE = '' ; Y.IDS = '' ; Y.ENTRY.ARRAY = '' ; Y.AMT.ARRAY = '' ; Y.TAX.ARRAY = ''
+            D.FIELDS<1> = 'TRANSACTION.REF'
+            D.RANGE.AND.VALUE<1> = Y.KEY
+            CALL E.TXN.ENTRY(Y.IDS)
+
+            IF Y.IDS NE '' THEN
+                LOOP
+                UNTIL Y.IDS<1> = ''
+                    Y.VAL = '' ; Y.VAL = Y.IDS<1>
+                    IF INDEX(Y.VAL,'*',1) THEN
+                        Y.VAL = FIELD(Y.VAL,'*',1)
+                    END
+                    IF Y.VAL[1,1] = 'S' THEN
+                        Y.ENTRY.ID = '' ; Y.ENTRY.ID = Y.VAL[2,99]
+                        Y.ENTRY.POS = '' ; Y.ENTRY.VALS = ''
+                        Y.ENTRY.VALS = R.INT.ACCUM<CABCRINT.ENTRY.ID> ; CHANGE SM TO FM IN Y.ENTRY.VALS ; CHANGE VM TO FM IN Y.ENTRY.VALS
+                        LOCATE Y.ENTRY.ID IN Y.ENTRY.VALS<1> SETTING Y.ENTRY.POS ELSE Y.ENTRY.POS = ''
+                        IF Y.ENTRY.POS = '' THEN
+                            R.SED = '' ; Y.RD.ERR = ''
+                            CALL F.READ(FN.SED,Y.ENTRY.ID,R.SED,F.SED,Y.RD.ERR)
+                            IF R.SED NE '' THEN
+                                Y.CAT.POS = '' ; Y.TXN.POS = ''
+                                LOCATE R.SED<AC.STE.PRODUCT.CATEGORY> IN Y.TAX.CAT<1,1> SETTING Y.CAT.POS ELSE Y.CAT.POS = ''
+                                LOCATE R.SED<AC.STE.TRANSACTION.CODE> IN Y.TAX.TXN<1,1> SETTING Y.TXN.POS ELSE Y.TXN.POS = ''
+                                IF Y.CAT.POS NE '' AND Y.TXN.POS NE '' AND R.SED<AC.STE.REVERSAL.MARKER> EQ '' AND R.SED<AC.STE.VALUE.DATE> GE Y.POST.DATE AND R.SED<AC.STE.VALUE.DATE> LE Y.END.DATE THEN
+                                    Y.TAX.KEY = ''
+                                    Y.HIS.KEY = '' ; Y.HIS.KEY = R.SED<AC.STE.TRANS.REFERENCE>
+                                    Y.RD.ERR = '' ; R.MM.HIS = ''
+                                    CALL F.READ(FN.MM.HIS,Y.HIS.KEY,R.MM.HIS,F.MM.HIS,Y.RD.ERR)
+                                    IF R.MM.HIS = '' THEN
+                                        Y.MM.KEY = '' ; Y.MM.KEY = R.SED<AC.STE.OUR.REFERENCE>
+                                        CALL EB.READ.HISTORY.REC(F.MM.HIS,Y.MM.KEY,R.MM.HIS,Y.RD.ERR)
+                                    END
+                                    IF R.MM.HIS NE '' THEN
+                                        Y.TAX.KEY = R.MM.HIS<MM.TAX.INTEREST.KEY>
+                                    END
+
+                                    IF Y.TAX.KEY NE '' AND Y.TAX.KEY MATCHES Y.TAX.CODES THEN
+                                        Y.ENTRY.VAL = '' ; Y.ENTRY.VAL = Y.ENTRY.ID[1]
+                                        IF Y.ENTRY.VAL = 1 THEN
+                                            Y.ENTRY.VAL = 2
+                                        END ELSE
+                                            IF Y.ENTRY.VAL = 2 THEN
+                                                Y.ENTRY.VAL = 1
+                                            END
+                                        END
+                                        Y.NEW.ID = '' ; Y.NEW.ID = Y.ENTRY.ID[1,LEN(Y.ENTRY.ID)-1]
+                                        Y.NEW.ID = Y.NEW.ID:Y.ENTRY.VAL
+                                        R.SPEC1 = '' ; R.SPEC2 = '' ; R.SPEC = ''
+                                        READ R.SPEC1 FROM F.SPEC.DET,Y.NEW.ID ELSE R.SPEC1 = ''
+                                        READ R.SPEC2 FROM F.SPEC.DET,Y.ENTRY.ID ELSE R.SPEC2 = ''
+                                        IF R.SPEC1 NE '' THEN
+                                            R.SPEC = R.SPEC1
+                                        END ELSE
+                                            IF R.SPEC2 NE '' THEN
+                                                R.SPEC = R.SPEC2
+                                            END
+                                        END
+                                        Y.SPEC.LCY = '' ; Y.SPEC.LCY = ABS(R.SPEC<RE.CSE.AMOUNT.LCY>)
+                                        IF Y.SPEC.LCY NE '' THEN
+                                            Y.ENTRY.ARRAY<-1> = Y.ENTRY.ID
+                                            Y.AMT.ARRAY<-1> = Y.SPEC.LCY
+                                            Y.TAX.ARRAY<-1> = Y.TAX.KEY
+                                        END
+                                    END
+                                END
+                            END
+                        END
+                    END
+                    DEL Y.IDS<1>
+                REPEAT
+
+                IF Y.ENTRY.ARRAY NE '' THEN
+                    Y.WRK.ID = '' ; Y.WRK.ID = Y.CUS:'.':Y.KEY
+                    R.INT.ACCUM.WRK = ''
+                    R.INT.ACCUM.WRK<CABCRINTWRK.CUSTOMER.ID> = Y.CUS
+                    FOR Y.ENTRY.CNT = 1 TO DCOUNT(Y.ENTRY.ARRAY,@FM)
+                        R.INT.ACCUM.WRK<CABCRINTWRK.ENTRY.ID,Y.ENTRY.CNT> = Y.ENTRY.ARRAY<Y.ENTRY.CNT>
+                        R.INT.ACCUM.WRK<CABCRINTWRK.INT.POST.LCY,Y.ENTRY.CNT> = Y.AMT.ARRAY<Y.ENTRY.CNT>
+                        R.INT.ACCUM.WRK<CABCRINTWRK.TAX.KEY,Y.ENTRY.CNT> = Y.TAX.ARRAY<Y.ENTRY.CNT>
+                    NEXT Y.ENTRY.CNT
+                    CALL F.WRITE(FN.INT.ACCUM.WRK,Y.WRK.ID,R.INT.ACCUM.WRK)
+                END
+
+            END
+
+        END
+
+    END ELSE
+
+        R.STMT.ACCT.CR = '' ; Y.RD.ERR = ''
+        CALL F.READ(FN.STMT.CR,Y.KEY,R.STMT.ACCT.CR,F.STMT.CR,Y.RD.ERR)
+        IF R.STMT.ACCT.CR NE '' THEN
+
+            Y.TAX.CRTXN = '' ; Y.TAXCATEG = ''
+            Y.TAX.CRTXN = R.STMT.ACCT.CR<IC.STMCR.CR.INT.TAXTRSCR,1>
+            Y.TAXCATEG = R.STMT.ACCT.CR<IC.STMCR.CR.INT.TAXCATEG,1>
+
+            Y.CAT.POS = '' ; Y.TXN.POS = ''
+            LOCATE Y.TAXCATEG IN Y.TAX.CAT<1,1> SETTING Y.CAT.POS ELSE Y.CAT.POS = ''
+            LOCATE Y.TAX.CRTXN IN Y.TAX.TXN<1,1> SETTING Y.TXN.POS ELSE Y.TXN.POS = ''
+
+            IF Y.CAT.POS NE '' AND Y.TXN.POS NE '' THEN
+
+                Y.ACC.ID = '' ; Y.ACC.ID = FIELD(Y.KEY,'-',1)
+                R.ACC = '' ; Y.RD.ERR = ''
+                CALL F.READ(FN.ACC,Y.ACC.ID,R.ACC,F.ACC,Y.RD.ERR)
+                IF R.ACC = '' THEN
+                    Y.RD.ERR = ''
+                    Y.HIS.KEY = '' ; Y.HIS.KEY = Y.ACC.ID:';1'
+                    CALL F.READ(FN.ACC.HIS,Y.HIS.KEY,R.ACC,F.ACC.HIS,Y.RD.ERR)
+                END
+                IF R.ACC NE '' THEN
+                    Y.CUS = R.ACC<AC.CUSTOMER>
+                    Y.TAX.KEY = '' ; Y.TAX.KEY = R.STMT.ACCT.CR<IC.STMCR.CR.INT.TAX.CODE,1>
+                    IF Y.TAX.KEY NE '' AND Y.TAX.KEY MATCHES Y.TAX.CODES THEN
+                        R.INT.ACCUM = '' ; Y.RD.ERR = ''
+                        CALL F.READ(FN.INT.ACCUM,Y.CUS:'-':Y.END.DATE,R.INT.ACCUM,F.INT.ACCUM,Y.RD.ERR)
+
+                        Y.ENTRY.POS = '' ; Y.ENTRY.VALS = ''
+                        Y.ENTRY.VALS = R.INT.ACCUM<CABCRINT.ENTRY.ID> ; CHANGE SM TO FM IN Y.ENTRY.VALS ; CHANGE VM TO FM IN Y.ENTRY.VALS
+                        LOCATE Y.KEY IN Y.ENTRY.VALS<1> SETTING Y.ENTRY.POS ELSE Y.ENTRY.POS = ''
+                        IF Y.ENTRY.POS = '' THEN
+                            Y.WRK.ID = '' ; Y.WRK.ID = Y.CUS:'.':Y.KEY
+                            R.INT.ACCUM.WRK = ''
+                            R.INT.ACCUM.WRK<CABCRINTWRK.CUSTOMER.ID> = Y.CUS
+                            R.INT.ACCUM.WRK<CABCRINTWRK.ENTRY.ID,1> = Y.KEY
+                            IF R.STMT.ACCT.CR<IC.STMCR.LIQUIDITY.CCY> = LCCY THEN
+                                R.INT.ACCUM.WRK<CABCRINTWRK.INT.POST.LCY,1> = R.STMT.ACCT.CR<IC.STMCR.TOTAL.INTEREST>
+                            END ELSE
+                                YFAMT = R.STMT.ACCT.CR<IC.STMCR.TOTAL.INTEREST> ; YFCY<1,1> = R.STMT.ACCT.CR<IC.STMCR.LIQUIDITY.CCY> ; YFCY<1,2> = R.STMT.ACCT.CR<IC.STMCR.INT.POST.DATE> ; YRATE = '' ; YLAMT = '' ; YDIF.AMT = '' ; YDIF.PCT = ''
+                                CALL MIDDLE.RATE.CONV.CHECK(YFAMT,YFCY,YRATE,1,YLAMT,YDIF.AMT,YDIF.PCT)
+                                R.INT.ACCUM.WRK<CABCRINTWRK.INT.POST.LCY,1> = YLAMT
+                            END
+                            R.INT.ACCUM.WRK<CABCRINTWRK.TAX.KEY,1> = Y.TAX.KEY
+                            CALL F.WRITE(FN.INT.ACCUM.WRK,Y.WRK.ID,R.INT.ACCUM.WRK)
+                        END
+                    END
+                END
+            END
+
+        END
+
+    END
+
+    RETURN
+
+END

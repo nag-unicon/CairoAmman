@@ -1,0 +1,56 @@
+    SUBROUTINE CAB.ACH.OUTMSG.RTN.NEW(Y.RESP)
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE CAB.BP I_CAB.ACHNEW.COMMON
+
+    IF Y.RESP THEN
+        GOSUB INITIALISE
+        GOSUB MAIN.PROCESS
+    END
+
+    RETURN
+
+***********
+INITIALISE:
+***********
+
+    RETURN
+
+*************
+MAIN.PROCESS:
+*************
+
+    Y.DATE = '' ; Y.DATE = OCONV(DATE(),"D-")
+    CHANGE '-' TO '/' IN Y.DATE
+
+    TIME.STAMP = '' ; TIME.STAMP=TIMEDATE()
+    Y.TIME = TIME.STAMP[1,8]
+
+    Y.FT.REF = ''
+    Y.CH.CODE = '' ; Y.CH.CODE = FIELD(FIELD(Y.IN.REQ.MSG,"<ReqChCode>",2),"</ReqChCode>",1)
+    Y.REF.NO = '' ; Y.REF.NO = FIELD(FIELD(Y.IN.REQ.MSG,"<ReqRefNo>",2),"</ReqRefNo>",1)
+    Y.REQ.DATE = '' ; Y.REQ.DATE = FIELD(FIELD(Y.IN.REQ.MSG,"<ReqDate>",2),"</ReqDate>",1)
+    Y.REQ.TIME = '' ; Y.REQ.TIME = FIELD(FIELD(Y.IN.REQ.MSG,"<ReqTime>",2),"</ReqTime>",1)
+
+    IF Y.ERR.CODE THEN
+        Y.RESP = '<A2AMW><MsgHeader><ReqCode>':Y.IN.MSG.TYPE:'</ReqCode><ReqChCode>':Y.CH.CODE:'</ReqChCode><ReqRefNo>':Y.REF.NO:'</ReqRefNo><ReqDate>':Y.REQ.DATE:'</ReqDate><ReqTime>':Y.REQ.TIME:'</ReqTime><Result><RespDate>':Y.DATE:'</RespDate><RespTime>':Y.TIME:'</RespTime><RespRefNo/><ErrCode>':Y.ERR.CODE:'</ErrCode><ErrMsg>':Y.IN.REQ.ERR:'</ErrMsg></Result></MsgHeader><MsgBody><TrxRefNo>':Y.FT.REF:'</TrxRefNo></MsgBody></A2AMW>'
+    END ELSE
+        Y.DETS = '' ; Y.DETS = FIELD(Y.RESP,',',1)
+        IF Y.DETS[1,2] = 'FT' THEN
+            IF FIELD(Y.DETS,'/',3) LT 0 THEN
+                Y.ERR.CODE = 1
+                Y.IN.REQ.ERR = FIELD(Y.RESP,',',2)
+            END ELSE
+                Y.FT.REF = FIELD(Y.DETS,'/',1)
+            END
+        END ELSE
+            Y.ERR.CODE = 1
+            Y.IN.REQ.ERR = Y.RESP
+        END
+        Y.RESP = '<A2AMW><MsgHeader><ReqCode>':Y.IN.MSG.TYPE:'</ReqCode><ReqChCode>':Y.CH.CODE:'</ReqChCode><ReqRefNo>':Y.REF.NO:'</ReqRefNo><ReqDate>':Y.REQ.DATE:'</ReqDate><ReqTime>':Y.REQ.TIME:'</ReqTime><Result><RespDate>':Y.DATE:'</RespDate><RespTime>':Y.TIME:'</RespTime><RespRefNo/><ErrCode>':Y.ERR.CODE:'</ErrCode><ErrMsg>':Y.IN.REQ.ERR:'</ErrMsg></Result></MsgHeader><MsgBody><TrxRefNo>':Y.FT.REF:'</TrxRefNo></MsgBody></A2AMW>'
+    END
+
+    RETURN
+
+END

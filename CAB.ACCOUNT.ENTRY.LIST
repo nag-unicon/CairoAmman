@@ -1,0 +1,205 @@
+* Version 2 02/06/00  GLOBUS Release No. G10.2.02 29/03/00
+*-----------------------------------------------------------------------------
+* <Rating>-90</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.ACCOUNT.ENTRY.LIST(ACCOUNT.NUMBER,FROM.DATE,END.DATE,TRANSACTION.CODES,YSTMT.LIST,YID.LIST,ER)
+*
+* Passed Parameters.
+*
+* ACCOUNT.NUMBER   :-  Account for which balance & entries is to be returned.
+* FROM.DATE        :-  Start date for opening balance and entries.
+* END.DATE         :-  The last date to be considered as given date or TODAY
+*
+* Outgoing :
+* ==========
+*
+* YSTMT.LIST       :-  List of statement entry ids.
+* YID.LIST         :-  List of FT & TT ids.
+* ER               :-  Any errors found
+*
+*-----------------------Modifcation log----------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_ENQUIRY.COMMON
+    $INSERT I_F.STMT.ENTRY
+    $INSERT I_CAB.LOS.UTILITY.LOAD.COMMON
+*---------------------------Check Parameters------------------------------
+
+*    GOSUB INITIALISE
+
+    IF NOT(ACCOUNT.NUMBER) THEN
+        ER = "ACCOUNT NUMBER REQUIRED"
+        RETURN
+    END
+
+    IF NOT(FROM.DATE) THEN
+        ER = "START DATE REQUIRED"
+        RETURN
+    END
+
+    IF NOT(END.DATE) THEN
+        END.DATE = TODAY
+    END
+
+    YSTMT.LIST = ""
+    YACCT.VALUES = ""
+    YACCT.VALUES =  ACCOUNT.NUMBER<1>
+    YDATE.VALUE =  FROM.DATE
+
+*----------------------- Central Control -------------------------------
+*ACCT.STMT.PRINT
+*===============
+*
+
+    CALL F.READ(FN.ACCT.STMT.PRINT, YACCT.VALUES, YR.ACCT.STMT, F.ACCT.STMT.PRINT, ER)
+    CALL F.READ(FN.ACCT.STMT.PRINT.ARC, YACCT.VALUES, YR.ARC.STMT, F.ACCT.STMT.PRINT.ARC, ARC.ER)
+    CALL F.READ(FN.ACCT.STMT.PRINT.1.ARC, YACCT.VALUES, YR.ARC.STMT1, F.ACCT.STMT.PRINT.1.ARC, ERR.ACCT.STMT.PRINT.1.ARC)
+
+    IF YR.ARC.STMT1 THEN
+        Y.ACT.STMT.DATE = YR.ARC.STMT1
+    END
+    IF YR.ARC.STMT THEN
+        IF Y.ACT.STMT.DATE THEN
+            Y.ACT.STMT.DATE = Y.ACT.STMT.DATE :FM: YR.ARC.STMT
+        END ELSE
+            Y.ACT.STMT.DATE = YR.ARC.STMT
+        END
+    END
+
+    IF Y.ACT.STMT.DATE THEN
+        Y.ACT.STMT.DATE = Y.ACT.STMT.DATE :FM: YR.ACCT.STMT
+    END ELSE
+        Y.ACT.STMT.DATE = YR.ACCT.STMT
+    END
+
+    IF Y.ACT.STMT.DATE THEN
+        YSTMT.DATES = FIELDS(Y.ACT.STMT.DATE,"/",1,1)
+        YCOUNT = DCOUNT(YSTMT.DATES,@FM)
+    END
+
+    LOCATE YDATE.VALUE IN YSTMT.DATES<1> BY "AR" SETTING YPOS ELSE
+        IF YPOS GT YCOUNT THEN
+            YPOS = YCOUNT
+        END
+    END
+
+    FOR I = YPOS TO YCOUNT
+        YR.ENTRY.FILE = ''
+        YDATE.VALUE = YSTMT.DATES<I>
+        STMT.PRINT.ID = YACCT.VALUES:'-':YDATE.VALUE
+
+        CALL F.READ(FN.STMT.PRINTED, STMT.PRINT.ID, YR.ENTRY.FILE, F.STMT.PRINTED,ER)
+
+        IF YR.ENTRY.FILE EQ '' THEN
+            CALL F.READ(FN.STMT.PRINTED.ARC, STMT.PRINT.ID, YR.ENTRY.FILE, F.STMT.PRINTED.ARC,ER)
+        END
+
+        IF YR.ENTRY.FILE EQ '' THEN
+            CALL F.READ(FN.STMT.PRINTED.1.ARC, STMT.PRINT.ID, YR.ENTRY.FILE, F.STMT.PRINTED.1.ARC,ERR.STMT.PRINTED.1.ARC)
+        END
+
+        IF NOT(ER) THEN
+            GOSUB PROCESS.RTN
+        END
+
+        IF YDATE.VALUE GT END.DATE THEN
+            GOSUB CHECK.NULL  ;* check for null values
+            RETURN  ;* Finished
+        END
+    NEXT I
+*
+    RETURN
+
+INITIALISE:
+*------------------------------------------------
+
+    DATE.TO.PROCESS = ""
+
+    BEGIN CASE
+    CASE ACCOUNT.NUMBER<2> EQ "PROCESS"
+        DATE.TO.PROCESS = "PROCESS"
+
+    CASE ACCOUNT.NUMBER<2> EQ "VALUE"
+        DATE.TO.PROCESS = "VALUE"
+
+    CASE 1
+        DATE.TO.PROCESS = "BOOK"
+
+    END CASE
+
+    ACCT.NO = ACCOUNT.NUMBER<1>
+
+    FN.STMT.ENTRY = 'F.STMT.ENTRY'
+    F.STMT.ENTRY = ''
+    CALL OPF(FN.STMT.ENTRY,F.STMT.ENTRY)
+
+    FN.STMT.ENTRY.DETAIL = 'F.STMT.ENTRY.DETAIL'
+    F.STMT.ENTRY.DETAIL  = ''
+    CALL OPF(FN.STMT.ENTRY.DETAIL,F.STMT.ENTRY.DETAIL)
+
+    FN.STMT.ENTRY.ARC  = 'F.STMT.ENTRY$ARC'
+    F.STMT.ENTRY.ARC   = ''
+    CALL OPF(FN.STMT.ENTRY.ARC,F.STMT.ENTRY.ARC)
+
+    FN.ACCT.STMT.PRINT = 'F.ACCT.STMT.PRINT'
+    F.ACCT.STMT.PRINT  = ''
+    CALL OPF(FN.ACCT.STMT.PRINT,F.ACCT.STMT.PRINT)
+
+    FN.ACCT.STMT.PRINT.ARC = 'F.ACCT.STMT.PRINT$ARC'
+    F.ACCT.STMT.PRINT.ARC  = ''
+    CALL OPF(FN.ACCT.STMT.PRINT.ARC,F.ACCT.STMT.PRINT.ARC)
+
+    FN.STMT.PRINTED = 'F.STMT.PRINTED'
+    F.STMT.PRINTED  = ''
+    CALL OPF(FN.STMT.PRINTED,F.STMT.PRINTED)
+
+    FN.STMT.PRINTED.ARC = 'F.STMT.PRINTED$ARC'
+    F.STMT.PRINTED.ARC  = ''
+    CALL OPF(FN.STMT.PRINTED.ARC,F.STMT.PRINTED.ARC)
+
+    RETURN
+
+PROCESS.RTN:
+
+    LOOP
+        REMOVE YENTRY.ID FROM YR.ENTRY.FILE SETTING YCODE
+    WHILE YENTRY.ID:YCODE
+        CALL F.READ(FN.STMT.ENTRY,YENTRY.ID,R.STMT.ENTRY,F.STMT.ENTRY,ST.DT.ERR)
+
+        IF R.STMT.ENTRY EQ '' THEN
+            CALL F.READ(FN.STMT.ENTRY.DETAIL,YENTRY.ID,R.STMT.ENTRY,F.STMT.ENTRY.DETAIL,ST.DT.ERR)
+        END
+
+        IF R.STMT.ENTRY EQ '' THEN
+            CALL F.READ(FN.STMT.ENTRY.ARC,YENTRY.ID,R.STMT.ENTRY,F.STMT.ENTRY.ARC,ST.DT.ERR)
+        END
+
+        Y.BOOKING.DATE = R.STMT.ENTRY<AC.STE.BOOKING.DATE>
+        TXN.CODE = R.STMT.ENTRY<AC.STE.TRANSACTION.CODE>
+
+        IF Y.BOOKING.DATE GE FROM.DATE AND Y.BOOKING.DATE LE END.DATE THEN
+
+            IF TXN.CODE MATCHES TRANSACTION.CODES THEN
+                YSTMT.LIST<-1> = YENTRY.ID
+                IF R.STMT.ENTRY<AC.STE.SYSTEM.ID> EQ 'FT' THEN
+                    YID.LIST<-1> = R.STMT.ENTRY<AC.STE.TRANS.REFERENCE>
+                END
+            END
+        END
+
+    REPEAT
+
+    RETURN
+
+*************************************************************************
+CHECK.NULL:
+***********************************************
+
+    IF YSTMT.LIST<1> EQ "" THEN
+        DEL YSTMT.LIST<1>
+    END
+    RETURN
+
+*******************************************************************************************
+END

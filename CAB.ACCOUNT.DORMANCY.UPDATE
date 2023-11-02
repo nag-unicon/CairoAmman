@@ -1,0 +1,82 @@
+*-----------------------------------------------------------------------------
+* <Rating>140</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.ACCOUNT.DORMANCY.UPDATE
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 11th Sep 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Main Line Routine
+* Attached to      :
+*
+* Attached As      :
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This routine used to update the next dormant date
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT
+
+    GOSUB OPEN.FILES
+    GOSUB PROCESS
+
+    RETURN
+
+OPEN.FILES:
+
+    FN.SAVEDLISTS = '&SAVEDLISTS&'
+    F.SAVEDLISTS = ''
+    CALL OPF(FN.SAVEDLISTS,F.SAVEDLISTS)
+
+    FN.ACCOUNT = "F.ACCOUNT"
+    F.ACCOUNT = ""
+    CALL OPF(FN.ACCOUNT, F.ACCOUNT)
+
+    RETURN
+
+PROCESS:
+
+    LIST.NAME = "INACTIVE"
+    CALL F.READ(FN.SAVEDLISTS, LIST.NAME, SEL.LIST, F.SAVEDLISTS, RET.ERR)
+
+    TOTAL.ACCOUNT = DCOUNT(SEL.LIST, FM)
+
+    ACCOUNT.CNT = 1
+    LOOP
+    WHILE ACCOUNT.CNT LE TOTAL.ACCOUNT
+
+        ACCOUNT.NO = SEL.LIST<ACCOUNT.CNT>
+
+        R.ACCOUNT = ""
+        ERR.ACCOUNT = ""
+
+        CALL F.READ(FN.ACCOUNT, ACCOUNT.NO, R.ACCOUNT, F.ACCOUNT, ERR.ACCOUNT)
+
+        IF R.ACCOUNT<AC.INACTIV.MARKER> NE "Y" THEN
+            R.ACCOUNT<AC.INACTIV.MARKER> = "Y"
+            CALL F.WRITE(FN.ACCOUNT, ACCOUNT.NO, R.ACCOUNT)
+        END
+
+        ACCOUNT.CNT + = 1
+    REPEAT
+
+    CALL JOURNAL.UPDATE('')
+
+    RETURN
+
+END

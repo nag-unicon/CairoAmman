@@ -1,0 +1,90 @@
+**-----------------------------------------------------------------------------------
+* <Rating>-12</Rating>
+*-----------------------------------------------------------------------------------
+    SUBROUTINE CAB.ACCT.E.FAWA.MSG.PROCESS.LOAD
+*-----------------------------------------------------------------------------------
+* Subroutine Type : BATCH ROUTINE
+* Attached to     :
+* Attached as     :
+* Primary Purpose :
+*
+* Incoming:
+* ---------
+*
+*
+* Outgoing:
+* ---------
+*
+*
+* Error Variables:
+* ----------------
+*
+*
+*-----------------------------------------------------------------------------------
+* Modification History:
+*
+*-----------------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_GTS.COMMON
+    $INSERT I_F.FUNDS.TRANSFER
+    $INSERT I_F.CAB.E.FAWA.PARAMETER
+    $INSERT I_F.COMPANY
+    $INSERT I_F.ACCOUNT
+    $INSERT I_CAB.ACCT.E.FAWA.MSG.PROCESS.COMMON
+    $INSERT I_F.CAB.E.FAWA.ACCT.LOG.TODAY
+    $INSERT I_F.DATES
+
+    GOSUB PROCESS
+    GOSUB READ.PARAM
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    FN.COMPANY = 'F.COMPANY'
+    F.COMPANY = ''
+    CALL OPF(FN.COMPANY,F.COMPANY)
+
+    FN.ACCOUNT = 'F.ACCOUNT'
+    F.ACCOUNT  = ''
+    CALL OPF(FN.ACCOUNT,F.ACCOUNT)
+
+    FN.CAB.E.FAWA.PARAMETER = 'F.CAB.E.FAWA.PARAMETER'
+    F.CAB.E.FAWA.PARAMETER  = ''
+    CALL OPF(FN.CAB.E.FAWA.PARAMETER,F.CAB.E.FAWA.PARAMETER)
+
+    FN.CAB.E.FAWA.ACCT.LOG.TODAY = 'F.CAB.E.FAWA.ACCT.LOG.TODAY'
+    F.CAB.E.FAWA.ACCT.LOG.TODAY = ''
+    CALL OPF(FN.CAB.E.FAWA.ACCT.LOG.TODAY,F.CAB.E.FAWA.ACCT.LOG.TODAY)
+
+    FN.ACCOUNT = 'F.ACCOUNT'
+    F.ACCOUNT = ''
+    CALL OPF(FN.ACCOUNT,F.ACCOUNT)
+    PURPOSE.POS = ''
+    CALL GET.LOC.REF("FUNDS.TRANSFER","FT.PURPOSE",PURPOSE.POS)
+
+    RETURN
+
+************
+READ.PARAM:
+************
+    R.CAB.E.FAWA.PARAMETER = ''
+    E.CAB.E.FAWA.PARAMETER = ''
+    CALL F.READ(FN.CAB.E.FAWA.PARAMETER,'SYSTEM',R.CAB.E.FAWA.PARAMETER,F.CAB.E.FAWA.PARAMETER,E.CAB.E.FAWA.PARAMETER)
+
+    Y.E.FAWA.PARAM.ACCOUNT = R.CAB.E.FAWA.PARAMETER<EFAVA.AC.PARAM.CBJ.ACCOUNT>
+    Y.E.FAWA.PARAM.CURRENCY = R.CAB.E.FAWA.PARAMETER<EFAVA.AC.PARAM.CBJ.CURRENCY>
+    Y.E.FAWA.PARAM.OFS.USER =  R.CAB.E.FAWA.PARAMETER<EFAVA.AC.PARAM.OFS.USER>
+    Y.E.FAWA.PARAM.OFS.PASSWORD =   R.CAB.E.FAWA.PARAMETER<EFAVA.AC.PARAM.OFS.PASSWORD>
+    Y.E.FAWA.PARAM.OFS.VERSION =  R.CAB.E.FAWA.PARAMETER<EFAVA.AC.PARAM.OFS.VERSION>
+    Y.E.FAWA.PARAM.OFS.SOURCE  =  R.CAB.E.FAWA.PARAMETER<EFAVA.AC.PARAM.OFS.SOURCE>
+    Y.E.FAWA.PARAM.OFS.COMPANY =  R.CAB.E.FAWA.PARAMETER<EFAVA.AC.PARAM.OFS.COMPANY>
+    Y.E.FAWA.PARAM.ACCOUNT.TYPE =  R.CAB.E.FAWA.PARAMETER<EFAVA.AC.PARAM.ACCOUNT.TYPE>
+    Y.E.FAWA.PARAM.TRANSACTION.TYPE =  R.CAB.E.FAWA.PARAMETER<EFAVA.AC.PARAM.TRANSACTION.TYPE>
+
+    RETURN
+
+END

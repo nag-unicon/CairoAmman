@@ -1,0 +1,94 @@
+    SUBROUTINE CAB.ACI.UPLOAD
+
+*-----------------------------------------------------------------------------
+*DEVELOPED BY:  Nuha Tuhul
+*DEVELOPED ON:  03 Feb 2016
+*DESCRIPTION :  Routine to get last ACI
+*-----------------------------------------------------------------------------
+*Modification Details:
+*=====================
+* Date        :
+* Modified by :
+* Description :
+*-----------------------------------------------------------------------------
+* Nuha Tuhul           23/2/2020            compare according DATE.TIME
+*-----------------------------------------------------------------------------
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INSERT T24.BP I_F.ACCOUNT.CREDIT.INT
+
+    GOSUB INITIALISE
+    GOSUB BUILD.BASE.LIST
+    RETURN
+
+INITIALISE:
+
+    SEL.LIST = ''
+    YR.ACI.ID.FINAL = ''
+    FN.ACCOUNT.CREDIT.INT ='F.ACCOUNT.CREDIT.INT'
+    F.ACCOUNT.CREDIT.INT=''
+    CALL OPF(FN.ACCOUNT.CREDIT.INT,F.ACCOUNT.CREDIT.INT)
+
+    FN.CAB.ACI ='F.CAB.ACI'
+    F.CAB.ACI=''
+    CALL OPF(FN.CAB.ACI,F.CAB.ACI)
+
+    RETURN
+
+BUILD.BASE.LIST:
+
+    SEL.CMD = 'SSELECT ':FN.ACCOUNT.CREDIT.INT
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',NO.REC,SEL.ERR)
+    TEMP = ''
+    LOOP
+        REMOVE SEL.ID FROM SEL.LIST SETTING POS
+    WHILE SEL.ID:POS
+        ACC.ID = SEL.ID
+
+        R.REC  = '' ; R.ERR  =''
+        CALL F.READ(FN.ACCOUNT.CREDIT.INT,SEL.ID,R.REC,F.ACCOUNT.CREDIT.INT,R.ERR)
+        YR.DATE.TIME         =  R.REC<IC.ACI.DATE.TIME>
+
+        IF FIELD(ACC.ID,"-",1) NE TEMP THEN
+            IF TEMP NE '' THEN
+                MM = YR.B
+***            YR.ACI.ID.FINAL<-1>= YR.A:'-':MM
+                YR.ACI.ID.FINAL<-1>= YR.A:'-':YR.B.PRINT
+                GOSUB WRITE.REC
+                YR.TEMP.DATE.TIME = ''
+            END
+        END
+        YR.A = FIELD(ACC.ID,"-",1)
+        YR.B = FIELD(ACC.ID,"-",2)
+        TEMP = YR.A
+
+        IF  YR.DATE.TIME  NE  YR.TEMP.DATE.TIME  THEN
+            IF YR.DATE.TIME   GT  YR.TEMP.DATE.TIME  THEN
+                YR.TEMP.DATE.TIME   = YR.DATE.TIME
+                YR.TEMP.ACC     = SEL.ID
+                YR.B.PRINT  =  FIELD(ACC.ID,"-",2)
+            END
+        END
+    REPEAT
+    IF SEL.ID EQ '' THEN
+        YR.ACI.ID.FINAL<-1>= YR.A:'-':YR.B
+        GOSUB WRITE.REC
+    END
+    RET.LIST = YR.ACI.ID.FINAL
+    RETURN
+
+**************
+WRITE.REC:
+*************
+    R.TEMP.REC  = '' ; R.ERR  =''   ;R.CAB.ACI.REC   = ''
+    YR.NEW.KEY   = YR.A:'-':YR.B.PRINT
+    CALL F.READ(FN.ACCOUNT.CREDIT.INT,YR.NEW.KEY,R.TEMP.REC,F.ACCOUNT.CREDIT.INT,R.TEMP.ERR)
+    IF R.TEMP.REC  THEN
+
+        CALL F.WRITE(FN.CAB.ACI,YR.NEW.KEY,R.TEMP.REC)
+
+    END
+
+    RETURN
+
+END

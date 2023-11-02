@@ -1,0 +1,90 @@
+*-----------------------------------------------------------------------------
+* <Rating>-28</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.ACCT.INT.TOTS.FIELDS
+*-----------------------------------------------------------------------------
+!** FIELD definitions FOR TEMPLATE
+*!
+* @ Gokul J
+* @stereotype fields
+* @uses C_METHODS
+* @uses C_PROPERTIES
+* @package infra.eb
+*----------------------------------------------------------------------------
+* Modification History:
+* Author -
+* Desc -
+* HD Ref No -
+* Date -
+*----------------------------------------------------------------------------- *
+* Description: This template is a common parameter table used for Counterparty
+* Beneficiary Parameter
+*-----------------------------------------------------------------------------
+*** <region name= Header>
+*** <desc>INCLUDE T24.BPs and control logic</desc>
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+
+*-----------------------------------------------------------------------------
+    CALL Table.defineId("CUST.ID", T24_String)    ;*Define Table id
+    ID.N = "25" ;  ID.T='A'  ; ID.T<2> = ""
+
+    field.name = 'CUST.ID'
+    field.type = 'A'
+    field.length = '12'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+    field.name = 'ACCT.CCY'
+    field.type = 'A'
+    field.length = '3'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+    field.name = 'ACCT.CATEG'
+    field.type = 'A'
+    field.length = '4'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+    field.name = 'INTEREST'
+    field.type = 'A'
+    field.length = '18'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+    field.name = 'LATE.INT'
+    field.type = 'A'
+    field.length = '18'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+    field.name = 'COMMNS'
+    field.type = 'A'
+    field.length = '18'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+    field.name = 'YEAR.COMM'
+    field.type = 'A'
+    field.length = '18'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+    field.name = 'BR.COMM'
+    field.type = 'A'
+    field.length = '18'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+    field.name = 'REC.INT'
+    field.type = 'A'
+    field.length = '18'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+    field.name = 'PAID.TAX'
+    field.type = 'A'
+    field.length = '18'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+    field.name = 'PARTITION'
+    field.type = 'A'
+    field.length = '18'
+    CALL Table.addFieldDefinition(field.name,field.length,field.type,"")
+
+    CALL Table.setAuditPosition
+    RETURN
+
+END

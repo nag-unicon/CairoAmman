@@ -1,0 +1,48 @@
+*-----------------------------------------------------------------------------
+* <Rating>0</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.ACC.SYN.ACT(IN.TAG.VAL,T24.FLD.NM,T24.FLD.NO,T24.OUT.VAL)
+*-----------------------------------------------------------------------------
+* Company  Name     : CAB BANK
+* Developed By      : Temenos Application Management
+* Subroutine Type   : CALL routine
+* Attached to       :
+*                   :
+* Attached as       : Subroutine
+* Primary Purpose   :
+*                   :
+*-----------------------------------------------------------------------------
+* Incoming:
+* ---------
+* N/A
+*
+* Outgoing:
+* ---------
+* N/A
+*
+* Error Variables:
+* ----------------
+*
+*-----------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* 01/05/2011    - DHARVESH J
+* ODR NO      - ODR-2011-02-0202
+* DEVELOPMENT - Development to form the unique reference for the customer creation from T24 to
+* send external system
+*-----------------------------------------------------------------------------
+
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+
+    IF T24.FLD.NM THEN
+        T24.OUT.VAL = T24.FLD.NM[1,15]
+    END
+    ELSE
+        T24.OUT.VAL = ''
+    END
+
+    RETURN
+
+END
+

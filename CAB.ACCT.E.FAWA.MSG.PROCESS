@@ -1,0 +1,152 @@
+**-----------------------------------------------------------------------------------
+* <Rating>-12</Rating>
+*-----------------------------------------------------------------------------------
+    SUBROUTINE CAB.ACCT.E.FAWA.MSG.PROCESS(Y.E.FAWA.ACCOUNT)
+*-----------------------------------------------------------------------------------
+* Subroutine Type : BATCH ROUTINE
+* Attached to     :
+* Attached as     :
+* Primary Purpose :
+*
+* Incoming:
+* ---------
+*
+*
+* Outgoing:
+* ---------
+*
+*
+* Error Variables:
+* ----------------
+*
+*
+*-----------------------------------------------------------------------------------
+* Modification History:
+* 11/3/2020    Nuha Tuhul               amend ordering bank to be EFAWATEERCOMSWEEP
+*-----------------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_GTS.COMMON
+    $INSERT I_F.FUNDS.TRANSFER
+    $INSERT I_F.CAB.E.FAWA.PARAMETER
+    $INSERT I_F.ACCOUNT
+    $INSERT I_CAB.ACCT.E.FAWA.MSG.PROCESS.COMMON
+    $INSERT I_F.EB.FREE.MESSAGE
+    $INSERT I_F.CAB.E.FAWA.ACCT.LOG.TODAY
+    $INSERT I_F.DATES
+
+
+    GOSUB PRE.PROCESS
+    IF Y.PROCESS.FLAG THEN
+        GOSUB PROCESS
+    END ELSE
+
+    END
+
+    RETURN
+
+********
+PROCESS:
+********
+    Y.CURR.APP = ''
+    R.E.FAWA.TRANSACTION = ''
+    Y.ACCOUNT.REC = ''
+    IF Y.WORKING.BALANCE EQ '' THEN
+        Y.WORKING.BALANCE = 0
+    END
+    IF Y.WORKING.BALANCE GT 0 THEN
+        Y.CURR.APP = "FUNDS.TRANSFER"
+        GOSUB FORM.OFS.MESSAGE.FT
+    END
+
+    RETURN
+
+********************
+FORM.OFS.MESSAGE.FT:
+********************
+
+    R.FT.VALUES = ''
+    R.FT.VALUES<FT.TRANSACTION.TYPE> = 'AC'
+    R.FT.VALUES<FT.DEBIT.ACCT.NO> = Y.ACCOUNT
+*    R.FT.VALUES<FT.BEN.ACCT.NO> = Y.E.FAWA.BFD.BEN
+    R.FT.VALUES<FT.DEBIT.CURRENCY> =  'JOD'
+    R.FT.VALUES<FT.DEBIT.VALUE.DATE> = TODAY
+    R.FT.VALUES<FT.CREDIT.ACCT.NO> = Y.E.FAWA.PARAM.ACCOUNT
+    R.FT.VALUES<FT.CREDIT.CURRENCY> = Y.E.FAWA.PARAM.CURRENCY
+    R.FT.VALUES<FT.CREDIT.AMOUNT> = Y.WORKING.BALANCE
+    R.FT.VALUES<FT.DEBIT.THEIR.REF> = Y.E.FAWA.PARAM.ACCOUNT
+    R.FT.VALUES<FT.CREDIT.THEIR.REF> = Y.ACCOUNT
+    R.FT.VALUES<FT.ORDERING.BANK> = 'EFAWATEERCOMSWEEP'
+    R.FT.VALUES<FT.CREDIT.VALUE.DATE> = TODAY
+    R.FT.VALUES<FT.PROCESSING.DATE> = TODAY
+*    R.FT.VALUES<FT.BEN.CUSTOMER> = Y.ACCT.SHORT.TITLE
+*    R.FT.VALUES<FT.LOCAL.REF,PURPOSE.POS> = "0902"
+    R.E.FAWA.TRANSACTION =  R.FT.VALUES
+    GOSUB BUILD.E.FAWA.OFS.MSG
+
+    RETURN
+
+******************
+BUILD.E.FAWA.OFS.MSG:
+******************
+
+    Y.OFS.MESSAGE = ''
+    OFS.FUNCTION = 'I' ; PROCESS = "PROCESS" ; GTSMODE = '' ; NO.OF.AUTH = '' ; OFS.RECORD = '' ; Y.OFS.APP.VERSION = Y.CURR.APP:Y.E.FAWA.PARAM.OFS.VERSION
+    TRANSACTION.ID = ''
+    CALL OFS.BUILD.RECORD(Y.CURR.APP,OFS.FUNCTION,PROCESS,Y.OFS.APP.VERSION,GTSMODE,NO.OF.AUTH,TRANSACTION.ID,R.E.FAWA.TRANSACTION,Y.OFS.MESSAGE)
+    OFS.MSG = Y.OFS.MESSAGE
+    COMMA.CNT = DCOUNT(OFS.MSG,',')
+    OFS.PART1 = FIELD(OFS.MSG,',',1,2)
+    OFS.PART2 = FIELD(OFS.MSG,',',3)
+    OFS.PART3 = FIELD(OFS.MSG,',',4,COMMA.CNT)
+    USER.DET.PART2 = FIELD(OFS.PART2,'/',4,7)
+    USER.DET.PART1 = Y.E.FAWA.PARAM.OFS.USER:'/':Y.E.FAWA.PARAM.OFS.PASSWORD:'/':Y.E.FAWA.PARAM.OFS.COMPANY
+    USER.DET = USER.DET.PART1:USER.DET.PART2
+    FINAL.OFS.MSG = OFS.PART1:',':USER.DET:',':OFS.PART3
+    GOSUB RAISE.OFS.MSG
+
+    RETURN
+
+**************
+RAISE.OFS.MSG:
+**************
+    OFS.MSG.ID = ''
+    Y.OPTIONS = ''
+    OFS.SOURCE.ID = Y.E.FAWA.PARAM.OFS.SOURCE
+    CALL OFS.POST.MESSAGE(FINAL.OFS.MSG,Y.OFS.MSG.ID ,OFS.SOURCE.ID, Y.OPTIONS)
+
+    RETURN
+
+
+PRE.PROCESS:
+*********************
+    Y.PROCESS.FLAG = ''
+    Y.LEN.OF.CHG.ACCT = ''
+    Y.LEN.OF.CHG.ACCT = LEN(Y.E.FAWA.PARAM.ACCOUNT)
+    Y.ACCOUNT = Y.E.FAWA.PARAM.ACCOUNT[1,Y.LEN.OF.CHG.ACCT-4]:Y.E.FAWA.ACCOUNT[6,4]
+    R.ACCOUNT = ''
+    E.ACCOUNT = ''
+    Y.WORKING.BALANCE = ''
+    Y.ACCT.SHORT.TITLE = ''
+    CALL F.READ(FN.ACCOUNT,Y.ACCOUNT,R.ACCOUNT,F.ACCOUNT,E.ACCOUNT)
+    IF R.ACCOUNT THEN
+        Y.PROCESS.FLAG = 1
+        Y.WORKING.BALANCE = R.ACCOUNT<AC.ONLINE.ACTUAL.BAL>
+        IF      Y.WORKING.BALANCE LE 0 THEN
+            Y.PROCESS.FLAG = ''
+        END
+    END ELSE
+        Y.PROCESS.FLAG = ''
+    END
+
+    IF Y.E.FAWA.ACCOUNT[6,4] EQ '0001' THEN
+        Y.PROCESS.FLAG = ''
+    END
+
+    IF Y.E.FAWA.ACCOUNT[1,2] NE 'JO' THEN
+        Y.PROCESS.FLAG = ''
+    END
+
+    RETURN
+
+END

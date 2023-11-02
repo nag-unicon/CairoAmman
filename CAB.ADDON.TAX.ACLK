@@ -1,0 +1,106 @@
+    SUBROUTINE CAB.ADDON.TAX.ACLK(Y.KEY)
+
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT CAB.BP I_CAB.ADDON.TAX.ACLK
+    $INSERT CAB.BP I_F.CAB.EXTRA.TAX.DETS
+    $INSERT T24.BP I_F.ACCOUNT
+    $INSERT T24.BP I_F.AC.LOCKED.EVENTS
+
+    GOSUB PROCESS
+
+    RETURN
+
+PROCESS:
+
+    R.TAX.DETS = '' ; Y.RD.ERR = ''
+    CALL F.READ(FN.TAX.FT.DETS,Y.KEY,R.TAX.DETS,F.TAX.FT.DETS,Y.RD.ERR)
+    IF R.TAX.DETS NE '' THEN
+        Y.WRITE = 0
+        FOR Y.CNT1 = 1 TO DCOUNT(R.TAX.DETS<CABXTRATAX.TAX.FOR.ENTRY>,@VM)
+            Y.ID.FT = '' ; Y.ID.FT = R.TAX.DETS<CABXTRATAX.FT.POSTED,Y.CNT1>
+            Y.ACLK.ID = '' ; Y.ACLK.ID = R.TAX.DETS<CABXTRATAX.ACLK.ID,Y.CNT1>
+            IF Y.ID.FT NE '' AND Y.ID.FT = 'ERROR.IN.FT' AND Y.ACLK.ID EQ 'NONE' THEN
+                Y.AMT.TO.TAX = '' ; Y.TAX.PERC = '' ; Y.ACC.ID = '' ; Y.TAX.AMT = ''
+                Y.ENTRY.ID = '' ; Y.CONTRACT.ID = ''
+                Y.AMT.TO.TAX = R.TAX.DETS<CABXTRATAX.TAX.FOR.LCY.AMT,Y.CNT1>
+                Y.TAX.PERC = R.TAX.DETS<CABXTRATAX.EXTRA.TAX.PERC,Y.CNT1>
+                Y.ACC.ID = R.TAX.DETS<CABXTRATAX.ACCOUNT.ID,Y.CNT1>
+                Y.ENTRY.ID = R.TAX.DETS<CABXTRATAX.TAX.FOR.ENTRY,Y.CNT1>
+                Y.CONTRACT.ID = R.TAX.DETS<CABXTRATAX.CONTRACT.ID,Y.CNT1>
+                Y.TAX.AMT = Y.AMT.TO.TAX*(Y.TAX.PERC/100)
+                Y.TAX.AMT = FMT(Y.TAX.AMT,'R2')
+                IF Y.TAX.AMT = 0 THEN Y.TAX.AMT = 0.01
+                GOSUB CREATE.ACLK
+                IF Y.ACLK.ID[1,4] = 'ACLK' THEN
+                    R.TAX.DETS<CABXTRATAX.ACLK.ID,Y.CNT1> = Y.ACLK.ID
+                    Y.WRITE = 1
+                END
+            END
+        NEXT Y.CNT1
+        IF Y.WRITE THEN
+            CALL F.WRITE(FN.TAX.FT.DETS,Y.KEY,R.TAX.DETS)
+        END
+    END
+
+    RETURN
+
+CREATE.ACLK:
+
+    R.ACC = '' ; Y.RD.ERR = '' ; Y.LOCK.AMT = ''
+    CALL F.READ(FN.ACC,Y.ACC.ID,R.ACC,F.ACC,Y.RD.ERR)
+    IF R.ACC NE '' THEN
+
+        Y.TAX.AMT = Y.AMT.TO.TAX*(Y.TAX.PERC/100)
+        IF R.ACC<AC.CURRENCY> = LCCY THEN
+
+            Y.TAX.AMT = FMT(Y.TAX.AMT,'R3')
+            IF Y.TAX.AMT = 0 THEN Y.TAX.AMT = 0.001
+            Y.LOCK.AMT = Y.TAX.AMT
+
+        END ELSE
+
+            Y.TAX.AMT = FMT(Y.TAX.AMT,'R2')
+            IF Y.TAX.AMT = 0 THEN
+                Y.TAX.AMT = 0.01
+            END
+            Y.OUT.AMT = '' ; Y.LCY.AMT = '' ; Y.RET.CODE = '' ; Y.RATE = ''
+            CALL EXCHRATE(1,LCCY,Y.TAX.AMT,R.ACC<AC.CURRENCY>,Y.OUT.AMT,"",Y.RATE,"",Y.LCY.AMT,Y.RET.CODE)
+            IF Y.OUT.AMT = 0 THEN Y.OUT.AMT = 0.01
+            Y.LOCK.AMT = Y.OUT.AMT
+
+        END
+
+        Y.FT.ID = ''
+        OFS.CUR.REC = ''
+        OFS.RECORD = ''
+        APP.NAME = 'AC.LOCKED.EVENTS'
+        OFS.FUNCTION = 'I'
+        VERSION.NAME = Y.VERS
+        NO.OF.AUTH = '0'
+        OFS.CUR.REC<AC.LCK.ACCOUNT.NUMBER> = Y.ACC.ID
+        OFS.CUR.REC<AC.LCK.DESCRIPTION> = 'Extra Tax Entry'
+        OFS.CUR.REC<AC.LCK.FROM.DATE> = TODAY
+        OFS.CUR.REC<AC.LCK.LOCKED.AMOUNT> = Y.LOCK.AMT
+        OFS.CUR.REC<AC.LCK.LOCAL.REF,1,1> = Y.ENTRY.ID
+        OFS.CUR.REC<AC.LCK.LOCAL.REF,1,2> = Y.CONTRACT.ID
+        OFS.CUR.REC<AC.LCK.LOCAL.REF,1,3> = Y.KEY
+
+        CALL OFS.BUILD.RECORD(APP.NAME,OFS.FUNCTION,'PROCESS',VERSION.NAME,'',NO.OF.AUTH,'',OFS.CUR.REC,OFS.RECORD)
+
+        THE.RESPONSE  = ""
+        TXN.COMMITTED = ""
+        OPTIONS  = ''
+        OPTIONS<1> = "CAB.TAX"
+
+        CALL OFS.CALL.BULK.MANAGER(OPTIONS,OFS.RECORD,THE.RESPONSE,TXN.COMMITTED)
+        IF TXN.COMMITTED = 1 THEN
+            Y.ACLK.ID = FIELD(THE.RESPONSE,'/',1)
+        END
+
+    END
+
+
+    RETURN
+
+END

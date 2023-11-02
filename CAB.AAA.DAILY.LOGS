@@ -1,0 +1,90 @@
+    SUBROUTINE CAB.AAA.DAILY.LOGS
+****************************************************************************************
+***
+*** AA.ARRANGEMENT.ACTIVITY Logs report will be generated on daily basis
+*** This single thread service will select all the log from CAB.AAA.LOG.DETAILS
+*** and moved to Savedlist Report after generating the report details from the source file
+*** will be deleted
+***
+*****************************************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE TT.BP I_F.CAB.AAA.LOG.DETAILS
+
+    GOSUB INIT
+    GOSUB PROCESS
+    GOSUB CLEAR.LOG.FILE
+
+    RETURN
+*****
+INIT:
+*****
+    FN.CAB.AAA.LOG ='F.CAB.AAA.LOG.DETAILS'
+    F.CAB.AAA.LOG =''
+
+    FN.SAVELIST ='&SAVEDLISTS&'
+    F.SAVELIST =''
+
+    CALL OPF(FN.CAB.AAA.LOG,F.CAB.AAA.LOG)
+    CALL OPF(FN.SAVELIST,F.SAVELIST)
+    YES.DATE = TODAY
+    CALL CDT('',YES.DATE,'-1W')
+
+    REP.NAME = 'CAB.AA.ARRANGEMENT.ACTIVITY.LOG_': YES.DATE :'.csv'
+    RET.ARR<-1> = 'ActivityId,CustomerName,ArrangementId,Customer,LoanAccount,AA Activity,Inputter,Authoriser,Product,Reversed,EffectiveDate,Currency,Company,DebitAccount,CreditAccount,TransactionCode,TransactionType,TransactionAmount,Status'
+
+    SEL.CMD ='SELECT ': FN.CAB.AAA.LOG
+
+    SEL.LIST =''
+    SEL.CNT =''
+    SEL.ERR=''
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+
+    FOR I=1 TO SEL.CNT
+        SEL.ID = SEL.LIST<I>
+        CALL F.READ(FN.CAB.AAA.LOG,SEL.ID,R.AAA.LOG,F.CAB.AAA.LOG,ERR.LOG)
+        ARR.ID = R.AAA.LOG<AAA.ARRANGEMENT.ID>
+        AAA.ID = SEL.ID
+        CUST.NAME = R.AAA.LOG<AAA.CUS.NAME>
+        CUSTOMER = R.AAA.LOG<AAA.CUSTOMER>
+        LOAN.ACC = R.AAA.LOG<AAA.LOANACCOUNT>
+        ACTIVITY = R.AAA.LOG<AAA.ACTIVITY>
+        INPUTTER = R.AAA.LOG<AAA.INPUTTER>
+        AUTHORISER = R.AAA.LOG<AAA.AUTHORISER>
+        PRODUCT = R.AAA.LOG<AAA.PRODUCT>
+        TXN.AMOUNT = R.AAA.LOG<AAA.REV.ACTIVITY>
+        EFF.DATE = R.AAA.LOG<AAA.EFF.DATE>
+        CURRENCY = R.AAA.LOG<AAA.CURRENCY>
+        COMPANY = R.AAA.LOG<AAA.COMPANY>
+        DR.ACCOUNT = R.AAA.LOG<AAA.DR.ACCOUNT>
+        CR.ACCOUNT = R.AAA.LOG<AAA.CR.ACCOUNT>
+        TRANS.CODE = R.AAA.LOG<AAA.TRANS.CODE>
+        TRANS.TYPE = R.AAA.LOG<AAA.TRANS.TYPE>
+        TRANS.AMT = R.AAA.LOG<AAA.TRANS.AMT>
+        ACT.STATUS = R.AAA.LOG<AAA.STATUS>
+        RET.ARR<-1> =AAA.ID :',': CUST.NAME :',': ARR.ID :',': CUSTOMER :',': LOAN.ACC :',': ACTIVITY :',': INPUTTER :',': AUTHORISER :',': PRODUCT :',': TXN.AMOUNT :',': EFF.DATE :',': CURRENCY :',': COMPANY :',': DR.ACCOUNT :',': CR.ACCOUNT :',': TRANS.CODE :',': TRANS.TYPE :',': TRANS.AMT :',': ACT.STATUS
+
+    NEXT I
+
+*** Write into the savedlists
+
+    IF RET.ARR THEN
+        WRITELIST RET.ARR TO REP.NAME
+    END
+
+    RETURN
+***************
+CLEAR.LOG.FILE:
+***************
+*** Clear the report once its generated
+
+    EXECUTE "CLEAR.FILE ":FN.CAB.AAA.LOG
+
+    RETURN

@@ -1,0 +1,53 @@
+    SUBROUTINE CAB.ADDON.TAX.CHECK.FT(Y.KEY)
+
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT CAB.BP I_CAB.ADDON.TAX.CHECK.FT
+    $INSERT CAB.BP I_F.CAB.EXTRA.TAX.DETS
+
+    GOSUB PROCESS
+
+    RETURN
+
+PROCESS:
+
+    R.TAX.DETS = '' ; Y.RD.ERR = ''
+    CALL F.READ(FN.TAX.FT.DETS,Y.KEY,R.TAX.DETS,F.TAX.FT.DETS,Y.RD.ERR)
+    IF R.TAX.DETS NE '' THEN
+        Y.WRITE = 0
+        FOR Y.CNT1 = 1 TO DCOUNT(R.TAX.DETS<CABXTRATAX.TAX.FOR.ENTRY>,@VM)
+            Y.ID.FT = '' ; Y.ID.FT = R.TAX.DETS<CABXTRATAX.FT.POSTED,Y.CNT1>
+            IF Y.ID.FT NE '' AND Y.ID.FT[1,2] = 'FT' THEN
+                Y.FT.EXISTS = 1
+                GOSUB CHECK.FT
+                IF Y.FT.EXISTS ELSE
+                    R.TAX.DETS<CABXTRATAX.FT.POSTED,Y.CNT1> = 'ERROR.IN.FT'
+                    Y.WRITE = 1
+                END
+            END
+        NEXT Y.CNT1
+        IF Y.WRITE THEN
+            CALL F.WRITE(FN.TAX.FT.DETS,Y.KEY,R.TAX.DETS)
+        END
+    END
+
+    RETURN
+
+CHECK.FT:
+
+    R.FT = ''
+    READ R.FT FROM F.FT,Y.ID.FT ELSE R.FT = ''
+
+    R.FT.NAU = ''
+    READ R.FT.NAU FROM F.FT.NAU,Y.ID.FT ELSE R.FT.NAU = ''
+
+    Y.FT.KEY = '' ; Y.FT.KEY = Y.ID.FT ; R.FT.HIS = ''
+    CALL EB.READ.HISTORY.REC(F.FT.HIS,Y.FT.KEY,R.FT.HIS,Y.RD.ERR)
+
+    IF R.FT = '' AND R.FT.NAU = '' AND R.FT.HIS = '' THEN
+        Y.FT.EXISTS = 0
+    END
+
+    RETURN
+
+END

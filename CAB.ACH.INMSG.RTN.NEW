@@ -1,0 +1,150 @@
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.ACH.INMSG.RTN.NEW(IN.REQ)
+*---------------------------------------------------------------------------------------------------
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE CAB.BP I_CAB.ACHNEW.COMMON
+    $INCLUDE CAB.BP I_F.CAB.ACH.BANK.PARAMETER
+    $INCLUDE CAB.BP I_F.CAB.USER.DETAILS
+    $INCLUDE T24.BP I_F.ACCOUNT
+    $INCLUDE T24.BP I_F.ALTERNATE.ACCOUNT
+
+*---------------------------------------------------------------------------------------------------
+
+    IF IN.REQ THEN
+        GOSUB INITIALISE
+        GOSUB PROCESS.IN.REQ
+    END
+
+    RETURN
+
+
+***********
+INITIALISE:
+***********
+
+    F.ACH.PARAM = ''
+    FN.ACH.PARAM = 'F.CAB.ACH.BANK.PARAMETER'
+    CALL OPF(FN.ACH.PARAM,F.ACH.PARAM)
+
+    F.ACC = ''
+    FN.ACC = 'F.ACCOUNT'
+    CALL OPF(FN.ACC,F.ACC)
+
+    F.CAB.USER = ''
+    FN.CAB.USER = 'F.CAB.USER.DETAILS'
+    CALL OPF(FN.CAB.USER,F.CAB.USER)
+
+    F.ALT.ACC = ''
+    FN.ALT.ACC = 'F.ALTERNATE.ACCOUNT'
+    CALL OPF(FN.ALT.ACC,F.ALT.ACC)
+
+    Y.IN.REQ.MSG = ""
+    Y.IN.REQ.MSG = IN.REQ
+    Y.IN.REQ.ERR = '' ; Y.ERR.CODE = 0
+    Y.SONAME = '' ; Y.PASS = '' ; Y.VER.NAME = '' ; Y.TXN.TYPE = '' ; Y.PROCESS.ROUTINE = ''
+
+    Y.IN.MSG.TYPE = '' ; Y.IN.MSG.TYPE = FIELD(FIELD(Y.IN.REQ.MSG,"<ReqCode>",2),"</ReqCode>",1)
+    Y.ACC.FROM = '' ; Y.ACC.FROM = FIELD(FIELD(Y.IN.REQ.MSG,"<AccFrom>",2),"</AccFrom>",1)
+    Y.ACC.TO = '' ; Y.ACC.TO = FIELD(FIELD(Y.IN.REQ.MSG,"<AccTo>",2),"</AccTo>",1)
+    Y.AMT = '' ; Y.AMT = FIELD(FIELD(Y.IN.REQ.MSG,"<Amount>",2),"</Amount>",1)
+    Y.CCY.FROM = '' ; Y.CCY.FROM = FIELD(FIELD(Y.IN.REQ.MSG,"<CurrFrom>",2),"</CurrFrom>",1)
+    Y.CCY.TO = '' ; Y.CCY.TO = FIELD(FIELD(Y.IN.REQ.MSG,"<CurrTo>",2),"</CurrTo>",1)
+    Y.DEB.REF = '' ; Y.DEB.REF = FIELD(FIELD(Y.IN.REQ.MSG,"<Debit.Their.Refernce>",2),"</Debit.Their.Refernce>",1)
+    Y.CRE.REF = '' ; Y.CRE.REF = FIELD(FIELD(Y.IN.REQ.MSG,"<Credit.Their.Refernce>",2),"</Credit.Their.Refernce>",1)
+
+    RETURN
+
+***************
+PROCESS.IN.REQ:
+***************
+
+    R.ACH.PARAM = '' ; Y.RD.ERR = ''
+    CALL F.READ(FN.ACH.PARAM,Y.IN.MSG.TYPE,R.ACH.PARAM,F.ACH.PARAM,Y.RD.ERR)
+    IF R.ACH.PARAM = '' THEN
+        Y.IN.REQ.ERR = 'Missing Parameter File For Code ':Y.IN.MSG.TYPE
+        Y.ERR.CODE = 1
+    END
+    IF Y.ERR.CODE ELSE
+        IF R.ACH.PARAM<CABACH.VERSION> = '' THEN
+            Y.IN.REQ.ERR = 'Missing Version In Parameter File For Code ':Y.IN.MSG.TYPE
+            Y.ERR.CODE = 1
+        END ELSE
+            Y.VER.NAME = R.ACH.PARAM<CABACH.VERSION>
+        END
+    END
+    IF Y.ERR.CODE ELSE
+        IF R.ACH.PARAM<CABACH.TRANSACTION.TYPE> = '' THEN
+            Y.IN.REQ.ERR = 'Missing Txn Type In Parameter File For Code ':Y.IN.MSG.TYPE
+            Y.ERR.CODE = 1
+        END ELSE
+            Y.TXN.TYPE = R.ACH.PARAM<CABACH.TRANSACTION.TYPE>
+        END
+    END
+    IF Y.ERR.CODE ELSE
+        R.ACC1 = '' ; Y.RD.ERR = ''
+        CALL F.READ(FN.ACC,Y.ACC.FROM,R.ACC1,F.ACC,Y.RD.ERR)
+        IF R.ACC1 = '' THEN
+            R.ALT.ACC = '' ; Y.RD.ERR = ''
+            CALL F.READ(FN.ALT.ACC,Y.ACC.FROM,R.ALT.ACC,F.ALT.ACC,Y.RD.ERR)
+            IF R.ALT.ACC NE '' THEN
+                Y.ACC.FROM = R.ALT.ACC<AAC.GLOBUS.ACCT.NUMBER>
+                CALL F.READ(FN.ACC,Y.ACC.FROM,R.ACC1,F.ACC,Y.RD.ERR)
+            END
+        END
+
+        R.ACC2 = '' ; Y.RD.ERR = ''
+        CALL F.READ(FN.ACC,Y.ACC.TO,R.ACC2,F.ACC,Y.RD.ERR)
+        IF R.ACC2 = '' THEN
+            R.ALT.ACC = '' ; Y.RD.ERR = ''
+            CALL F.READ(FN.ALT.ACC,Y.ACC.TO,R.ALT.ACC,F.ALT.ACC,Y.RD.ERR)
+            IF R.ALT.ACC NE '' THEN
+                Y.ACC.TO = R.ALT.ACC<AAC.GLOBUS.ACCT.NUMBER>
+                CALL F.READ(FN.ACC,Y.ACC.TO,R.ACC2,F.ACC,Y.RD.ERR)
+            END
+        END
+
+        IF R.ACC1 = '' OR R.ACC2 = '' THEN
+            Y.IN.REQ.ERR = 'Missing AccountFrom or AccountTo'
+            Y.ERR.CODE = 1
+        END
+    END
+
+    IF Y.ERR.CODE ELSE
+        R.CAB.USER = '' ; Y.RD.ERR = ''
+        CALL F.READ(FN.CAB.USER,'CAB.ACH',R.CAB.USER,F.CAB.USER,Y.RD.ERR)
+        Y.SONAME = R.CAB.USER<CAB.USER.DETAILS.OFS.USER.NAME>
+        Y.PASS = R.CAB.USER<CAB.USER.DETAILS.OFS.USER.PWD>
+        IF Y.SONAME = '' OR Y.PASS = '' THEN
+            Y.IN.REQ.ERR = 'Missing User or Password Info'
+            Y.ERR.CODE = 1
+        END
+    END
+
+    Y.RATE = ''
+    IF Y.ERR.CODE ELSE
+        IF R.ACC1<AC.CURRENCY> <> R.ACC2<AC.CURRENCY> THEN
+            Y.OUT.AMT = '' ; Y.LCY.AMT = '' ; Y.RET.CODE = ''
+            CALL EXCHRATE(1,R.ACC1<AC.CURRENCY>,Y.AMT,R.ACC2<AC.CURRENCY>,Y.OUT.AMT,"",Y.RATE, "",Y.LCY.AMT,Y.RET.CODE)
+        END
+    END
+    IF Y.ERR.CODE THEN
+        Y.DUMMY.OFS = ''
+        Y.DUMMY.OFS = "ENQUIRY.SELECT,,":Y.SONAME:"/":Y.PASS:",SECTOR.LIST,@ID:EQ=1000"
+        IN.REQ = Y.DUMMY.OFS
+    END ELSE
+        Y.OFS.MSG = '' ; Y.OFS.MSG = Y.VER.NAME:'/I/PROCESS,':Y.SONAME:'/':Y.PASS:'/':ID.COMPANY:',,TRANSACTION.TYPE=':Y.TXN.TYPE:',DEBIT.ACCT.NO=':Y.ACC.FROM:',DEBIT.CURRENCY=':R.ACC1<AC.CURRENCY>:',DEBIT.AMOUNT=':Y.AMT:',CREDIT.ACCT.NO=':Y.ACC.TO:',CREDIT.CURRENCY=':R.ACC2<AC.CURRENCY>:',DEBIT.THEIR.REF=':Y.DEB.REF:',CREDIT.THEIR.REF=':Y.CRE.REF:',ORDERING.CUST:1=ACHDD'
+        IF Y.RATE NE '' THEN
+            Y.OFS.MSG := ',TREASURY.RATE=':Y.RATE
+        END
+        IF R.ACC1<AC.CATEGORY>[1,1] = '5' THEN
+            Y.OFS.MSG := ',PROFIT.CENTRE.DEPT=1'
+            Y.OFS.MSG := ',COMMISSION.CODE=CREDIT LESS CHARGES'
+        END
+        IN.REQ = Y.OFS.MSG
+    END
+
+    RETURN
+
+END

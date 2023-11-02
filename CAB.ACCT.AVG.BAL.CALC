@@ -1,0 +1,220 @@
+* Version 1.1
+
+    SUBROUTINE CAB.ACCT.AVG.BAL.CALC(START.DATE,END.DATE,ACCOUNT.NO,AVG.BALANCE.CR,AVG.BALANCE.DR,CR.NO.DAYS,DR.NO.DAYS)
+
+*-----------------------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.ACCT.AVG.BAL.CALC
+*---------------------------------------------------------------
+*Description       : Subroutine to calculate average balances for accounts from given start date to end date
+*Linked With       : BATCH>BNK/CAB.B.INT.BUILD
+*Incoming variable : ACCOUNT.NO, START.DATESTART.DATE, END.DATE
+*Outgoing variable : AVG.BALANCE.CR, AVG.BALANCE.DR, CR.NO.DAYS, DR.NO.DAYS
+*ODR Number        : ODR-2011-10-0066
+*---------------------------------------------------------------
+* - 20120312 by agryaznov@temenos.com
+*   UAT issue T24-12030017: changed CRED.BAL & DEB.BAL to Y.N.BAL*NO.DAYS
+*------------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCT.ACTIVITY
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.EB.CONTRACT.BALANCES
+
+    GOSUB INITIALIZE
+    GOSUB READFILES
+    GOSUB PROCESS
+
+    RETURN
+
+*------------------------------------------------------------------------------
+INITIALIZE:
+*---------
+* Initialise Variables
+
+    R.ACCT.ACTIVITY = ""
+    NO.DAYS = "C"
+    ZERO.DAYS = "0"
+    CURR.DATE = START.DATE
+    START.YRMN = START.DATE[1,6]
+    START.DAY = START.DATE[7,2]
+    END.YRMN = END.DATE[1,6]
+    END.DAY = END.DATE[7,2]
+    END.FLAG = 0
+    CNT = 1
+
+    TOTAL.BALANCE = ''
+    BALANCE  = ''
+    AVG.BALNCE.FCY = ''
+    AVG.BALANCE.LCY = ''
+
+    GOSUB OPEN.FILES
+    RETURN
+*----------------------------------------------------------------------------
+OPEN.FILES:
+*---------
+    FN.EB.CONTRACT.BALANCES = 'F.EB.CONTRACT.BALANCES'
+    F.EB.CONTRACT.BALANCES = ''
+
+    FN.ACCT.ACTIVITY = "F.ACCT.ACTIVITY"
+    F.ACCT.ACTIVITY = ''
+
+    CALL OPF(FN.EB.CONTRACT.BALANCES,F.EB.CONTRACT.BALANCES)
+    CALL OPF(FN.ACCT.ACTIVITY,F.ACCT.ACTIVITY)
+
+    RETURN
+*---------------------------------------------------------------------------------
+READFILES:
+*--------
+    IF START.DATE > END.DATE THEN
+        CALL OCOMO("AC-RTN.START.DATE.GT.THAN.END.DATE")
+        RETURN
+    END
+    CALL F.READ(FN.EB.CONTRACT.BALANCES,ACCOUNT.NO,R.EB.CONTRACT.BALANCES,F.EB.CONTRACT.BALANCES,ECB.ERR)
+    IF R.EB.CONTRACT.BALANCES THEN
+        YR.YEARM = R.EB.CONTRACT.BALANCES<ECB.ACTIVITY.MONTHS>
+    END ELSE
+        YR.YEARM = ""
+    END
+    RETURN
+*----------------------------------------------------------------------------------
+PROCESS:
+*------
+    LOCATE START.YRMN IN YR.YEARM<1,1> SETTING YLOC THEN
+
+        ACCID = ACCOUNT.NO:"-":START.YRMN
+        CALL F.READ("F.ACCT.ACTIVITY",ACCID,R.ACCT.ACTIVITY,F.ACCT.ACTIVITY,READ.ERR)
+        IF READ.ERR THEN
+            CALL OCOMO("AC-RTN.NO.AC.ACTIVITY.ON.REC")
+            RETURN
+        END
+        D.FLAG = 0
+        CNT = 1
+        LOOP WHILE R.ACCT.ACTIVITY<IC.ACT.DAY.NO><1,CNT> <> "" AND D.FLAG = 0
+            GOSUB BAL.CHECK
+        REPEAT
+        GOSUB CALC.BAL.DAYS
+        GOSUB FINAL.CALC
+    END
+
+    RETURN
+*-----------------------------------------------------------------------------
+BAL.CHECK:
+*---------
+    NEW.BAL = ''
+    Y.DAY = R.ACCT.ACTIVITY<IC.ACT.DAY.NO><1,CNT>
+    IF CNT EQ '1' THEN
+        IF Y.DAY NE '01' THEN
+            YLOC.TEMP = YLOC-1
+            GOSUB CHECK.FIRST.BAL
+        END ELSE
+            CURR.DATE =  YR.YEARM<1,YLOC> : R.ACCT.ACTIVITY<IC.ACT.DAY.NO><1,CNT>
+            NEW.BAL = R.ACCT.ACTIVITY<IC.ACT.BALANCE><1,CNT>
+            CALC.DATE<-1>= CURR.DATE
+            Y.NEW.BAL<-1>= NEW.BAL
+        END
+    END ELSE
+        NEW.BAL = R.ACCT.ACTIVITY<IC.ACT.BALANCE,CNT>
+        CURR.DATE =  YR.YEARM<1,YLOC> : R.ACCT.ACTIVITY<IC.ACT.DAY.NO><1,CNT>
+
+        CALC.DATE<-1>= CURR.DATE
+        Y.NEW.BAL<-1>= NEW.BAL
+    END
+    CNT += 1
+
+    RETURN
+*------------------------------------------------------------------------------
+CHECK.FIRST.BAL:
+*---------------
+
+    IF YLOC.TEMP NE '0' THEN
+        TEMP.YR.YEARM = YR.YEARM<1,YLOC.TEMP>
+        TEMP.ACCID = ACCOUNT.NO:"-":TEMP.YR.YEARM
+        CALL F.READ("F.ACCT.ACTIVITY",TEMP.ACCID,R.TEMP.ACCT.ACTIVITY,F.ACCT.ACTIVITY,TEMP.READ.ERR)
+        GOSUB BAL.ONE
+    END ELSE
+        CURR.DATE =  YR.YEARM<1,YLOC> : R.ACCT.ACTIVITY<IC.ACT.DAY.NO><1,CNT>
+        NEW.BAL = R.ACCT.ACTIVITY<IC.ACT.BALANCE><1,CNT>
+    END
+    CALC.DATE<-1>= CURR.DATE
+    Y.NEW.BAL<-1>= NEW.BAL
+
+    RETURN
+*-----------------------------------------------------------------------------
+BAL.ONE:
+*-------
+    IF R.TEMP.ACCT.ACTIVITY THEN
+        TEMP.BAL = R.TEMP.ACCT.ACTIVITY<IC.ACT.BALANCE>
+        BAL.CNT = DCOUNT(TEMP.BAL,VM)
+        NEW.BAL = R.TEMP.ACCT.ACTIVITY<IC.ACT.BALANCE,BAL.CNT>
+        Y.ONE = '01'
+        CURR.DATE =  YR.YEARM<1,YLOC> : Y.ONE
+
+        CALC.DATE<-1>= CURR.DATE
+        Y.NEW.BAL<-1>= NEW.BAL
+
+    END
+    NEW.BAL = ''
+    CURR.DATE = ''
+    NEW.BAL = R.ACCT.ACTIVITY<IC.ACT.BALANCE><1,CNT>
+    CURR.DATE = YR.YEARM<1,YLOC> : R.ACCT.ACTIVITY<IC.ACT.DAY.NO><1,CNT>
+
+    RETURN
+*---------------------------------------------------------------------------
+CALC.BAL.DAYS:
+*------------
+    Y.DATE.CNT = DCOUNT(CALC.DATE,FM)
+    Y.BAL.CNT = DCOUNT(Y.NEW.BAL,FM)
+    FOR D.CNT = 1 TO Y.DATE.CNT
+        Y.CURR.DATE = FIELD(CALC.DATE,FM,D.CNT)
+        Y.REC.DATE = FIELD(CALC.DATE,FM,D.CNT+1)
+        IF Y.REC.DATE EQ '' THEN
+            Y.REC.DATE = END.DATE
+        END
+        IF Y.CURR.DATE >= START.DATE AND Y.REC.DATE <= END.DATE THEN
+            Y.N.BAL = FIELD(Y.NEW.BAL,FM,D.CNT)
+            GOSUB CALC.FIELDS
+        END
+    NEXT D.CNT
+
+    RETURN
+*----------------------------------------------------------------------------
+* Calculate account balances
+CALC.FIELDS:
+*----------
+    NO.DAYS = "C"
+    CALL CDD("",Y.CURR.DATE,Y.REC.DATE,NO.DAYS)
+
+    IF Y.N.BAL GT '0' THEN
+        CRED.BAL += Y.N.BAL ;*NO.DAYS
+        CRED.DAYS += NO.DAYS
+    END ELSE
+        DEB.BAL += Y.N.BAL ;*NO.DAYS
+        DEB.DAYS += NO.DAYS
+    END
+
+    RETURN
+*--------------------------------------------------------------
+FINAL.CALC:
+*---------
+    IF CRED.BAL AND CRED.DAYS NE '0' THEN
+        AVG.BALANCE.CR = CRED.BAL/CRED.DAYS
+        CALL EB.ROUND.AMOUNT(CURRENCY,AVG.BALANCE.CR,"","")
+    END ELSE
+        AVG.BALANCE.CR = '0'
+    END
+
+    IF DEB.BAL AND DEB.DAYS NE '0' THEN
+        AVG.BALANCE.DR = DEB.BAL/DEB.DAYS
+        CALL EB.ROUND.AMOUNT(CURRENCY,AVG.BALANCE.DR,"","")
+    END ELSE
+        AVG.BALANCE.DR = '0'
+    END
+    DR.NO.DAYS = DEB.DAYS
+    CR.NO.DAYS = CRED.DAYS
+
+    RETURN
+*--------------------------------------------------------------
+END

@@ -1,0 +1,230 @@
+*-----------------------------------------------------------------------------------------------------------------------
+* <Rating>-114</Rating>
+*-----------------------------------------------------------------------------------------------------------------------
+    SUBROUTINE CAB.ADDON.TAX.VALIDATE
+*-----------------------------------------------------------------------------------------------------------------------
+
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT CAB.BP I_F.CAB.ADDON.TAX
+
+    GOSUB INITIALISE
+    GOSUB PROCESS.MESSAGE
+
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------------------------------------------------
+VALIDATE:
+* TODO - Add the validation code here
+* Set AF, AV and AS to the field, multi value and sub value and invoke STORE.END.ERROR
+* Set ETEXT to point to the EB.ERROR.TABLE
+
+    IF V$FUNCTION = 'I' ELSE RETURN
+
+    FOR Y.CNT = 1 TO DCOUNT(R.NEW(CABADDTAX.ACC.TO.CHECK),@VM)
+        FOR Y.CNT2 = 1 TO DCOUNT(R.NEW(CABADDTAX.ACC.TO.CHECK)<1,Y.CNT>,@SM)
+            Y.VAL = '' ; Y.VAL = R.NEW(CABADDTAX.ACC.TO.CHECK)<1,Y.CNT,Y.CNT2>
+            Y.OP = '' ; Y.OP = FIELD(Y.VAL,' ',1)
+            Y.ACC = '' ; Y.ACC = FIELD(Y.VAL,' ',2)
+            IF Y.OP NE 'BW' THEN
+                AF = CABADDTAX.ACC.TO.CHECK
+                AV = Y.CNT
+                AS = Y.CNT2
+                ETEXT = 'Accepted Input Format Is "BW <CCY><CATEGORY>0001" eg.. BW JOD171120001'
+                CALL STORE.END.ERROR
+                RETURN
+            END
+            Y.ACC.CCY = '' ; Y.ACC.CCY = Y.ACC[1,3]
+            R.ACC.CCY = '' ; Y.RD.ERR = ''
+            CALL F.READ(FN.CCY,Y.ACC.CCY,R.ACC.CCY,F.CCY,Y.RD.ERR)
+            IF R.ACC.CCY = '' THEN
+                AF = CABADDTAX.ACC.TO.CHECK
+                AV = Y.CNT
+                AS = Y.CNT2
+                ETEXT = 'Accepted Input Format Is "BW <CCY><CATEGORY>0001" eg.. BW JOD171120001'
+                CALL STORE.END.ERROR
+                RETURN
+            END
+            Y.ACC.CAT = '' ; Y.ACC.CAT = Y.ACC[4,5]
+            IF Y.ACC.CAT GE 10000 AND Y.ACC.CAT LE 19999 ELSE
+                AF = CABADDTAX.ACC.TO.CHECK
+                AV = Y.CNT
+                AS = Y.CNT2
+                ETEXT = 'Category Should Be Between 10000 19999 - Accepted Input Format Is "BW <CCY><CATEGORY>0001" eg.. BW JOD171120001'
+                CALL STORE.END.ERROR
+                RETURN
+            END
+            R.ACC.CAT = '' ; Y.RD.ERR = ''
+            CALL F.READ(FN.CAT,Y.ACC.CAT,R.ACC.CAT,F.CAT,Y.RD.ERR)
+            IF R.ACC.CAT = '' THEN
+                AF = CABADDTAX.ACC.TO.CHECK
+                AV = Y.CNT
+                AS = Y.CNT2
+                ETEXT = 'Missing Internal Account Category - ':Y.ACC.CAT:' - Accepted Input Format Is "BW <CCY><CATEGORY>0001" eg.. BW JOD171120001'
+                CALL STORE.END.ERROR
+                RETURN
+            END
+        NEXT Y.CNT2
+    NEXT Y.CNT
+
+    Y.IND.FLAG = '' ; Y.IND.FLAG = R.NEW(CABADDTAX.INDIVIDUAL.FLAG)
+    Y.TAX.KEYS = '' ; Y.TAX.KEYS = R.NEW(CABADDTAX.TAX.KEY)
+
+    FOR Y.CNT = 1 TO DCOUNT(Y.TAX.KEYS,@VM)
+        FOR Y.CNT2 = 1 TO DCOUNT(Y.TAX.KEYS<1,Y.CNT>,@SM)
+            IF Y.TAX.KEYS<1,Y.CNT,Y.CNT2> MATCHES 2:VM:3:VM:5:VM:6:VM:7:VM:8:VM:9:VM:10:VM:11:VM:12 ELSE
+                AF = CABADDTAX.TAX.KEY
+                AV = Y.CNT
+                AS = Y.CNT2
+                ETEXT = 'Accepted Values Are 2 3 5 6 7 8 9 10 11 12'
+                CALL STORE.END.ERROR
+                RETURN
+            END
+        NEXT Y.CNT2
+    NEXT Y.CNT
+
+    FOR Y.CNT = 1 TO DCOUNT(Y.IND.FLAG,@VM)
+        Y.VAL = '' ; Y.VAL = Y.IND.FLAG<1,Y.CNT>
+        Y.TAX.KEYS = '' ; Y.TAX.KEYS = R.NEW(CABADDTAX.TAX.KEY)<1,Y.CNT>
+        CHANGE SM TO VM IN Y.TAX.KEYS
+        IF Y.VAL = 'Y' THEN
+            Y.POS1 = ''
+            LOCATE 2 IN Y.TAX.KEYS<1,1> SETTING Y.POS1 ELSE Y.POS1 = ''
+            Y.POS2 = ''
+            LOCATE 3 IN Y.TAX.KEYS<1,1> SETTING Y.POS2 ELSE Y.POS2 = ''
+            IF Y.POS1 = '' AND Y.POS2 = '' THEN
+                AF = CABADDTAX.INDIVIDUAL.FLAG
+                AV = Y.CNT
+                ETEXT = 'TAX.KEY Should Be 2 3 If Individual Flag Is Y'
+                CALL STORE.END.ERROR
+                RETURN
+            END
+            IF Y.POS1 NE '' OR Y.POS2 NE '' THEN
+                IF R.NEW(CABADDTAX.ACCUMULATED.CR.INT)<1,Y.CNT> EQ '' THEN
+                    AF = CABADDTAX.ACCUMULATED.CR.INT
+                    AV = Y.CNT
+                    ETEXT = 'Mandatory Input If TAX.KEY is 2 or 3'
+                    CALL STORE.END.ERROR
+                    RETURN
+                END ELSE
+                    Y.VAL.TO.CHECK = '' ; Y.VAL.TO.CHECK = R.NEW(CABADDTAX.ACCUMULATED.CR.INT)<1,Y.CNT>
+                    Y.OP = '' ; Y.OP = FIELD(Y.VAL.TO.CHECK,' ',1)
+                    Y.SLAB = '' ; Y.SLAB = FIELD(Y.VAL.TO.CHECK,' ',2)
+                    Y.AMT = '' ; Y.AMT = Y.SLAB[1,LEN(Y.SLAB)-3]
+                    IF Y.OP NE 'GT' THEN
+                        AF = CABADDTAX.ACCUMULATED.CR.INT
+                        AV = Y.CNT
+                        ETEXT = 'Accepted Input Format Is "GT <AMOUNT>JOD" eg.. GT 200000JOD'
+                        CALL STORE.END.ERROR
+                        RETURN
+                    END
+                    IF Y.SLAB[3] NE LCCY THEN
+                        AF = CABADDTAX.ACCUMULATED.CR.INT
+                        AV = Y.CNT
+                        ETEXT = 'Accepted Input Format Is "GT <AMOUNT>JOD" eg.. GT 200000JOD'
+                        CALL STORE.END.ERROR
+                        RETURN
+                    END
+                    IF NUM(Y.AMT) ELSE
+                        AF = CABADDTAX.ACCUMULATED.CR.INT
+                        AV = Y.CNT
+                        ETEXT = 'Accepted Input Format Is "GT <AMOUNT>JOD" eg.. GT 200000JOD'
+                        CALL STORE.END.ERROR
+                        RETURN
+                    END
+                END
+            END
+            FOR Y.TAX.CNT = 5 TO 12
+                Y.TAX.POS = ''
+                LOCATE Y.TAX.CNT IN Y.TAX.KEYS<1,1> SETTING Y.TAX.POS ELSE Y.TAX.POS = ''
+                IF Y.TAX.POS NE '' THEN
+                    AF = CABADDTAX.INDIVIDUAL.FLAG
+                    AV = Y.CNT
+                    ETEXT = 'TAX.KEY Should Be 2 3 If Individual Flag Is Y'
+                    CALL STORE.END.ERROR
+                    RETURN
+                END
+            NEXT Y.TAX.CNT
+        END
+
+        IF Y.VAL = 'N' THEN
+            Y.POS1 = ''
+            LOCATE 2 IN Y.TAX.KEYS<1,1> SETTING Y.POS1 ELSE Y.POS1 = ''
+            Y.POS2 = ''
+            LOCATE 3 IN Y.TAX.KEYS<1,1> SETTING Y.POS2 ELSE Y.POS2 = ''
+            IF Y.POS1 NE '' OR Y.POS2 NE '' THEN
+                AF = CABADDTAX.INDIVIDUAL.FLAG
+                AV = Y.CNT
+                ETEXT = 'TAX.KEY Should Be 5 6 7 8 9 10 11 12 If Individual Flag Is N'
+                CALL STORE.END.ERROR
+                RETURN
+            END
+            IF R.NEW(CABADDTAX.ACCUMULATED.CR.INT)<1,Y.CNT> NE '' THEN
+                AF = CABADDTAX.ACCUMULATED.CR.INT
+                AV = Y.CNT
+                ETEXT = 'Input Not Needed If TAX.KEY is 5 6 7 8 9 10 11 12'
+                CALL STORE.END.ERROR
+                RETURN
+            END
+        END
+
+    NEXT Y.CNT
+
+    RETURN
+*-----------------------------------------------------------------------------------------------------------------------
+*** <region name= Initialise>
+INITIALISE:
+***
+
+    F.CCY = ''
+    FN.CCY = 'F.CURRENCY'
+    CALL OPF(FN.CCY,F.CCY)
+
+    F.CAT = ''
+    FN.CAT = 'F.CATEGORY'
+    CALL OPF(FN.CAT,F.CAT)
+
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------------------------------------------------
+*** <region name= Process Message>
+PROCESS.MESSAGE:
+    BEGIN CASE
+    CASE MESSAGE EQ ''        ;* Only during commit
+        BEGIN CASE
+        CASE V$FUNCTION EQ 'D'
+            GOSUB VALIDATE.DELETE
+        CASE V$FUNCTION EQ 'R'
+            GOSUB VALIDATE.REVERSE
+        CASE OTHERWISE        ;* The real VALIDATE
+            GOSUB VALIDATE
+        END CASE
+    CASE MESSAGE EQ 'AUT' OR MESSAGE EQ 'VER'     ;* During authorisation and verification
+        GOSUB VALIDATE.AUTHORISATION
+    END CASE
+*
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------------------------------------------------
+*** <region name= VALIDATE.DELETE>
+VALIDATE.DELETE:
+* Any special checks for deletion
+
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------------------------------------------------
+*** <region name= VALIDATE.REVERSE>
+VALIDATE.REVERSE:
+* Any special checks for reversal
+
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------------------------------------------------
+*** <region name= VALIDATE.AUTHORISATION>
+VALIDATE.AUTHORISATION:
+* Any special checks for authorisation
+
+    RETURN
+*** </region>
+*-----------------------------------------------------------------------------------------------------------------------
+END
