@@ -1,0 +1,110 @@
+*-----------------------------------------------------------------------------
+* <Rating>-43</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.A.CANPAY.MCDD.UPDATE
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.A.CANPAY.MCDD.UPDATE
+*---------------------------------------------------------------
+*Description       :
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0067
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.TELLER
+    $INSERT I_F.FUNDS.TRANSFER
+    $INSERT I_F.EB.MESSAGE.111
+    $INSERT I_F.MC.DD.REGISTER
+    $INSERT I_F.MCDD.L.REFUND.CONCAT
+
+    GOSUB INIT.FILES
+    GOSUB OPEN.FILES
+    GOSUB PROCESS
+
+    RETURN
+
+***********
+INIT.FILES:
+***********
+
+    FN.MC.DD.REGISTER = "F.MC.DD.REGISTER"
+    F.MC.DD.REGISTER = ""
+    FN.MCDD.CONCAT = "F.MCDD.L.REFUND.CONCAT"
+    F.MCDD.CONCAT = ""
+
+    RETURN
+
+***********
+OPEN.FILES:
+***********
+
+    CALL OPF(FN.MC.DD.REGISTER,F.MC.DD.REGISTER)
+    CALL OPF(FN.MCDD.CONCAT,F.MCDD.CONCAT)
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    GOSUB UPDATE.REGISTER
+
+    RETURN
+
+****************
+UPDATE.REGISTER:
+****************
+
+    IF ID.NEW[1,2] EQ "TT" THEN
+        Y.MDR.ID = R.NEW(TT.TE.STOCK.NUMBER)
+    END
+    IF ID.NEW[1,2] EQ "FT" THEN
+        LOCAL.APPLICATION = 'FUNDS.TRANSFER'
+        LOCAL.FIELD = 'L.CHEQUE.NUMBER'
+        LOCAL.POS = ''
+        CALL MULTI.GET.LOC.REF(LOCAL.APPLICATION,LOCAL.FIELD,LOCAL.POS)
+        L.CHEQUE.NUMBER.POS = LOCAL.POS<1,1>
+        Y.MDR.ID = R.NEW(FT.LOCAL.REF)<1,L.CHEQUE.NUMBER.POS>
+    END
+    IF APPLICATION EQ "EB.MESSAGE.111" AND PGM.VERSION EQ ",INP.DD.STOP" THEN
+        Y.MDR.ID = R.NEW(EB.MT111.CHEQUE.NUMBER) ; CURR.STATUS = "STOPPED"
+    END
+    IF PGM.VERSION EQ ",MC.DD.CAN.CASH" OR PGM.VERSION EQ ",MC.DD.CAN.ACCT" OR PGM.VERSION EQ ',MC.DD.CAN.ACCT.DMD' THEN
+        CURR.STATUS = "CANCELLED"
+    END
+    IF PGM.VERSION EQ ",MC.DD.PAY.CASH" OR PGM.VERSION EQ ",MC.DD.PAY.ACCT" OR PGM.VERSION EQ ",DD.SETTLEMENT" THEN
+        CURR.STATUS = "PAID"
+    END
+    CALL F.READ(FN.MC.DD.REGISTER,Y.MDR.ID,R.MC.REG,F.MC.DD.REGISTER,READ.ERR)
+    IF R.MC.REG THEN
+        R.MC.REG<MC.DD.REG.STATUS.HIST,-1> = CURR.STATUS
+        R.MC.REG<MC.DD.REG.STATUS.DATE,-1> = TODAY
+        R.MC.REG<MC.DD.REG.STATUS.TRANSID,-1> = ID.NEW
+        R.MC.REG<MC.DD.REG.STATUS>       = CURR.STATUS
+        R.MC.REG<MC.DD.REG.CURR.NO> +=1
+        R.MC.REG<MC.DD.REG.INPUTTER> = TNO:"_":OPERATOR
+        TIME.STAMP = TIMEDATE()
+        X = OCONV(DATE(),"D-")
+        X = X[9,2]:X[1,2]:X[4,2]:TIME.STAMP[1,2]:TIME.STAMP[4,2]
+        R.MC.REG<MC.DD.REG.DATE.TIME> = X
+        R.MC.REG<MC.DD.REG.AUTHORISER> = TNO:"_":OPERATOR
+        R.MC.REG<MC.DD.REG.CO.CODE> = ID.COMPANY
+        CALL F.WRITE(FN.MC.DD.REGISTER,Y.MDR.ID,R.MC.REG)
+        CALL F.DELETE(FN.MCDD.CONCAT,Y.MDR.ID)
+
+*    IF (V$FUNCTION NE 'R' AND R.NEW(FT.RECORD.STATUS) NE 'RNAU') THEN
+*        TEXT = "Cheque Number is ":Y.MDR.ID
+*        CALL REM
+*    END
+    END
+
+    RETURN
+
+END

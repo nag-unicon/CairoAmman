@@ -1,0 +1,83 @@
+*-----------------------------------------------------------------------------
+* <Rating>-11</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE B.SUSPENSE.AC.TRANSFER.LOAD
+*----------------------------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : B.SUSPENSE.AC.TRANSFER.LOAD
+*----------------------------------------------------------------------------------
+*Description       : To open required files for the batch
+*Linked With       : BATCH>XXX/SYSTEM.END.OF.DAY5
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2012-07-0116
+*------------------------------------------------------------------------------------
+*Modification Details:
+*=====================
+*------------------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_GTS.COMMON
+    $INSERT I_F.ACCOUNT.CLASS
+    $INSERT I_F.OFS.SOURCE
+    $INCLUDE POSTFR.BP I_F.POSTFR.PARAMS
+    $INCLUDE CAB.BP I_F.CAB.FILE.PARAMETER
+    $INCLUDE CAB.BP I_B.SUSPENSE.AC.TRANSFER.COMMON
+
+    GOSUB OPEN.FILES
+
+    RETURN
+*-------------------------------------------------------------------------------------
+OPEN.FILES:
+*----------
+
+    FN.ACCOUNT = 'F.ACCOUNT'
+    F.ACCOUNT = ''
+    CALL OPF(FN.ACCOUNT,F.ACCOUNT)
+
+    FN.POSTFR.PARAMS = 'F.POSTFR.PARAMS'
+    F.POSTFR.PARAMS = ''
+    CALL OPF(FN.POSTFR.PARAMS,F.POSTFR.PARAMS)
+
+    FN.ACCOUNT.CLASS = 'F.ACCOUNT.CLASS'
+    F.ACCOUNT.CLASS = ''
+    CALL OPF(FN.ACCOUNT.CLASS,F.ACCOUNT.CLASS)
+
+    FN.OFS.SOURCE = 'F.OFS.SOURCE'
+    F.OFS.SOURCE = ''
+    CALL OPF(FN.OFS.SOURCE,F.OFS.SOURCE)
+
+    FN.CAB.FILE.PARAMETER = 'F.CAB.FILE.PARAMETER'
+    F.CAB.FILE.PARAMETER = ''
+    CALL OPF(FN.CAB.FILE.PARAMETER,F.CAB.FILE.PARAMETER)
+
+    CALL F.READ(FN.CAB.FILE.PARAMETER,'POS.TRANSFER',R.CAB.FILE.PARAMETER,F.CAB.FILE.PARAMETER,CAB.FIL.ERR)
+    IF R.CAB.FILE.PARAMETER THEN
+        Y.VERSION.ID = R.CAB.FILE.PARAMETER<CAB.FIL.SOURCE.FILE.NAME>
+        OFS.SOURCE.ID = R.CAB.FILE.PARAMETER<CAB.FIL.OFS.SOURCE>
+        AC.CLASS.ARR = R.CAB.FILE.PARAMETER<CAB.FIL.MAPPING.DATA>
+    END
+
+    CHANGE SM TO FM IN AC.CLASS.ARR
+    CATEG.ARR = ''
+    LOOP
+        REMOVE AC.CLASS.ID FROM AC.CLASS.ARR SETTING AC.CLS.POS
+    WHILE AC.CLASS.ID:AC.CLS.POS
+        CALL F.READ(FN.ACCOUNT.CLASS,AC.CLASS.ID,R.ACCOUNT.CLASS,F.ACCOUNT.CLASS,AC.CLS.ERR)
+        IF R.ACCOUNT.CLASS THEN
+            IF AC.CLASS.ID EQ 'U-BRPOSCR' THEN
+                BR.POS.CR = R.ACCOUNT.CLASS<AC.CLS.CATEGORY>
+            END
+            IF AC.CLASS.ID EQ 'U-BRPOSDR' THEN
+                BR.POS.DR = R.ACCOUNT.CLASS<AC.CLS.CATEGORY>
+            END
+            CATEG.ARR<-1> = R.ACCOUNT.CLASS<AC.CLS.CATEGORY>
+        END
+    REPEAT
+
+    RETURN
+*-----------------------------------------------------------------------------------------
+END

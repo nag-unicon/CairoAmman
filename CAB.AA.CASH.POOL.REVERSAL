@@ -1,0 +1,125 @@
+    SUBROUTINE CAB.AA.CASH.POOL.REVERSAL
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 26th Sep 2017
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Post routine
+
+* Attached to      : Activity Class  : LENDING-CHANGE.PRODUCT-ARRANGEMENT
+*                    Property Class  : ACCOUNT
+*                    Action          : MAINTAIN
+*                    Post Routine    : CAB.AA.CASH.POOL.REVERSAL
+
+* Attached As      : Post Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Routine is used to reverse the AC.CASH.POOL record for the Legal Loan.
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.AA.ARRANGEMENT
+    $INSERT I_AA.APP.COMMON
+    $INSERT I_AA.ACTION.CONTEXT
+    $INSERT I_F.AC.CASH.POOL
+
+*** </region>
+*** <region name= Main Body>
+
+    IF c_arrActivityStatus EQ "AUTH" THEN
+
+        GOSUB PROCESS
+
+    END
+
+    RETURN
+
+*** </region>
+*** <region name= Select Statment>
+
+PROCESS:
+
+    SAVE.ID.COMPANY = ID.COMPANY
+    ID.COMPANY = AA$R.ARRANGEMENT<AA.ARR.CO.CODE>
+    ACCOUNT.ID = AA$R.ARRANGEMENT<AA.ARR.LINKED.APPL.ID,1>
+
+    FN.AC.CASH.POOL = "F.AC.CASH.POOL"
+    F.AC.CASH.POOL = ""
+    CALL OPF(FN.AC.CASH.POOL, F.AC.CASH.POOL)
+
+    GOSUB CHECK.CASH.POOL.RECORD
+
+    ID.COMPANY = SAVE.ID.COMPANY
+
+    RETURN
+
+CHECK.CASH.POOL.RECORD:
+
+    FN.ACCOUNT = "F.ACCOUNT"
+    F.ACCOUNT = ""
+    CALL OPF(FN.ACCOUNT, F.ACCOUNT)
+
+    R.ACCOUNT = ""
+    ERR.ACCOUNT = ""
+    CALL F.READ(FN.ACCOUNT, ACCOUNT.ID, R.ACCOUNT, F.ACCOUNT, ERR.ACCOUNT)
+
+    IF R.ACCOUNT<AC.CASH.POOL.GROUP,1> NE "" THEN
+        TRANSACTION.ID = FIELD(R.ACCOUNT<AC.CASH.POOL.GROUP,1>, "_", 1)
+
+        R.AC.CASH.POOL = ""
+        ERR.AC.CASH.POOL = ""
+        CALL F.READ(FN.AC.CASH.POOL, TRANSACTION.ID, R.AC.CASH.POOL, F.AC.CASH.POOL, ERR.AC.CASH.POOL)
+
+        IF TRANSACTION.ID AND R.AC.CASH.POOL<AC.CP.CO.CODE> THEN
+
+            IF R.AC.CASH.POOL<AC.CP.CO.CODE> NE ID.COMPANY THEN
+                ID.COMPANY = R.AC.CASH.POOL<AC.CP.CO.CODE>
+            END
+
+            APP.NAME = "AC.CASH.POOL"
+            FUNCT = "R"
+            GOSUB BUILD.OFS.RECORD
+
+        END
+    END
+
+    RETURN
+
+BUILD.OFS.RECORD:
+
+    OFS.RECORD = ''
+    OFSVERSION = APP.NAME:","
+    NO.OF.AUTH = "0"
+    GTS.MODE = 1
+
+    CALL OFS.BUILD.RECORD(APP.NAME, FUNCT, "PROCESS", OFSVERSION, GTS.MODE, NO.OF.AUTH, TRANSACTION.ID, R.PROCESS.RECORD, OFS.RECORD)
+
+    theResponse    = ""
+    txnCommitted   = ""
+    options        = ""
+    options<1>     = "AA.CLOSE"
+    options<4>     = "HLD"
+
+*    CALL OFS.CALL.BULK.MANAGER(options,OFS.RECORD,theResponse,txnCommitted)
+    OFS.SOURCE = "AA.CLOSE"
+    CALL OFS.POST.MESSAGE(OFS.RECORD,'',OFS.SOURCE,'')
+
+    RETURN
+
+*** </region>
+
+END

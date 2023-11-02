@@ -1,0 +1,39 @@
+    SUBROUTINE CAB.AA.CASHPOOL.REVE.LIST(RET.ID)
+
+* Desc   - Report routine used to show the list of cashpool that has been reversed during COB
+* Author - BalaGnanaPandian
+* ITSS Development
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_ENQUIRY.COMMON
+
+    GOSUB INIT
+    GOSUB PROCESS
+    RETURN
+
+
+
+INIT:
+    RET.ID = ''
+    RUN.DATE = TODAY
+    CALL CDT ('',RUN.DATE,'-1W')
+
+    FN.AA.CASHPOOL = 'F.AA.CASHPOOL.REVERSE'
+    F.AA.CASHPOOL  = ''
+    CALL OPF(FN.AA.CASHPOOL,F.AA.CASHPOOL)
+    SEL.CMD = '' ; SEL.LIST = ''
+    SEL.CMD = 'SELECT ': FN.AA.CASHPOOL :' WITH @ID LIKE REVE.CASH.POOL-': RUN.DATE :"..."
+    CALL EB.READLIST (SEL.CMD,SEL.LIST,'',NO.OF.REC,SEL.ERR)
+    RETURN
+
+PROCESS:
+    LOOP
+        REMOVE REC.ID FROM SEL.LIST SETTING SEL.POS
+    WHILE REC.ID : SEL.POS
+        R.REC.DETAILS = ''
+        CALL F.READ(FN.AA.CASHPOOL,REC.ID,R.REC.DETAILS,F.AA.CASHPOOL,REC.ERR)
+        RET.ID <-1> = R.REC.DETAILS
+    REPEAT
+    RETURN
+END

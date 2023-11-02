@@ -1,0 +1,30 @@
+    SUBROUTINE CAB.AA.ADHOC.INTEREST.ACCRUE.LOAD
+**********************************************************************************
+***  This is adhoc service, If bank required to accure interest on online they can
+***  run this service and accure interest uptodate
+***
+*** Author : Arundharun
+***
+**********************************************************************************
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INCLUDE TT.BP I_CAB.AA.ACC.COMMON
+
+    FN.AA.ARR.ACTIVITY ='F.AA.ARRANGEMENT.ACTIVITY'
+    F.AA.ARR.ACTIVITY = ''
+    CALL OPF(FN.AA.ARR.ACTIVITY,F.AA.ARR.ACTIVITY)
+
+    FN.SAVEDLISTS = '&SAVEDLISTS&'
+    F.SAVEDLISTS =''
+    CALL OPF(FN.SAVEDLISTS,F.SAVEDLISTS)
+
+    OPEN '&SAVEDLISTS&' TO SAVED.FILE.PATH ELSE
+
+    END
+
+    FN.AA.ARRANGEMENT ='F.AA.ARRANGEMENT'
+    F.AA.ARRANGEMENT =''
+    CALL OPF(FN.AA.ARRANGEMENT,F.AA.ARRANGEMENT)
+
+    RETURN

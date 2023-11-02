@@ -1,0 +1,30 @@
+*-----------------------------------------------------------------------------
+* <Rating>0</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.A.MC.STOP.NEWTASK
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.A.MC.STOP.NEWTASK
+*---------------------------------------------------------------
+*Description       :
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0067
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.FUNDS.TRANSFER
+    $INCLUDE CAB.BP I_F.MC.DD.REGISTER
+
+    R.NEW(MC.DD.REG.STATUS.HIST)<1,-1> = "STOPPED"
+    R.NEW(MC.DD.REG.STATUS.DATE)<1,-1> = TODAY
+    R.NEW(MC.DD.REG.STATUS) = "STOPPED"
+    CALL EB.SET.NEW.TASK("FUNDS.TRANSFER,MC.STOP.CHG I F3")
+
+    RETURN
+END

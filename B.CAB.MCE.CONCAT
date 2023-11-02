@@ -1,0 +1,131 @@
+* Version 1.1
+* Started on 18.06.2012 by AGryaznov@Temenos.com
+
+*********************************************************************
+* This COB routine will 
+* - Select the CAB.MCE.STOCK.ID file in SELECT part.
+* - With the returned IDs list, read & format the STOCK.ENTRY related details.
+* - Produce flat files in the folder MCE\TMP.
+* It is designed for the MCE Interface (project CAB).
+*
+*                       ---- MODIFICATIONS ---------
+*********************************************************************
+
+   SUBROUTINE B.CAB.MCE.CONCAT(SEL.ID)
+
+$INSERT I_COMMON
+$INSERT I_EQUATE
+$INSERT I_B.CAB.MCE.CONCAT
+$INSERT I_F.STOCK.ENTRY
+$INSERT I_F.ACCOUNT
+$INSERT I_F.CAB.MCE.PARAM
+$INSERT I_F.COMPANY
+
+
+    GOSUB INITIALIZE
+    GOSUB PROCESS
+
+    RETURN
+
+
+*********************************************************************
+
+PROCESS:
+
+    LOC.MSG  = ''
+
+    LOC.ENT.ID = SEL.ID['.',2,1]
+    R.STOCK.ENTRY = ''
+    CALL F.READ(FN.STOCK.ENTRY,LOC.ENT.ID,R.STOCK.ENTRY,F.STOCK.ENTRY,STOCK.ENTRY.ERR)
+
+    *Bank Code
+    LOC.MSG := "09"
+
+    *Branch Code
+    LOC.TREG = R.STOCK.ENTRY<STO.ENT.TO.REGISTER>
+    LOC.MSG := LOC.TREG[4]'4" "L'
+
+    *Fixed Value
+    LOC.MSG := "000"
+
+    *Account number
+    LOC.AC.ID = R.STOCK.ENTRY<STO.ENT.STOCK.ACCT.NO,1>
+    R.ACCOUNT = ''
+    CALL F.READ(FN.ACCOUNT,LOC.AC.ID,R.ACCOUNT,F.ACCOUNT,ACCOUNT.ERR)
+    IF R.ACCOUNT<AC.ALT.ACCT.ID> THEN
+       BEGIN CASE
+          CASE R.ACCOUNT<AC.ALT.ACCT.ID,1>
+             LOC.AC.ID = R.ACCOUNT<AC.ALT.ACCT.ID,1> 
+          CASE R.ACCOUNT<AC.ALT.ACCT.ID,2>
+             LOC.AC.ID = R.ACCOUNT<AC.ALT.ACCT.ID,2> 
+          CASE R.ACCOUNT<AC.ALT.ACCT.ID,3>
+             LOC.AC.ID = R.ACCOUNT<AC.ALT.ACCT.ID,3> 
+       END CASE
+    END
+    LOC.MSG := LOC.AC.ID[13]'13" "L'
+
+    *Start Chq Book Num
+    LOC.START.NO = R.STOCK.ENTRY<STO.ENT.STOCK.START.NO,1>
+    LOC.MSG := LOC.START.NO[6]'6"0"R'
+
+    *Num Of Chq Books
+    LOC.MSG := "001"
+
+    *Cheque Book Type
+    LOC.QUANT = R.STOCK.ENTRY<STO.ENT.STOCK.QUANTITY,1>
+    LOC.MSG := LOC.QUANT[2]'2" "L'
+
+    *Cheque book title
+    LOC.MSG := "                  "
+
+    R.CAB.MCE.PARAM = ''
+    CALL F.READ(FN.CAB.MCE.PARAM,"CUST.NAME",R.CAB.MCE.PARAM,F.CAB.MCE.PARAM,CAB.MCE.PARAM.ERR)
+
+    *Customer Name.1
+    LOC.CUST.NAME1 = R.CAB.MCE.PARAM<CMP.VALUE,1>
+    LOC.MSG := LOC.CUST.NAME1[1,35]'35" "L'
+
+    *Customer Name.2
+    LOC.CUST.NAME2 = R.CAB.MCE.PARAM<CMP.VALUE,2>
+    LOC.MSG := LOC.CUST.NAME2[1,35]'35" "L'
+
+    *Language Indicator
+    LOC.MSG := "A"
+
+    *Registration Number
+    LOC.MSG := "          "
+
+    *National ID Number
+    LOC.MSG := "          "
+
+    *Paper Type
+    LOC.MSG := "M"
+
+    *Printing Type
+    LOC.MSG := "2"
+
+    *Branch Name
+    Y.COMPANY = ''
+    CALL F.READ(FN.COMPANY,LOC.TREG[9],Y.COMPANY,F.COMPANY,COMPANY.ERR)
+    LOC.CO.NAME = Y.COMPANY<EB.COM.COMPANY.NAME,2>
+    LOC.MSG := LOC.CO.NAME[1,30]'30" "L'
+
+    *Save to file
+    FILE.NAME = SEL.ID
+    WRITE LOC.MSG TO F.OUT.FILE,FILE.NAME
+
+    *Move ID to HIS table
+    CALL F.WRITE(FN.CAB.MCE.STOCK.ID.HIS,SEL.ID,LOC.ENT.ID)
+    CALL F.DELETE(FN.CAB.MCE.STOCK.ID,SEL.ID)
+
+    RETURN
+ 
+*********************************************************************
+
+INITIALIZE:
+
+    RETURN
+
+*********************************************************************
+
+END

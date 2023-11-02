@@ -1,0 +1,68 @@
+* Developed by - AGryaznov@Temenos.com
+
+    SUBROUTINE B.CAB.ATM.BAL.REFRESH.LOAD
+
+************************************************************************
+* This COB routine will
+* - Select the CARD.ISSUE.ACCOUNT file in SELECT part
+* - With the returned account list, read & format the account related details
+* - Produce flat files in the folder BAL.REFRESH.TMP
+* It is designed for the ATM Interface (project CAB)
+*
+*                  ---- MODIFICATIONS ---------
+*
+* 12-Feb-2012 - Initial Creation
+************************************************************************
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_B.CAB.ATM.BAL.REFRESH
+
+    GOSUB INITIALISE
+
+    RETURN
+
+************************************************************************
+
+INITIALISE:
+
+    LOC.OUT.DIR = "ATM.BATCH/OUT/BAL.REFRESH.TMP"
+
+    OPEN LOC.OUT.DIR TO F.OUT.FILE ELSE
+        PRINT "Can not open file ":LOC.OUT.DIR
+        RETURN
+    END
+
+    FN.ACCOUNT = 'F.ACCOUNT'
+    F.ACCOUNT  = ''
+    CALL OPF(FN.ACCOUNT,F.ACCOUNT)
+
+    FN.CARD.ISSUE.ACCOUNT = 'F.CARD.ISSUE.ACCOUNT'
+    F.CARD.ISSUE.ACCOUNT  = ''
+    CALL OPF(FN.CARD.ISSUE.ACCOUNT,F.CARD.ISSUE.ACCOUNT)
+
+    FN.POSTING.RESTRICT = 'F.POSTING.RESTRICT'
+    F.POSTING.RESTRICT = ''
+    CALL OPF(FN.POSTING.RESTRICT,F.POSTING.RESTRICT)
+
+    FN.CUSTOMER = 'F.CUSTOMER'
+    F.CUSTOMER = ''
+    CALL OPF(FN.CUSTOMER,F.CUSTOMER)
+
+    FN.ACCT.GROUP.CONDITION = 'F.ACCT.GROUP.CONDITION'
+    F.ACCT.GROUP.CONDITION = ''
+    CALL OPF(FN.ACCT.GROUP.CONDITION,F.ACCT.GROUP.CONDITION)
+
+
+    FN.LIMIT = 'F.LIMIT'
+    F.LIMIT  = ''
+    CALL OPF(FN.LIMIT,F.LIMIT)
+
+    LOC.DEL.CMD = "CLEAR.FILE ":LOC.OUT.DIR
+    EXECUTE LOC.DEL.CMD
+
+    RETURN
+
+************************************************************************
+
+END

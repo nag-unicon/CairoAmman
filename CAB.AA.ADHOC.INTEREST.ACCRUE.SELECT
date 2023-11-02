@@ -1,0 +1,42 @@
+    SUBROUTINE CAB.AA.ADHOC.INTEREST.ACCRUE.SELECT
+**********************************************************************************
+***  This is adhoc service, If bank required to accure interest on online they can
+***  run this service and accure interest uptodate
+***
+*** Author : Arundharun
+***
+**********************************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE TT.BP I_CAB.AA.ACC.COMMON
+
+    GOSUB CLEAR.FILE.BEFORE.PROCESS
+    GOSUB PROCESS
+
+    RETURN
+
+CLEAR.FILE.BEFORE.PROCESS:
+
+    SEL.CMD ="SELECT ": FN.SAVEDLISTS :" WITH @ID LIKE AA.INT_....csv"          ;* Delete the existing processed list file before processing the new one
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+
+    LOOP
+    WHILE LoopCount LE SEL.CNT
+
+        DELETE SAVED.FILE.PATH, SEL.LIST<LoopCount>
+
+        LoopCount + = 1
+
+    REPEAT
+
+    RETURN
+
+
+PROCESS:
+
+    SEL.CMD = "SELECT ": FN.AA.ARRANGEMENT : " WITH PRODUCT.LINE EQ LENDING AND ARR.STATUS EQ CURRENT OR ARR.STATUS EQ EXPIRED"
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.CNT,SEL.ERR)
+
+    CALL BATCH.BUILD.LIST('',SEL.LIST)
+
+    RETURN

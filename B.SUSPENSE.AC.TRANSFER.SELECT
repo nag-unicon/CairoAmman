@@ -1,0 +1,42 @@
+*-----------------------------------------------------------------------------
+* <Rating>-10</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE B.SUSPENSE.AC.TRANSFER.SELECT
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : B.SUSPENSE.AC.TRANSFER.SELECT
+*---------------------------------------------------------------
+*Description       : This select routine is used to select the suspense
+*                    accounts for the category mentioned in ACCOUNT.CLASS
+*                    record of U-BRPOSCR,U-BRPOSDR,U-HOPOSCR and U-HOPOSDR
+*Linked With       : BATCH>XXX/SYSTEM.END.OF.DAY5
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2012-07-0116
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT
+    $INCLUDE CAB.BP I_B.SUSPENSE.AC.TRANSFER.COMMON
+
+    GOSUB SEL.PROCESS
+
+    RETURN
+*--------------------------------------------------------------------------
+SEL.PROCESS:
+*-----------
+    CHANGE FM TO ' ' IN CATEG.ARR
+
+    SEL.CMD = 'SELECT ':FN.ACCOUNT:' WITH CATEGORY EQ ':CATEG.ARR
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',NO.OF.REC,ERR)
+
+    CALL BATCH.BUILD.LIST('',SEL.LIST)
+
+    RETURN
+*--------------------------------------------------------------------------
+END

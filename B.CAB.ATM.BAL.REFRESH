@@ -1,0 +1,337 @@
+* Developed by - AGryaznov@Temenos.com
+
+    SUBROUTINE B.CAB.ATM.BAL.REFRESH(SEL.ID)
+
+************************************************************************
+* This COB routine will
+* - Select the CARD.ISSUE.ACCOUNT file in SELECT part
+* - With the returned account list, read & format the account related details
+* - Produce flat files in the folder BAL.REFRESH.TMP
+* It is designed for the ATM Interface (project CAB)
+*
+*                  ---- MODIFICATIONS ---------
+*
+* 06-Feb-2012 - Initial Creation
+* 12-Mar-2017 - Nuha tuhul          add ID, ID TYPE And nationality
+************************************************************************
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.LIMIT
+    $INSERT I_F.CURRENCY
+    $INSERT I_B.CAB.ATM.BAL.REFRESH
+    $INSERT I_F.POSTING.RESTRICT
+    $INSERT I_F.CUSTOMER
+    $INSERT I_F.ACCT.GROUP.CONDITION
+    $INSERT I_TSA.COMMON
+
+    GOSUB INITIALIZE
+    GOSUB PROCESS
+
+    RETURN
+
+
+************************************************************************
+
+PROCESS:
+
+    LOC.MSG  = ''
+
+    R.ACCOUNT = ''
+
+    CALL F.READ(FN.ACCOUNT,SEL.ID,R.ACCOUNT,F.ACCOUNT,ACCOUNT.ERR)
+
+    R.POSTING.RESTRICT = ''
+    YR.POST.CHECK = ''
+    R.CUSTOMER    = ''
+    CALL F.READ(FN.CUSTOMER,R.ACCOUNT<AC.CUSTOMER>,R.CUSTOMER,F.CUSTOMER,CUST.ERR)
+
+    IF R.ACCOUNT<AC.POSTING.RESTRICT> NE '' THEN
+        IF R.ACCOUNT<AC.POSTING.RESTRICT> EQ '48' THEN
+            YR.POST.CHECK = 1
+        END
+        CALL F.READ(FN.POSTING.RESTRICT,R.ACCOUNT<AC.POSTING.RESTRICT>,R.POSTING.RESTRICT,F.POSTING.RESTRICT,POST.ERR)
+        YR.POSTING.RESTRICT = R.POSTING.RESTRICT<AC.POS.RESTRICTION.TYPE>
+    END ELSE
+**       R.CUSTOMER = ''
+**       CALL F.READ(FN.CUSTOMER,R.ACCOUNT<AC.CUSTOMER>,R.CUSTOMER,F.CUSTOMER,CUST.ERR)
+        IF R.CUSTOMER<EB.CUS.POSTING.RESTRICT> NE '' THEN
+            IF R.CUSTOMER<EB.CUS.POSTING.RESTRICT> EQ '48' THEN
+                YR.POST.CHECK = 1
+            END
+            CALL F.READ(FN.POSTING.RESTRICT,R.CUSTOMER<EB.CUS.POSTING.RESTRICT>,R.POSTING.RESTRICT,F.POSTING.RESTRICT,POST.ERR)
+            YR.POSTING.RESTRICT = R.POSTING.RESTRICT<AC.POS.RESTRICTION.TYPE>
+        END
+    END
+
+
+    LOC.AC.ID = SEL.ID
+    IF R.ACCOUNT<AC.ALT.ACCT.ID> THEN
+        BEGIN CASE
+        CASE R.ACCOUNT<AC.ALT.ACCT.ID,1>
+            LOC.AC.ID = R.ACCOUNT<AC.ALT.ACCT.ID,1>
+        CASE R.ACCOUNT<AC.ALT.ACCT.ID,2>
+            LOC.AC.ID = R.ACCOUNT<AC.ALT.ACCT.ID,2>
+        CASE R.ACCOUNT<AC.ALT.ACCT.ID,3>
+            LOC.AC.ID = R.ACCOUNT<AC.ALT.ACCT.ID,3>
+        END CASE
+    END
+    LOC.MSG := LOC.AC.ID[13]'13" "L'
+
+    LOC.CU.ID = R.ACCOUNT<AC.CUSTOMER>
+    LOC.MSG := LOC.CU.ID[8]'8" "L'
+
+    LOC.OP.DT = R.ACCOUNT<AC.OPENING.DATE>
+    LOC.MSG := LOC.OP.DT[6]'6" "L'
+
+    Y.CCY = R.ACCOUNT<AC.CURRENCY>
+    CALL DBR("CURRENCY":FM:EB.CUR.NO.OF.DECIMALS,Y.CCY,LOC.CCY.DEC)
+
+    Y.B.BAL = R.ACCOUNT<AC.ONLINE.ACTUAL.BAL> + 0
+    Y.WORK.BAL = R.ACCOUNT<AC.WORKING.BALANCE> + 0
+    YR.ACCT.GROUP = R.ACCOUNT<AC.CONDITION.GROUP>:R.ACCOUNT<AC.CURRENCY>
+    R.ACCT.GROUP = ''
+    CALL F.READ(FN.ACCT.GROUP.CONDITION,YR.ACCT.GROUP,R.ACCT.GROUP,F.ACCT.GROUP.CONDITION,ACCT.GROUP.ERR)
+    YR.MIN.BAL = ''
+    YR.MIN.BAL = R.ACCT.GROUP<ACCT.GRP.MINIMUM.BAL>
+
+    LOC.BK.BL = Y.B.BAL
+    LOC.BK.BL = LOC.BK.BL['.',1,1] : '.' : FMT(LOC.BK.BL['.',2,1], LOC.CCY.DEC:'"0"L')
+    LOC.MSG := LOC.BK.BL[16]'16" "R'
+
+*Available balance
+    Y.A.BAL = 0
+    CALL AT.CALC.AVAIL.BALANCE(LOC.R.ACCOUNT,Y.WORK.BAL,Y.C.BAL)
+    LIMIT.REF = R.ACCOUNT<AC.LIMIT.REF>
+    LIMIT.REF = R.ACCOUNT<AC.CUSTOMER>:'.':FMT(FIELD(LIMIT.REF,'.',1),'R%7'):'.':FIELD(LIMIT.REF,'.',2)
+    DIM R.LIMIT(500)
+    UNUTILISED.LIMIT.AMT = 0
+    MATREAD R.LIMIT FROM F.LIMIT,LIMIT.REF THEN
+        UTILISED.AMT = 0
+        CALL AT.CALC.AVAIL.LIMIT(MAT R.LIMIT,UTILISED.AMT)
+        UTILISED.AMT = ABS(UTILISED.AMT)
+        IF UTILISED.AMT GT R.LIMIT(LI.AVAIL.AMT) THEN
+            UNUTILISED.LIMIT.AMT = 0
+        END ELSE
+            UNUTILISED.LIMIT.AMT = R.LIMIT(LI.AVAIL.AMT) - UTILISED.AMT
+        END
+        IF Y.C.BAL LT 0 THEN
+            Y.A.BAL = Y.C.BAL + R.LIMIT(LI.AVAIL.AMT)
+        END ELSE
+            Y.A.BAL = Y.C.BAL + UNUTILISED.LIMIT.AMT
+        END
+    END ELSE
+        Y.A.BAL = Y.C.BAL
+    END
+
+    LOC.DT.LIST = R.ACCOUNT<AC.FROM.DATE>
+    LOC.VAL     = 0
+    LOC.DT.TMP  = 0
+    Y.LOCK.AMT  = 0
+    LOOP
+        LOC.VAL += 1
+        REMOVE LOC.DT FROM LOC.DT.LIST SETTING LOC.L.MARK
+    WHILE LOC.DT : LOC.L.MARK
+        IF LOC.DT GT LOC.DT.TMP AND LOC.DT LE TODAY THEN
+            LOC.DT.TMP  = LOC.DT
+            Y.LOCK.AMT  = R.ACCOUNT<AC.LOCKED.AMOUNT,LOC.VAL>
+        END
+    REPEAT
+
+**    LOC.CL.BL = ABS(Y.WORK.BAL) - Y.LOCK.AMT
+    LOC.CL.BL = Y.WORK.BAL - Y.LOCK.AMT - YR.MIN.BAL
+    LOC.CL.BL = LOC.CL.BL['.',1,1] : '.' : FMT(LOC.CL.BL['.',2,1], LOC.CCY.DEC:'"0"L')
+    LOC.MSG := LOC.CL.BL[16]'16" "R'
+
+*    LOC.UC.BL = ''
+**    LOC.UC.BL = ABS(Y.WORK.BAL) - Y.LOCK.AMT + UNUTILISED.LIMIT.AMT
+**    LOC.UC.BL = Y.WORK.BAL - Y.LOCK.AMT + UNUTILISED.LIMIT.AMT ; * Making unclear balance 0
+**    LOC.UC.BAL = 0
+    LOC.UC.BL = LOC.BK.BL - LOC.CL.BL
+    LOC.MSG := LOC.UC.BL[16]'16" "R'
+
+**    LOC.UU.LM = UNUTILISED.LIMIT.AMT
+    LOC.UU.LM = - (R.LIMIT(LI.AVAIL.AMT))
+**    IF LOC.UU.LM NE '' OR LOC.UU.LM NE '0' THEN
+**        LOC.UU.LM = - (UNUTILISED.LIMIT.AMT)
+**    END
+    LOC.UU.LM = LOC.UU.LM['.',1,1] : '.' : FMT(LOC.UU.LM['.',2,1], LOC.CCY.DEC:'"0"L')
+    LOC.MSG := LOC.UU.LM[16]'16" "R'
+
+    LOC.MT.DT = ''
+    LOC.MSG := LOC.MT.DT[6]'6" "L'
+
+    LOC.ST.FR = ''
+    LOC.MSG := LOC.ST.FR[3]'3" "L'
+
+    LOC.AR.DB = ''
+    LOC.MSG := LOC.AR.DB[16]'16" "L'
+
+    LOC.AR.CR = ''
+    LOC.MSG := LOC.AR.CR[16]'16" "L'
+
+    LOC.IR.DB = ''
+    LOC.MSG := LOC.IR.DB[16]'16" "L'
+
+    LOC.IR.CR = ''
+    LOC.MSG := LOC.IR.CR[16]'16" "L'
+
+    LOC.BRNCH = R.ACCOUNT<AC.CO.CODE>
+    LOC.MSG := LOC.BRNCH[4]'4" "L'
+
+    LOC.TMEMO = ''
+    LOC.MSG := LOC.TMEMO'3" "L'
+
+    LOC.DRMNT = IF R.ACCOUNT<AC.INACTIV.MARKER>[1,1] THEN 'Y' ELSE 'N'
+    LOC.MSG := LOC.DRMNT'1" "L'
+
+    LOC.DB.AL = IF YR.POSTING.RESTRICT EQ 'ALL' OR YR.POSTING.RESTRICT EQ 'DEBIT' THEN 'N' ELSE 'Y'
+    IF YR.POST.CHECK THEN
+        LOC.DB.AL = 'Y'
+    END
+    LOC.MSG := LOC.DB.AL'1" "L'
+
+    LOC.CR.AL = IF YR.POSTING.RESTRICT EQ 'ALL' OR YR.POSTING.RESTRICT EQ 'CREDIT' THEN 'N' ELSE 'Y'
+    IF YR.POST.CHECK THEN
+        LOC.CR.AL = 'Y'
+    END
+    LOC.MSG := LOC.CR.AL'1" "L'
+
+    LOC.ACTIV = IF R.ACCOUNT<AC.INACTIV.MARKER>[1,1] EQ 'Y' THEN 'N' ELSE 'Y'
+    LOC.MSG := LOC.ACTIV'1" "L'
+
+    LOC.NMEM1 = ''
+    LOC.MSG := LOC.NMEM1'30" "L'
+
+    LOC.NMEM2 = ''
+    LOC.MSG := LOC.NMEM2'30" "L'
+
+    LOC.DB.RT = ''
+    LOC.MSG := LOC.DB.RT'5" "L'
+
+    LOC.CR.RT = ''
+    LOC.MSG := LOC.CR.RT'5" "L'
+
+    LOC.AC.IN = ''
+    LOC.MSG := LOC.AC.IN'13" "L'
+
+    LOC.CCODE = ''
+    CALL DBR("CURRENCY":FM:EB.CUR.NUMERIC.CCY.CODE,Y.CCY,LOC.CCODE)
+    IF NOT(LOC.CCODE) THEN LOC.CCODE = Y.CCY
+    LOC.MSG := LOC.CCODE'3" "L'
+
+    GOSUB GET.ID.TYPE
+    LOC.NAT    = YR.NAT
+    LOC.MSG   := LOC.NAT'2" "L'
+
+    LOC.ID.TYPE =YR.ID.TYPE
+    LOC.MSG     := LOC.ID.TYPE'3" "L'
+
+    LOC.ID     =  YR.ID
+    LOC.MSG   := LOC.ID'30" "L'
+
+
+*Save to file
+**    FILE.NAME = TODAY:'.':SEL.ID:'.':AGENT.NUMBER
+    FILE.NAME = TODAY:'.':AGENT.NUMBER
+
+**    OPEN LOC.OUT.DIR TO F.OUT.FILE ELSE
+    OPENSEQ LOC.OUT.DIR,FILE.NAME TO F.OUT.FILE ELSE
+        CREATE F.OUT.FILE ELSE
+            PRINT "Can not open file ":LOC.OUT.DIR
+            RETURN
+        END
+    END
+
+**    WRITE LOC.MSG TO F.OUT.FILE,FILE.NAME
+    WRITESEQ LOC.MSG APPEND TO F.OUT.FILE ELSE NULL
+    FLUSH F.OUT.FILE ELSE NULL
+**    SH.CMD = "SH -c cat ":LOC.OUT.DIR:"/":FILE.NAME:" > ":LOC.OUT.DIR:"/":TODAY:".":AGENT.NUMBER
+**    EXECUTE SH.CMD CAPTURING SH.RESULTS
+**    DEL.CMD = "SH -c rm ":LOC.OUT.DIR:"/":FILE.NAME
+**    EXECUTE DEL.CMD CAPTURING DEL.RESULTS
+
+    RETURN
+
+GET.ID.TYPE:
+
+    YR.NAT = '' ; YR.ID.TYPE = ''   ; YR.ID  = ''
+    LOC.NAT = ''; LOC.ID.TYPE = ''  ; LOC.ID = ''
+    IF R.CUSTOMER THEN
+        YR.NAT    =   R.CUSTOMER<EB.CUS.NATIONALITY>
+
+        BEGIN CASE
+        CASE R.CUSTOMER<EB.CUS.SECTOR> LT  '1999'
+            IF  R.CUSTOMER<EB.CUS.NATIONALITY>  EQ 'JO' THEN
+                YR.ID         = R.CUSTOMER<EB.CUS.LOCAL.REF,YR.NAT.POS>
+                YR.ID.TYPE    = "NAT"
+            END ELSE
+                IF R.CUSTOMER<EB.CUS.LEGAL.DOC.NAME,1> EQ "PASSPORT"  THEN
+                    YR.ID      = R.CUSTOMER<EB.CUS.LEGAL.ID,1>
+                    YR.ID.TYPE = "PAS"
+                END ELSE
+                    YR.ID      = R.CUSTOMER<EB.CUS.LEGAL.ID,1>
+                    YR.ID.TYPE = "IQA"
+                END
+            END
+        CASE R.CUSTOMER<EB.CUS.SECTOR> GT '1999'
+            IF  R.CUSTOMER<EB.CUS.NATIONALITY>  EQ 'JO' THEN
+                YR.ID         = R.CUSTOMER<EB.CUS.LOCAL.REF,YR.CORP.POS>
+                YR.ID.TYPE    = "BIS"
+            END ELSE
+                YR.ID         = R.CUSTOMER<EB.CUS.LEGAL.ID,1>
+                YR.ID.TYPE    = "BIS"
+            END
+
+        CASE R.CUSTOMER<EB.CUS.SECTOR> EQ  '1999'
+            CUS.REL   =  R.CUSTOMER<EB.CUS.REL.CUSTOMER,1>
+            R.REL.CUS = ''
+            CALL F.READ(FN.CUSTOMER,CUS.REL ,R.REL.CUS,F.CUSTOMER,REL.ERR)
+            GOSUB EXTRACT.REL.CUS
+        END  CASE
+    END
+
+    RETURN
+*************************************************************************
+EXTRACT.REL.CUS:
+    BEGIN CASE
+    CASE R.REL.CUS<EB.CUS.SECTOR> LT  '1999'
+        IF  R.REL.CUS<EB.CUS.NATIONALITY>  EQ 'JO' THEN
+            YR.ID         = R.REL.CUS<EB.CUS.LOCAL.REF,YR.NAT.POS>
+            YR.ID.TYPE    = "NAT"
+        END ELSE
+            IF R.REL.CUS<EB.CUS.LEGAL.DOC.NAME,1> EQ "PASSPORT"  THEN
+                YR.ID      = R.REL.CUS<EB.CUS.LEGAL.ID,1>
+                YR.ID.TYPE = "PAS"
+            END ELSE
+                YR.ID      = R.REL.CUS<EB.CUS.LEGAL.ID,1>
+                YR.ID.TYPE = "IQA"
+            END
+        END
+    CASE R.REL.CUS<EB.CUS.SECTOR> GT '1999'
+        IF  R.REL.CUS<EB.CUS.NATIONALITY>  EQ 'JO' THEN
+            YR.ID         = R.REL.CUS<EB.CUS.LOCAL.REF,YR.CORP.POS>
+            YR.ID.TYPE    = "BIS"
+        END ELSE
+            YR.ID         = R.REL.CUS<EB.CUS.LEGAL.ID,1>
+            YR.ID.TYPE    = "BIS"
+        END
+
+    END CASE
+    RETURN
+
+
+
+INITIALIZE:
+    YR.LOC.REF.POS = ''
+    YR.LOC.REF.FIELDS = "L.IND.NAT.ID":VM:"L.CORP.NAT.ID"
+    CALL MULTI.GET.LOC.REF("CUSTOMER",YR.LOC.REF.FIELDS,YR.LOC.REF.POS)
+    YR.NAT.POS       = YR.LOC.REF.POS<1,1>
+    YR.CORP.POS      = YR.LOC.REF.POS<1,2>
+
+    RETURN
+
+*************************************************************************
+
+END

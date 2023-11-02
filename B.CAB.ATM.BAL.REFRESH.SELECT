@@ -1,0 +1,42 @@
+* Developed by - AGryaznov@Temenos.com
+
+    SUBROUTINE B.CAB.ATM.BAL.REFRESH.SELECT
+
+************************************************************************
+* This COB routine will 
+* - Select the CARD.ISSUE.ACCOUNT file in SELECT part
+* - With the returned account list, read & format the account related details
+* - Produce flat files in the folder BAL.REFRESH.TMP
+* It is designed for the ATM Interface (project CAB)
+*
+*                  ---- MODIFICATIONS ---------
+*
+* 12-Feb-2012 - Initial Creation
+************************************************************************
+
+$INSERT I_COMMON
+$INSERT I_EQUATE
+$INSERT I_B.CAB.ATM.BAL.REFRESH
+
+    GOSUB PROCESS
+
+    RETURN
+
+************************************************************************
+
+PROCESS:
+
+    SEL.CMD = ''
+    SEL.LIST = ''
+    SEL.RECS = ''
+    SEL.ERR = ''
+    SEL.CMD = 'SELECT ':FN.CARD.ISSUE.ACCOUNT
+    CALL EB.READLIST(SEL.CMD,SEL.LIST,'',SEL.RECS,SEL.ERR)
+
+    CALL BATCH.BUILD.LIST('',SEL.LIST)
+
+    RETURN
+
+************************************************************************
+
+END

@@ -1,0 +1,123 @@
+    SUBROUTINE CAB.AA.ACCOUNT.CLOSE(AccountID)
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.AA.ARRANGEMENT
+    $INSERT I_F.ACCOUNT.CLOSURE
+    $INSERT I_F.AC.CASH.POOL
+    $INSERT I_BATCH.FILES
+    $INSERT TT.BP I_CAB.AA.ACCOUNT.CLOSE.COMMON
+
+    recID = "AAClosedAccounts_":SESSION.NO :"_":TODAY:'.csv'
+
+    READ rClosedAccounts FROM TMP.SAVED.LISTS, recID ELSE NULL
+
+    GOSUB PROCESS
+
+    WRITE rClosedAccounts TO TMP.SAVED.LISTS, recID         ;* Write it out. Job well done!
+
+    RETURN
+
+PROCESS:
+
+    rAccount = ""
+    eRRaccount = ""
+    CALL F.READ(FN.ACCOUNT, AccountID, rAccount, F.ACCOUNT, eRRaccount)
+
+    IF rAccount<AC.WORKING.BALANCE> EQ 0 AND rAccount<AC.ONLINE.ACTUAL.BAL> EQ 0 AND rAccount<AC.ARRANGEMENT.ID> THEN
+
+        ArrangementID = rAccount<AC.ARRANGEMENT.ID>
+        rArrangementRecord = ""
+        eRRArrangementRecord = ""
+
+        CALL F.READ(FN.AA.ARRANGEMENT, ArrangementID, rArrangementRecord, F.AA.ARRANGEMENT, eRRArrangementRecord)
+
+        IF rArrangementRecord<AA.ARR.PRODUCT.LINE> EQ "LENDING"  AND (rArrangementRecord<AA.ARR.ARR.STATUS> EQ 'CLOSE' OR NOT(rArrangementRecord)) THEN
+
+            rAccount<AC.ARRANGEMENT.ID> = ''
+            ACCOUNT.COMPANY = rAccount<AC.CO.CODE>
+            CALL LOAD.COMPANY(ACCOUNT.COMPANY)
+
+            CALL F.WRITE(FN.ACCOUNT, AccountID, rAccount)
+
+            GOSUB PROCESS.CASH.POOL.REVERSAL
+            GOSUB PROCESS.ACCOUNT.CLOSURE
+            rClosedAccounts<-1> = AccountID :',': ArrangementID :',': rAccount<AC.CO.CODE>
+
+        END
+    END
+
+    RETURN
+
+PROCESS.CASH.POOL.REVERSAL:
+
+    IF rAccount<AC.CASH.POOL.GROUP> THEN
+
+        R.AC.CASH.POOL = ""
+        ERR.AC.CASH.POOL = ""
+        CALL F.READ(FN.AC.CASH.POOL, AccountID, R.AC.CASH.POOL, F.AC.CASH.POOL, ERR.AC.CASH.POOL)
+
+        IF AccountID AND R.AC.CASH.POOL<AC.CP.CO.CODE> THEN
+
+            IF R.AC.CASH.POOL<AC.CP.CO.CODE> NE ID.COMPANY THEN
+                ID.COMPANY = R.AC.CASH.POOL<AC.CP.CO.CODE>
+            END
+
+            APP.NAME = "AC.CASH.POOL"
+            FUNCT = "R"
+            GOSUB BUILD.OFS.RECORD
+
+        END
+    END
+
+    RETURN
+
+BUILD.OFS.RECORD:
+
+    OFS.RECORD = ''
+    OFSVERSION = APP.NAME:","
+    NO.OF.AUTH = "0"
+    GTS.MODE = 1
+
+    R.PROCESS.RECORD = ""
+    CALL OFS.BUILD.RECORD(APP.NAME, FUNCT, "PROCESS", OFSVERSION, GTS.MODE, NO.OF.AUTH, AccountID, R.PROCESS.RECORD, OFS.RECORD)
+
+    theResponse    = ""
+    txnCommitted   = ""
+    options        = ""
+    options<1>     = "AA.CLOSE"
+
+    CALL OFS.CALL.BULK.MANAGER(options,OFS.RECORD,theResponse,txnCommitted)
+
+    RETURN
+
+PROCESS.ACCOUNT.CLOSURE:
+
+    R.ACCOUNT.CLOSURE = ""
+    R.ACCOUNT.CLOSURE<AC.ACL.POSTING.RESTRICT> = "90"
+    R.ACCOUNT.CLOSURE<AC.ACL.CLOSE.ONLINE> = "Y"
+
+    APP.NAME     = 'ACCOUNT.CLOSURE'
+    PROCESS      = 'PROCESS'
+    OFS.VERSION  = "ACCOUNT.CLOSURE,CLOSE"
+    OFS.FUNCTION = 'I'
+    GTS.MODE     = ''
+    NO.OF.AUTH   = '0'
+    TRANSACTION.ID = ''
+    OFS.RECORD = ""
+    OFS.SOURCE.ID  = 'AA.CLOSE'
+
+    CALL LOAD.COMPANY(ACCOUNT.COMPANY)
+    CALL OFS.BUILD.RECORD(APP.NAME,OFS.FUNCTION, PROCESS, OFS.VERSION, GTS.MODE, NO.OF.AUTH, AccountID, R.ACCOUNT.CLOSURE, OFS.RECORD)
+
+    theResponse    = ""
+    txnCommitted   = ""
+    options        = ""
+    options<1>     = "AA.CLOSE"
+
+    CALL OFS.POST.MESSAGE(OFS.RECORD,'', OFS.SOURCE.ID, '')
+
+    RETURN
+
+END

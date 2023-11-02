@@ -1,0 +1,106 @@
+    SUBROUTINE CAB.AA.BILLS.OSOR(ARR.ID,PROPERTY,OS.AMOUNT,OR.AMOUNT,FROM.DATE,TO.DATE)
+**************************************************************************************
+***  This routine will return the OS and OR amount of Property wise as on from and to date selection
+***  Criteria
+***  Author @ ArunKabalieswaran
+***  Mail @ akabalieswaran@itssglobal.com
+***
+***************************************************************************************
+***************************************************************************************
+***  Modification Histroy:-
+***
+***
+***************************************************************************************
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.AA.BILL.DETAILS
+
+
+    GOSUB INIT.PARA
+    GOSUB PROCESS
+
+    RETURN
+
+*********
+INIT.PARA:
+*********
+
+*** Get all the bill from the account details
+    OS.AMOUNT = ''
+    OR.AMOUNT = ''
+    BILL.CREATE.DATE = ""
+    BILL.REFERENCES = ""
+    BILL.TYPE = "PAYMENT"
+    LAST.PAYMENT.DATE =''
+    BILL.CREATE.DATE =''
+    BILL.STATUS =''
+
+    CALL AA.GET.BILL(ARR.ID, "", LAST.PAYMENT.DATE, BILL.CREATE.DATE, BILL.TYPE, "", BILL.STATUS, "", "", "", "", BILL.REFERENCES, RET.ERROR)
+
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    LOOP
+        REMOVE BILL.REFERENCE FROM BILL.REFERENCES SETTING BILL.REF.POS
+    WHILE BILL.REFERENCE
+
+        GOSUB GET.BILL.DETAILS
+        IF BILL.DATE GE FROM.DATE AND BILL.DATE LE TO.DATE THEN
+            GOSUB GET.OS.DETAILS
+            GOSUB GET.OR.DETAILS
+        END
+
+    REPEAT
+
+    RETURN
+
+***************
+GET.BILL.DETAILS:
+***************
+
+    R.BILL.DETAILS = ""
+
+    IF BILL.REFERENCE THEN
+        CALL AA.GET.BILL.DETAILS(ARR.ID, BILL.REFERENCE, R.BILL.DETAILS, RET.ERROR)
+        BILL.DATE = R.BILL.DETAILS<AA.BD.PAYMENT.DATE>
+    END
+
+    RETURN
+
+**************
+GET.OS.DETAILS:
+**************
+    PROCESS.TYPE= 'DUE'
+    PAYMENT.TYPE =''
+    EFFECTIVE.DATE =''
+    PROPERTY.AMOUNT=''
+    PROPERTY.AMOUNT.LCY=''
+    ERR.MSG =''
+
+    CALL AA.GET.BILL.PROPERTY.AMOUNT(PROCESS.TYPE, PAYMENT.TYPE, PROPERTY, EFFECTIVE.DATE, R.BILL.DETAILS, PROPERTY.AMOUNT, PROPERTY.AMOUNT.LCY, ERR.MSG)
+
+    OS.AMOUNT = PROPERTY.AMOUNT + OS.AMOUNT
+
+    RETURN
+
+**************
+GET.OR.DETAILS:
+**************
+    PROCESS.TYPE= 'BILL'
+    PAYMENT.TYPE =''
+    EFFECTIVE.DATE =''
+    PROPERTY.AMOUNT=''
+    PROPERTY.AMOUNT.LCY=''
+    ERR.MSG =''
+
+    CALL AA.GET.BILL.PROPERTY.AMOUNT(PROCESS.TYPE, PAYMENT.TYPE, PROPERTY, EFFECTIVE.DATE, R.BILL.DETAILS, PROPERTY.AMOUNT, PROPERTY.AMOUNT.LCY, ERR.MSG)
+
+    OR.AMOUNT = PROPERTY.AMOUNT + OR.AMOUNT
+
+    RETURN
+
+END

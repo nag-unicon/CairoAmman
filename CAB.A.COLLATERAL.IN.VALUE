@@ -1,0 +1,62 @@
+*-----------------------------------------------------------------------------
+* <Rating>-30</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.A.COLLATERAL.IN.VALUE
+*---------------------------------------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.A.COLLATERAL.IN.VALUE
+*---------------------------------------------------------------------------------------------
+*Description       : Auth Routine for core COLATERAL,while authorising it authorizes the
+*                    corresponding COLLATERAL.FIELDS$NAU records.
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2012-01-0004
+*---------------------------------------------------------------------------------------------
+*Modification Details:
+*=====================
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INCLUDE CAB.BP I_F.CAB.FILE.PARAMETER
+    $INCLUDE CAB.BP I_F.COLLATERAL.FIELDS
+
+**********test
+    GOSUB INIT.FILES
+    GOSUB OPEN.FILES
+    GOSUB PROCESS
+
+    RETURN
+
+***********
+INIT.FILES:
+***********
+
+    FN.CAB.FILE = "F.CAB.FILE.PARAMETER"
+    F.CAB.FILE = ""
+
+    RETURN
+
+***********
+OPEN.FILES:
+***********
+
+    CALL OPF(FN.CAB.FILE,F.CAB.FILE)
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    CALL F.READ(FN.CAB.FILE,"LI6DATAS",R.CAB.FILE,F.CAB.FILE,CAB.FILE.ERR)
+    IF R.CAB.FILE THEN
+        Y.OFS.SOURCE.ID = R.CAB.FILE<CAB.FIL.OFS.SOURCE>
+        Y.AUTH.DATA = 'COLLATERAL.FIELDS,/A/PROCESS,,':ID.NEW
+        CALL OFS.POST.MESSAGE(Y.AUTH.DATA,'',Y.OFS.SOURCE.ID,OPERATOR)
+    END
+
+    RETURN
+
+END

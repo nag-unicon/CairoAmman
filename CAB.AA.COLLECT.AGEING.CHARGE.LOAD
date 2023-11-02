@@ -1,0 +1,60 @@
+    SUBROUTINE CAB.AA.COLLECT.AGEING.CHARGE.LOAD
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 29th Dec 2016
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Load routine
+* Attached to      : BNK/CAB.AA.COLLECT.AGEING.CHARGE
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : Load Routine to initialise and Open the variables to Collect the AGEINGFEE
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT TT.BP I_CAB.AA.COLLECT.AGEING.CHARGE.COMMON
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB OPEN.FILES
+
+    RETURN
+
+*** </region>
+*** <region name= Main Body>
+
+OPEN.FILES:
+
+    FN.AA.ACCOUNT.DETAILS = "F.AA.ACCOUNT.DETAILS"
+    F.AA.ACCOUNT.DETAILS = ""
+    CALL OPF(FN.AA.ACCOUNT.DETAILS, F.AA.ACCOUNT.DETAILS)
+
+    FN.CAB.AA.AGEING.BILL = "F.CAB.AA.AGEING.BILL"
+    F.CAB.AA.AGEING.BILL = ""
+    CALL OPF(FN.CAB.AA.AGEING.BILL, F.CAB.AA.AGEING.BILL)
+
+    FN.AA.ARRANGEMENT.ACTIVITY = "F.AA.ARRANGEMENT.ACTIVITY"
+    F.AA.ARRANGEMENT.ACTIVITY = ""
+    CALL OPF(FN.AA.ARRANGEMENT.ACTIVITY, F.AA.ARRANGEMENT.ACTIVITY)
+
+
+    RETURN
+
+END

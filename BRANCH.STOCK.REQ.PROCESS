@@ -1,0 +1,76 @@
+*-----------------------------------------------------------------------------
+* <Rating>-30</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE BRANCH.STOCK.REQ.PROCESS
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : BRANCH.STOCK.REQ.PROCESS
+*---------------------------------------------------------------
+*Description       :
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0067
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.BRANCH.STOCK.REQ
+
+    IF PGM.VERSION NE ",REJ.STOCK" THEN
+        IF R.NEW(BR.STO.CURR.NO) EQ "" THEN
+            GOSUB INIT.FILES
+            GOSUB OPEN.FILES
+            GOSUB PROCESS
+        END
+    END
+
+    RETURN
+
+***********
+INIT.FILES:
+***********
+
+    FN.SL = "&SAVEDLISTS&"
+    F.SL = ""
+
+    RETURN
+
+***********
+OPEN.FILES:
+***********
+
+    CALL OPF(FN.SL,F.SL)
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    DT.VAL = TODAY
+    CALL JULDATE(DT.VAL,JULL.VAL)
+    CALL F.READ(FN.SL,"DD.CHQ.LIST",R.SL,F.SL,SL.ERR)
+    IF R.SL THEN
+        IF R.SL<1> EQ TODAY THEN
+            R.SL<2> = R.SL<2> + 1
+            R.SL<2> = FMT(R.SL<2>,"R%4")
+        END ELSE
+            R.SL<1> = TODAY
+            R.SL<2> = 1
+        END
+    END ELSE
+        R.SL<1> = TODAY
+        R.SL<2> = 1
+    END
+    Y.SEQ.NO = FMT(R.SL<2>,"R%4")
+    R.SL<2> = FMT(R.SL<2>,"R%4")
+    R.NEW(BR.STO.REFERENCE) = ID.COMPANY[LEN(ID.COMPANY)-3,LEN(ID.COMPANY)]:".":JULL.VAL:".":Y.SEQ.NO
+    CALL F.WRITE(FN.SL,"DD.CHQ.LIST",R.SL)
+
+    RETURN
+
+END

@@ -1,0 +1,48 @@
+* Developed by AGryaznov@Temenos.com
+* 15/Feb/2012 - Initial Creation
+
+    SUBROUTINE B.CAB.BATCH.ACCTS.SELECT
+
+************************************************************************
+* The algorithm for this COB routine is the following:
+* - Pick the accounts defined in CAB.EBI.MNSTR.ACCOUNTS
+* - Read the file ACCT.ENT.LWORK.DAY with @ID as the account
+* - Loop in the stmt.entry ids mentioned in the record of acct.ent.lwork.day
+* - Pick the details and create Ministry Finance Transaction Report
+*   as a flat file in the folder EBI/MNSTR.TMP
+* It is designed for the External Batch Interface (project CAB)
+*
+*                  ---- MODIFICATIONS ---------
+*
+************************************************************************
+
+$INSERT I_COMMON
+$INSERT I_EQUATE
+$INSERT I_B.CAB.BATCH.ACCTS
+
+    GOSUB PROCESS
+
+    RETURN
+
+************************************************************************
+
+PROCESS:
+
+    SEL.LIST = ''
+    SEL.ERR = ''
+    LOOP
+       REMOVE Y.ACCT FROM Y.ACCT.LIST SETTING LOC.L.MARK
+    WHILE Y.ACCT : LOC.L.MARK
+       R.ACCT.ENT.LWORK.DAY = ''
+       CALL F.READ(FN.ACCT.ENT.LWORK.DAY,Y.ACCT,R.ACCT.ENT.LWORK.DAY,F.ACCT.ENT.LWORK.DAY,ACCT.ENT.LWORK.DAY.ERR)
+       IF R.ACCT.ENT.LWORK.DAY THEN SEL.LIST<-1> = R.ACCT.ENT.LWORK.DAY
+    REPEAT
+    CONVERT VM TO FM IN SEL.LIST
+
+    CALL BATCH.BUILD.LIST('',SEL.LIST)
+
+    RETURN
+
+************************************************************************
+
+END

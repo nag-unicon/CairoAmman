@@ -1,0 +1,92 @@
+    SUBROUTINE CAB.AA.CLOSE.EXPIRED(ARR.ID)
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 07th Nov 2016
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Select routine
+* Attached to      : BNK/CAB.AA.CLOSE.EXPIRED
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : Routine to trigger the LENDING-EVALUATE-CLOSURE activity for the expired loans.
+*                    CAB failed to setup the Payment Schedule Product conditions with ON.ACTIVITY with LENDING-APPLYPAYMENT-PR.PAYOFF.
+*                    Due to this system failed to trigger this LENDING-EVALUATE-CLOSURE activity by default.
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.AA.ARRANGEMENT
+    $INSERT I_F.AA.ARRANGEMENT.ACTIVITY
+    $INSERT TT.BP I_CAB.AA.CLOSE.EXPIRED.COMMON
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB PROCESS
+
+    RETURN
+
+*** </region>
+*** <region name= Select Statment>
+
+PROCESS:
+
+    CALL AA.GET.ARRANGEMENT(ARR.ID, R.ARRANGEMENT, RET.ERROR)
+    SAVE.ID.COMPANY = ID.COMPANY
+    ID.COMPANY = R.ARRANGEMENT<AA.ARR.CO.CODE>
+    ACCOUNT.ID = R.ARRANGEMENT<AA.ARR.LINKED.APPL.ID,1>
+
+    GOSUB PROCESS.EXPIRED.ARRANGEMENT
+    GOSUB BUILD.OFS.RECORD
+
+    ID.COMPANY = SAVE.ID.COMPANY
+
+    RETURN
+*** </region>
+
+PROCESS.EXPIRED.ARRANGEMENT:
+
+    R.AA.ARRANGEMENT.ACTIVITY = ""
+    APP.NAME = "AA.ARRANGEMENT.ACTIVITY"
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ACTIVITY>    = "LENDING-EVALUATE-CLOSURE"
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ARRANGEMENT> = ARR.ID
+
+    TRANSACTION.ID = ""
+    R.PROCESS.RECORD = R.AA.ARRANGEMENT.ACTIVITY
+
+    RETURN
+
+BUILD.OFS.RECORD:
+
+    OFS.RECORD = ''
+    OFSVERSION = APP.NAME:","
+    NO.OF.AUTH = "0"
+    FUNCT = "I"
+    GTS.MODE = 1
+
+    CALL OFS.BUILD.RECORD(APP.NAME, FUNCT, "PROCESS", OFSVERSION, GTS.MODE, NO.OF.AUTH, TRANSACTION.ID, R.PROCESS.RECORD, OFS.RECORD)
+
+    theResponse    = ""
+    txnCommitted   = ""
+    options        = ""
+    options<1>     = "AA.CLOSE"
+    options<4>     = "HLD"
+
+    CALL OFS.CALL.BULK.MANAGER(options,OFS.RECORD,theResponse,txnCommitted)
+
+    RETURN
+END

@@ -1,0 +1,41 @@
+*-----------------------------------------------------------------------------
+* <Rating>-10</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.A.STOCK.ENT.UPD
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.A.STOCK.ENT.UPD
+*---------------------------------------------------------------
+*Description       :
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0067
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.STOCK.ENTRY
+
+    IF V$FUNCTION EQ "I" OR V$FUNCTION EQ "A" THEN
+        LOCAL.APPLICATION = 'STOCK.ENTRY'
+        LOCAL.FIELD = 'L.STATUS':VM:'VERSION.NAME'
+        LOCAL.POS = ''
+        CALL MULTI.GET.LOC.REF(LOCAL.APPLICATION,LOCAL.FIELD,LOCAL.POS)
+        L.STATUS.POS = LOCAL.POS<1,1>
+        VER.POS = LOCAL.POS<1,2>
+        IF R.NEW(STO.ENT.LOCAL.REF)<1,VER.POS> EQ ",DD.MC.REGISTRY" THEN
+            R.NEW(STO.ENT.LOCAL.REF)<1,L.STATUS.POS> = "READY TO ISSUE"
+            RETURN
+        END
+        IF R.NEW(STO.ENT.LOCAL.REF)<1,VER.POS> EQ ",DEL.STOCK" THEN
+            R.NEW(STO.ENT.LOCAL.REF)<1,L.STATUS.POS> = "STOCK DELIVERED"
+            RETURN
+        END 
+    END
+
+    RETURN
+END

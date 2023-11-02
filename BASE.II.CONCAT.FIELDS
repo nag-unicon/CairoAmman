@@ -1,0 +1,75 @@
+*-----------------------------------------------------------------------------
+* <Rating>-12</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE BASE.II.CONCAT.FIELDS
+*-----------------------------------------------------------------------------
+
+*** <region name= Header>
+*** <desc>Inserts and control logic</desc>
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_DataTypes
+*** </region>
+*-----------------------------------------------------------------------------
+*    dataType<2> = "60.1"
+    dataType<3> = "ANY"
+    CALL Table.defineId("AT.BASE.ID",dataType)    ;* Define Table id
+*-----------------------------------------------------------------------------
+
+    CALL Table.addFieldDefinition("DEST.MAILBOX","1","A","")
+    CALL Table.addFieldDefinition("SRC.IMD" ,"6","A","")
+    CALL Table.addFieldDefinition("SRC.COUNTRY.CODE","3","A","")
+    CALL Table.addFieldDefinition("SRC.BRANCH.CODE","4","A","")
+    CALL Table.addFieldDefinition("DEVICE.ID","4","A","")
+    CALL Table.addFieldDefinition("TRANS.SEQ.NO","4","A","")
+    CALL Table.addFieldDefinition("MESSAGE.TYPE","1","A","")
+    CALL Table.addFieldDefinition("TRANS.TYPE","2","A","")
+    CALL Table.addFieldDefinition("FORCE.POST","1","A","")
+    CALL Table.addFieldDefinition("TXN.DATE","6","A","")
+    CALL Table.addFieldDefinition("TXN.TIME","6","A","")
+    CALL Table.addFieldDefinition("SRC.MAILBOX","1","A","")
+    CALL Table.addFieldDefinition("DEST.COUNTRY.CODE","3","A","")
+    CALL Table.addFieldDefinition("DEST.IMD","6","A","")
+    CALL Table.addFieldDefinition("DEST.BRANCH.CODE","4","A","")
+    CALL Table.addFieldDefinition("CARD.NUMBER","13","A","")
+    CALL Table.addFieldDefinition("CARD.SEQ.NO","1","A","")
+    CALL Table.addFieldDefinition("AUTH.FLAG","1","A","")
+    CALL Table.addFieldDefinition("SRC.ACCOUNT","13","A","")
+    CALL Table.addFieldDefinition("SRC.ACCOUNT.DESC","2","A","")
+    CALL Table.addFieldDefinition("SRC.ACCOUNT.CCY","3","A","")
+    CALL Table.addFieldDefinition("AMOUNT1","15","A","")
+    CALL Table.addFieldDefinition("AMOUNT2","15","A","")
+    CALL Table.addFieldDefinition("DEST.CURRENCY","3","A","")
+    CALL Table.addFieldDefinition("DEST.ACCOUNT.NUM","20","A","")
+    CALL Table.addFieldDefinition("DEST.ACCOUNT.DESC","2","A","")
+    CALL Table.addFieldDefinition("SUB.INDEX","1","A","")
+    CALL Table.addFieldDefinition("ACTION.CODE","1","A","")
+    CALL Table.addFieldDefinition("LOCAL.CCY.CODE","3","A","")
+    CALL Table.addFieldDefinition("AMOUNT3","15","A","")
+    CALL Table.addFieldDefinition("AMOUNT4","15","A","")
+    CALL Table.addFieldDefinition("VAR.DATA.TYPE","1","A","")
+    CALL Table.addFieldDefinition("IOS.EXT.VERSN","1","A","")
+    CALL Table.addFieldDefinition("EXT.NETWORK.IDENT","3","A","")
+    CALL Table.addFieldDefinition("AUTH.CODE","6","A","")
+    CALL Table.addFieldDefinition("ACQ.INST.ID.CODE","11","A","")
+    CALL Table.addFieldDefinition("FWD.INST.ID.CODE","11","A","")
+    CALL Table.addFieldDefinition("MER.CATEG.CODE","4","A","")
+    CALL Table.addFieldDefinition("CARD.ACCEPT.TEM.ID","16","A","")
+    CALL Table.addFieldDefinition("CARD.ACCEPT.ID","15","A","")
+    CALL Table.addFieldDefinition("CARD.ACCEPT.NAME","40","A","")
+    CALL Table.addFieldDefinition("BILLING.CCY.CODE","3","A","")
+    CALL Table.addFieldDefinition("BILL.TRANS.AMT","15","A","")
+    CALL Table.addFieldDefinition("BILL.CONV.RATE","8","A","")
+    CALL Table.addFieldDefinition("BILL.CASHBACK.AMT","15","A","")
+    CALL Table.addFieldDefinition("DEV.CASHBACK.AMT","15","A","")
+    CALL Table.addFieldDefinition("ACCT.CASHBACK.AMT","15","A","")
+    CALL Table.addFieldDefinition("SETTL.CCY","3","A","")
+    CALL Table.addFieldDefinition("SETTL.AMOUNT","15","A","")
+    CALL Table.addFieldDefinition("SETTL.CONV.RATE","8","A","")
+    CALL Table.addFieldDefinition("ACTUAL.BALANCE","15","A","")
+    CALL Table.addFieldDefinition("AVAILABLE.BALANCE","15","A","")
+    CALL Table.addFieldDefinition("RETREIVAL.REF.NUM","12","A","")
+    CALL Table.addFieldDefinition("STAN","6","A","")
+    CALL Table.setAuditPosition
+    RETURN
+END

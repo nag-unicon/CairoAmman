@@ -1,0 +1,68 @@
+    SUBROUTINE CAB.AA.CHANGE.INTEREST.PARAM.FIELDS
+*-----------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthu
+* Development Id   :
+* Date             : 01st May 2019
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Template Routine
+* Attached to      : CAB.AA.CHANGE.INTEREST.PARAM
+*
+* Attached As      : Template Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : Parameter to define the PRODUCT.GROUP which will be used to extract change interest loan details.
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : N/A
+* ARGS -(Output)   : N/A
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+*----------------------------------------------------------------------------------------------
+*** <region name = Inserts>
+*** <desc> File inserts and common variables in the subroutine </desc>
+*-----------------------------------------------------------------------------
+* Modification History :
+*
+*** <desc>Inserts and control logic</desc>
+
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT T24.BP I_DataTypes
+
+*** </region>
+*-----------------------------------------------------------------------------
+    CALL Table.defineId("INTEREST.PARAM",T24_String)          ;* Define Table id
+    ID.N = "17" ;  ID.T=''  ; ID.T<2> = "SYSTEM"
+*-----------------------------------------------------------------------------
+
+    neighbour =''
+    fieldName = 'XX<DESCRIPTION' ; fieldLength = '35' ; fieldType = 'A'
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    neighbour =''
+    fieldName = 'XX-PRODUCT.GROUP' ; fieldType = 'A' ; fieldLength = '35' ;
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("AA.PRODUCT.GROUP")   ;* Use DEFAULT.ENRICH from SS or just field 1
+
+    fieldName = 'XX>PRODUCT'
+    fieldLength = '35'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("AA.PRODUCT")         ;* Use DEFAULT.ENRICH from SS or just field 1
+
+    CALL Table.addReservedField("RESERVED.3")
+    CALL Table.addReservedField("RESERVED.2")
+    CALL Table.addReservedField("RESERVED.1")
+*
+    CALL Table.addLocalReferenceField(XX.LOCAL.REF)
+    CALL Table.addOverrideField
+*-------------------------------------------------------------------
+    CALL Table.setAuditPosition         ;* Poputale audit informatio
+*-------------------------------------------------------------------
+    RETURN
+END

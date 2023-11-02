@@ -1,0 +1,427 @@
+    SUBROUTINE CAB.AA.COLLECT.AGEING.CHARGE(ARR.ID)
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 07th Nov 2016
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Service routine
+* Attached to      : BNK/CAB.AA.COLLECT.AGEING.CHARGE
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Routine used to trigger the Named Activity to collect the Overdue Payment (AGEINGFEE) those
+*                    bills are directly moved to NAB during loan suspension.
+
+*                  : Purpose of this routine is used to collect AGEINGFEE (10 JOD as per current setup) for the overdue bills.
+*                    Here after this service will take care to collect the AGEINGFEE.
+
+*                    1. System will remove the activity LENDING-AGE-OVERDUE*GRC from the arrangement activity charge record if exists.
+*                    2. System will update the new activity LENDING-COLLECT-AGEINGFEE in the arrangement activity charge record if not exists.
+*                    3. Get all the AGEING bills for the arrangement and check whether system has triggered the LENDING-ISSUEBILL-AGEINGFEE for each bill.
+*                       Trigger the LENDING-COLLECT-AGEINGFEE activity to get AGEINGFEE bill and update the concat table to understand the system stating that
+*                       ageingfee triggerd this is particular bill.
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.AA.ARRANGEMENT
+    $INSERT I_F.AA.ACCOUNT
+    $INSERT I_F.AA.ACCOUNT.DETAILS
+    $INSERT I_F.AA.BILL.DETAILS
+    $INSERT I_F.AA.ARRANGEMENT.ACTIVITY
+    $INSERT I_F.AA.ACTIVITY.CHARGES
+    $INSERT I_F.AA.CHARGE
+    $INSERT TT.BP I_F.CAB.AA.AGEING.BILL
+    $INSERT TT.BP I_CAB.AA.COLLECT.AGEING.CHARGE.COMMON
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB GET.ACTIVITY.CHARGES.RECORD
+    GOSUB GET.ARRANGEMENT
+    GOSUB GET.AA.ACCOUNT.DETAILS
+    GOSUB GET.AGEING.BILLS
+    GOSUB PROCESS.AGEING.BILLS
+
+    RETURN
+
+*** </region>
+*** <region name= Get Arrangement Record>
+
+GET.ARRANGEMENT:
+
+    R.ARRANGEMENT =''
+    CALL AA.GET.ARRANGEMENT(ARR.ID,R.ARRANGEMENT,"")
+
+    IF R.ARRANGEMENT<AA.ARR.PRODUCT.LINE> EQ "LENDING" THEN
+        IF R.ARRANGEMENT<AA.ARR.ARR.STATUS> EQ "CURRENT" OR R.ARRANGEMENT<AA.ARR.ARR.STATUS> EQ "EXPIRED" THEN
+            ARR.COMPANY = R.ARRANGEMENT<AA.ARR.CO.CODE>
+            ARRANGEMENT.PROPERTIES = R.ARRANGEMENT<AA.ARR.PROPERTY>
+
+            CHANGE SM TO FM IN ARRANGEMENT.PROPERTIES
+            LOCATE "AGEINGFEE" IN ARRANGEMENT.PROPERTIES SETTING PROP.POS ELSE
+                GOSUB PROGRAM.END
+            END
+        END ELSE
+            GOSUB PROGRAM.END
+        END
+    END ELSE
+        GOSUB PROGRAM.END
+    END
+
+    RETURN
+
+*** </region>
+*** <region name= Get the Customer Accounts from CUSTOMER.ACCOUNT file>
+
+GET.AA.ACCOUNT.DETAILS:
+
+    PROCESS.TYPE = 'INITIALISE'
+    R.AA.ACCOUNT.DETAILS = ''
+
+    CALL AA.PROCESS.ACCOUNT.DETAILS(ARR.ID, PROCESS.TYPE, UPDATE.TYPE, R.AA.ACCOUNT.DETAILS, RET.ERROR)
+
+    RETURN
+
+*** </region>
+*** <region name= Get all the Ageing payment bills for the arrangement>
+
+GET.AGEING.BILLS:
+
+    LAST.PAYMENT.DATE = ""
+    BILL.CREATE.DATE = ""
+    BILL.REFERENCES = ""
+    BILL.STATUS = "DUE":VM:"AGING"
+    BILL.TYPE = "PAYMENT"
+    CALL AA.GET.BILL(ARR.ID, "", LAST.PAYMENT.DATE, BILL.CREATE.DATE, BILL.TYPE, "", BILL.STATUS, "", "", "", "", BILL.REFERENCES, RET.ERROR)
+
+    RETURN
+
+*** </region>
+
+PROCESS.AGEING.BILLS:
+
+    UnPaidBillsCount = DCOUNT(BILL.REFERENCES, VM)
+    ACTIVITY.EXISTS = 0
+    BillCount = 1
+
+    LOOP
+    WHILE BillCount LE UnPaidBillsCount
+        BILL.ID = BILL.REFERENCES<1,BillCount>
+
+        GOSUB GET.BILL.DETAILS
+        GOSUB GET.CAB.AA.AGEING.BILL.RECORD
+        PROCESS.FLAG = 1
+        IF R.CAB.AA.AGEING.BILL AND R.CAB.AA.AGEING.BILL<CAB.AGE.ARRANGEMENT.ID> EQ ARR.ID THEN     ;* Dont Collect the Activity charge for this bill since we have already collected through R.CAB.AA.AGEING.BILL<CAB.AGE.AGING.REF>
+
+        END ELSE
+
+            GOSUB CHECK.AGEINGFEE.COLLECTED
+
+            IF NOT(AGEINGFEE.COLLECTED) AND BILL.DETAILS<AA.BD.ACTUAL.PAY.DATE> THEN
+                BILL.PAYMENT.DATE = BILL.DETAILS<AA.BD.ACTUAL.PAY.DATE>
+                GOSUB GET.NO.OF.DAYS
+
+                IF DEFAULTS.DAYS GT '10' THEN
+                    GOSUB CHECK.ACTIVITY.ALREADY.EXISTS
+                    IF R.ARRANGEMENT<AA.ARR.PRODUCT> EQ "PERSONAL.DEDUC.PERIOD" THEN
+                        IF OS.BILL.AMOUNT LE 5 THEN
+                            PROCESS.FLAG = 0
+                        END
+                    END
+                    IF PROCESS.FLAG THEN
+                        R.AA.ARRANGEMENT.ACTIVITY = ""
+                        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ARRANGEMENT> = ARR.ID
+                        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ACTIVITY> = "LENDING-COLLECT-AGEINGFEE"
+                        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.EFFECTIVE.DATE> = TODAY
+
+                        GOSUB PROCESS.OFS.MESSAGE
+                        IF theResponse THEN
+                            GOSUB UPDATE.COLLECTED.CHARGE.BILL
+                        END
+                    END
+
+                END
+            END
+        END
+
+        BillCount + = 1
+    REPEAT
+
+    RETURN
+
+GET.BILL.DETAILS:
+
+    BILL.DETAILS = ""
+    RET.ERROR = ""
+    CALL AA.GET.BILL.DETAILS(ARR.ID, BILL.ID, BILL.DETAILS, RET.ERROR)
+
+    AGEING.STATUS  = BILL.DETAILS<AA.BD.AGING.STATUS>
+    OS.BILL.AMOUNT = BILL.DETAILS<AA.BD.OS.TOTAL.AMOUNT>
+
+    RETURN
+
+GET.CAB.AA.AGEING.BILL.RECORD:
+
+    R.CAB.AA.AGEING.BILL = ""
+    ERR.CAB.AA.AGEING.BILL = ""
+    CALL F.READ(FN.CAB.AA.AGEING.BILL, BILL.ID, R.CAB.AA.AGEING.BILL, F.CAB.AA.AGEING.BILL, ERR.CAB.AA.AGEING.BILL)
+
+    RETURN
+
+READ.AA.ARRANGEMENT.ACTIVITY.RECORD:
+
+    R.AA.ARRANGEMENT.ACTIVITY = ""
+    ERR.AA.ARRANGEMENT.ACTIVITY = ""
+
+    CALL F.READ(FN.AA.ARRANGEMENT.ACTIVITY, AGEING.AAA.ID, R.AA.ARRANGEMENT.ACTIVITY,F.AA.ARRANGEMENT.ACTIVITY, ERR.AA.ARRANGEMENT.ACTIVITY)
+
+    RETURN
+
+CHECK.AGEINGFEE.COLLECTED:
+
+    AGEINGFEE.COLLECTED = 0
+    AGEING.REF = BILL.DETAILS<AA.BD.AGING.REF>
+    CHANGE VM TO FM IN AGEING.REF
+
+    TOTAL.AGEING.REF =  DCOUNT(AGEING.REF, FM)
+
+    FOR AGEING.REF.CNT = 1 TO TOTAL.AGEING.REF
+
+        AGEING.AAA.ID = AGEING.REF<AGEING.REF.CNT>
+
+        GOSUB READ.AA.ARRANGEMENT.ACTIVITY.RECORD
+        IF R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ACTIVITY> EQ "LENDING-AGE-OVERDUE*GRC" THEN
+            AGEING.AAA.ID = R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.CHILD.ACTIVITY>
+            GOSUB READ.AA.ARRANGEMENT.ACTIVITY.RECORD
+
+            IF R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ACTIVITY> EQ "LENDING-ISSUEBILL-AGEINGFEE" THEN
+                AGEINGFEE.COLLECTED = 1
+                AGEING.REF.CNT = TOTAL.AGEING.REF
+            END
+
+        END
+
+    NEXT AGEING.REF.CNT
+
+    RETURN
+
+GET.NO.OF.DAYS:
+
+    DEFAULTS.DAYS = 'C'
+    REPORT.RUN.DATE = TODAY
+    CALL CDD('',BILL.PAYMENT.DATE,REPORT.RUN.DATE,DEFAULTS.DAYS)
+
+    RETURN
+
+CHECK.ACTIVITY.ALREADY.EXISTS:
+
+    IF NOT(ACTIVITY.EXISTS) THEN
+
+
+        ACTIVITY.LIST = R.AA.ACTIVITY.CHARGES<AA.ACT.CHG.ACTIVITY.ID>
+        AGEING.FEE.ACTIVITY = "LENDING-COLLECT-AGEINGFEE"
+
+        ACTIVITY.EXISTS = 1
+        theResponse = ""
+        TOTAL.ACTIVITY.CNT = DCOUNT(ACTIVITY.LIST, VM)
+        LOCATE AGEING.FEE.ACTIVITY IN ACTIVITY.LIST<1,1> SETTING ACT.POS THEN
+
+            LOCATE "LENDING-AGE-OVERDUE*GRC" IN ACTIVITY.LIST<1,1> SETTING GRC.POS THEN
+                IF R.AA.ACTIVITY.CHARGES<AA.ACT.CHG.CHARGE,GRC.POS,1> EQ "AGEINGFEE" THEN
+                    GOSUB FORM.ARRANGEMENT.ACTIVITY
+                    GOSUB UPDATE.EXISTING.ACTIVITY.CHARGE
+                    GOSUB UPDATE.SETTLE.ACTIVITY
+                    GOSUB PROCESS.OFS.MESSAGE
+                END
+            END
+
+        END ELSE
+            GOSUB FORM.ARRANGEMENT.ACTIVITY
+            GOSUB UPDATE.EXISTING.ACTIVITY.CHARGE
+            GOSUB UPDATE.AGEINGFEE.ACTIVITY
+            GOSUB UPDATE.SETTLE.ACTIVITY
+            GOSUB PROCESS.OFS.MESSAGE
+        END
+
+        IF theResponse AND NOT(ERR.ID.DETAILS) THEN
+            ACTIVITY.EXISTS = 1
+        END
+    END
+
+    RETURN
+
+FORM.ARRANGEMENT.ACTIVITY:
+
+    R.AA.ARRANGEMENT.ACTIVITY = ""
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ARRANGEMENT>    = ARR.ID
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ACTIVITY>       = "LENDING-UPDATE-ACTIVITY.CHARGES"
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.EFFECTIVE.DATE> = TODAY
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.PROPERTY,1>     = "ACTIVITY.CHARGES"
+    FIELD.CNT = 0
+
+    RETURN
+
+UPDATE.EXISTING.ACTIVITY.CHARGE:
+
+    ACTIVITY.COUNT = 0
+    FOR ACT.CNT = 1 TO TOTAL.ACTIVITY.CNT
+
+        IF ACTIVITY.LIST<1,ACT.CNT> EQ "LENDING-AGE-OVERDUE*GRC" AND R.AA.ACTIVITY.CHARGES<AA.ACT.CHG.CHARGE,ACT.CNT,1> EQ "AGEINGFEE" ELSE
+            FIELD.CNT + = 1
+            ACTIVITY.COUNT + = 1
+            R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,FIELD.CNT> = 'ACTIVITY.ID:':ACTIVITY.COUNT:':1'
+            R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,FIELD.CNT> = ACTIVITY.LIST<1,ACT.CNT>
+
+            FIELD.CNT + = 1
+            R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,FIELD.CNT> = 'CHARGE:':ACTIVITY.COUNT:':1'
+            R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,FIELD.CNT> = R.AA.ACTIVITY.CHARGES<AA.ACT.CHG.CHARGE,ACT.CNT,1>
+
+            FIELD.CNT + = 1
+            R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,FIELD.CNT> = 'APP.METHOD:':ACTIVITY.COUNT:':1'
+            R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,FIELD.CNT> = R.AA.ACTIVITY.CHARGES<AA.ACT.CHG.APP.METHOD,ACT.CNT,1>
+
+        END
+
+    NEXT ACT.CNT
+
+    RETURN
+
+UPDATE.AGEINGFEE.ACTIVITY:
+
+    ACTIVITY.COUNT + = 1
+    FIELD.CNT + =1
+
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,FIELD.CNT> = 'ACTIVITY.ID:':ACTIVITY.COUNT:':1'
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,FIELD.CNT> = AGEING.FEE.ACTIVITY
+
+    FIELD.CNT + = 1
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,FIELD.CNT> = 'CHARGE:':ACTIVITY.COUNT:':1'
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,FIELD.CNT> = "AGEINGFEE"
+
+    FIELD.CNT+=1
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,FIELD.CNT> = 'APP.METHOD:':ACTIVITY.COUNT:':1'
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,FIELD.CNT> = "DUE"
+
+    RETURN
+
+UPDATE.SETTLE.ACTIVITY:
+
+    IF R.AA.ACTIVITY.CHARGES<AA.ACT.CHG.SETTLE.ACTIVITY> THEN
+        FIELD.CNT+=1
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,FIELD.CNT>   = 'SETTLE.ACTIVITY:1:1'
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,FIELD.CNT>  =  R.AA.ACTIVITY.CHARGES<AA.ACT.CHG.SETTLE.ACTIVITY>
+    END
+
+    RETURN
+
+GET.ACTIVITY.CHARGES.RECORD:
+
+    idPropertyClass = "ACTIVITY.CHARGES"
+    idProperty = ""
+    GOSUB GET.ARRANGEMENT.CONDITIONS
+    R.AA.ACTIVITY.CHARGES = RAISE(CONDITION.RECORD)
+
+    IF NOT(R.AA.ACTIVITY.CHARGES) THEN
+        GOSUB PROGRAM.END
+    END
+
+* Validate an Arrangement has defined with AGEINGFEE Amount
+    idPropertyClass = "CHARGE"
+    idProperty = "AGEINGFEE"
+    GOSUB GET.ARRANGEMENT.CONDITIONS
+    R.AA.CHARGE = RAISE(CONDITION.RECORD)
+
+    IF NOT(R.AA.CHARGE) THEN
+        GOSUB PROGRAM.END
+    END ELSE
+        IF R.AA.CHARGE<AA.CHG.FIXED.AMOUNT> GT 0 ELSE
+            GOSUB PROGRAM.END
+        END
+    END
+
+* Validate an Arrangement is Legal
+
+    idPropertyClass = "ACCOUNT"
+    idProperty = ""
+    GOSUB GET.ARRANGEMENT.CONDITIONS
+    R.AA.ACCOUNT = RAISE(CONDITION.RECORD)
+
+    IF R.AA.ACCOUNT<AA.AC.CATEGORY> EQ "1053" THEN
+        GOSUB PROGRAM.END
+    END
+
+    RETURN
+
+GET.ARRANGEMENT.CONDITIONS:
+
+    effectiveDate = TODAY
+    returnIds = ""
+    CONDITION.RECORD = ""
+    CALL AA.GET.ARRANGEMENT.CONDITIONS(ARR.ID, idPropertyClass, idProperty, effectiveDate, returnIds, CONDITION.RECORD, returnError)
+
+    RETURN
+
+PROCESS.OFS.MESSAGE:
+
+    APP.NAME = "AA.ARRANGEMENT.ACTIVITY"
+    OFS.RECORD = ''
+    OFSVERSION = APP.NAME:","
+    NO.OF.AUTH = "0"
+    GTS.MODE = 1
+    TRANSACTION.ID = ""
+    FUNCT = "I"
+    SAVE.APPLICATION = APPLICATION
+
+    CALL AA.GET.ARRANGEMENT.ACTIVITY.ID("TRANS", TRANSACTION.ID)
+    APPLICATION = SAVE.APPLICATION
+
+    IF ARR.COMPANY THEN
+
+        SAVE.ID.COMPANY = ID.COMPANY
+        ID.COMPANY = ARR.COMPANY
+
+        CALL OFS.BUILD.RECORD(APP.NAME, FUNCT, "PROCESS", OFSVERSION, GTS.MODE, NO.OF.AUTH, TRANSACTION.ID, R.AA.ARRANGEMENT.ACTIVITY, OFS.RECORD)
+
+        theResponse    = ""
+        txnCommitted   = ""
+        options        = ""
+        options<1>     = "AA.CHARGE"
+        options<4>     = "HLD"
+
+        CALL OFS.CALL.BULK.MANAGER(options,OFS.RECORD,theResponse,txnCommitted)
+        CALL AA.GET.ERROR.DETAILS(theResponse, "OFS", ERROR.SOURCE, ERROR.MESSAGE, ERR.ID.DETAILS)
+
+        ID.COMPANY = SAVE.ID.COMPANY
+    END
+
+    RETURN
+
+UPDATE.COLLECTED.CHARGE.BILL:
+
+    IF NOT(ERR.ID.DETAILS) THEN
+        R.CAB.AA.AGEING.BILL<CAB.AGE.ARRANGEMENT.ID> = ARR.ID
+        R.CAB.AA.AGEING.BILL<CAB.AGE.AGING.REF>      = TRANSACTION.ID
+        R.CAB.AA.AGEING.BILL<CAB.AGE.ACTIVITY.DATE>  = TODAY
+        CALL F.WRITE(FN.CAB.AA.AGEING.BILL, BILL.ID, R.CAB.AA.AGEING.BILL)
+    END
+
+    RETURN
+
+PROGRAM.END:
+
+    RETURN TO PROGRAM.END
+
+END

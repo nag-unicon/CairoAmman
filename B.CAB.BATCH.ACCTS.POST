@@ -1,0 +1,67 @@
+* Developed by AGryaznov@Temenos.com
+* 15/Feb/2012 - Initial Creation
+
+    SUBROUTINE B.CAB.BATCH.ACCTS.POST
+
+************************************************************************
+* This COB routine will 
+* - Select the files in folder EBI/MNSTR.TMP
+* - Concatenate all the flat files and produce a single file in the folder
+*   defined in the CAB.EBI.MNSTR.ACCOUNTS record SYSTEM
+* This rtn must be run after program B.CAB.BATCH.ACCTS
+* It is designed for the External Batch Interface (project CAB)
+*
+*                  ---- MODIFICATIONS ---------
+*
+************************************************************************
+
+$INSERT I_COMMON
+$INSERT I_EQUATE
+$INSERT I_F.CAB.EBI.MNSTR.ACCOUNTS
+
+    GOSUB INITIALIZE
+    IF NOT(LOC.OUT.DIR) THEN RETURN
+    GOSUB PROCESS
+
+    RETURN
+
+************************************************************************
+
+PROCESS:
+
+    LOC.TMP.DIR = "EBI/MNSTR.TMP"
+
+    LOC.CAT.CMD = 'SH "cat ./':LOC.TMP.DIR:'/* > ./':LOC.OUT.DIR:'/':TODAY:'"'
+    EXECUTE LOC.CAT.CMD
+    CRT LOC.CAT.CMD
+
+    LOC.DEL.CMD = "CLEAR.FILE ":LOC.TMP.DIR
+    EXECUTE LOC.DEL.CMD
+    CRT LOC.DEL.CMD
+
+    RETURN
+ 
+*************************************************************************
+
+INITIALIZE:
+
+    LOC.OUT.DIR = ''
+
+    *Read parameters
+    OPEN "F.CAB.EBI.MNSTR.ACCOUNTS" TO F.CAB.EBI.MNSTR.ACCOUNTS ELSE
+       PAR.ERROR = "Can not open a file CAB.EBI.MNSTR.ACCOUNTS"
+       RETURN
+    END
+    READ R.CAB.EBI.MNSTR.ACCOUNTS FROM F.CAB.EBI.MNSTR.ACCOUNTS, 'SYSTEM' ELSE
+       CRT "Can not read a record SYSTEM from CAB.EBI.MNSTR.ACCOUNTS"
+       CLOSE F.CAB.EBI.MNSTR.ACCOUNTS
+       RETURN
+    END 
+    LOC.OUT.DIR = R.CAB.EBI.MNSTR.ACCOUNTS<CEMA.PATH>
+    CLOSE F.CAB.EBI.MNSTR.ACCOUNTS
+
+    RETURN
+
+*************************************************************************
+
+END

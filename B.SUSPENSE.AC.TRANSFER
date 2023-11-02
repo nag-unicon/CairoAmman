@@ -1,0 +1,124 @@
+*--------------------------------------------------------------------------------------
+* <Rating>-70</Rating>
+*--------------------------------------------------------------------------------------
+    SUBROUTINE B.SUSPENSE.AC.TRANSFER(AC.ID)
+*--------------------------------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : B.SUSPENSE.AC.TRANSFER
+*--------------------------------------------------------------------------------------
+*Description       : The batch routine is to nullify the suspense account used
+*                    for the currency position transfer from branch to treasury
+*                    automatically during cob after the position transfer done by Gpack.
+*
+*Linked With       : BATCH>XXX/SYSTEM.END.OF.DAY5
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2012-07-0116
+*--------------------------------------------------------------------------------------
+*Modification Details:
+*=====================
+*02-05-2016 - ITSS - ECB Used instead of Account for Working Balance
+*--------------------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.ACCOUNT.CLASS
+    $INSERT I_GTS.COMMON
+    $INSERT I_F.OFS.SOURCE
+    $INSERT BP I_F.POSTFR.PARAMS
+    $INSERT I_B.SUSPENSE.AC.TRANSFER.COMMON
+    $INSERT I_F.EB.CONTRACT.BALANCES
+
+    GOSUB INIT
+    GOSUB PROCESS
+    RETURN
+*--------------------------------------------------------------------------------------
+INIT:
+*----
+    CATEG.DR = ''
+    CATEG.CR = ''
+    DR.ACCT = ''
+    CR.ACCT = ''
+    Y.TR.ACCT = ''
+    R.ACCOUNT.CLASS = ''
+    AC.CL.ERR = ''
+    Y.TR.BRANCH = ''
+    Y.BAL = ''
+    OFS$SOURCE.ID = OFS.SOURCE.ID
+    CALL F.READ(FN.OFS.SOURCE,OFS.SOURCE.ID,R.OFS.SOURCE,F.OFS.SOURCE,OFS.SOURCE.READ.ERR)
+    IF R.OFS.SOURCE THEN
+        OFS$SOURCE.REC = R.OFS.SOURCE
+    END
+
+    RETURN
+*---------------------------------------------------------------------------------------
+PROCESS:
+*-------
+    CALL F.READ(FN.ACCOUNT,AC.ID,R.ACCOUNT,F.ACCOUNT,AC.ERR)
+
+    IF R.ACCOUNT THEN
+        Y.CO.CODE = R.ACCOUNT<AC.CO.CODE>
+        Y.CATEG = R.ACCOUNT<AC.CATEGORY>
+        Y.POST.CCY = R.ACCOUNT<AC.CURRENCY>
+        Y.BAL = R.ACCOUNT<AC.ONLINE.ACTUAL.BAL>     ;* Commented - ITSS
+        Y.BAL.FIR = Y.BAL[1,1]
+        Y.LEN = LEN(Y.BAL)
+
+* ITSS - Working balance taken from ECB
+!!        ECB.ID = AC.ID
+!!        R.EB.CONTRACT.BALANCES = ''
+!!        CALL EB.READ.HVT('EB.CONTRACT.BALANCES',ECB.ID,R.EB.CONTRACT.BALANCES,ERR.ECB)
+!!
+!!        IF R.EB.CONTRACT.BALANCES THEN
+!!            Y.BAL = R.EB.CONTRACT.BALANCES<ECB.WORKING.BALANCE>
+!!            Y.BAL.FIR = Y.BAL[1,1]
+!!            Y.LEN = LEN(Y.BAL)
+!!    END
+* ITSS -End
+
+    END ELSE
+        MESSAGE.INFO<1> = 'B.SUSPENSE.AC.TRANSFER'
+        MESSAGE.INFO<4> = 'Cannot find the ACCOUNT record'
+        CALL FATAL.ERROR(MESSAGE.INFO)
+    END
+    IF Y.BAL NE '' AND Y.BAL NE 0 THEN
+
+        CALL F.READ(FN.POSTFR.PARAMS,Y.CO.CODE,R.POSTFR.PARAMS,F.POSTFR.PARAMS,POST.PARA)
+        IF R.POSTFR.PARAMS THEN
+            Y.TR.BRANCH = R.POSTFR.PARAMS<POSTFR.PARAMS.CONSOL.COMP>
+
+            IF Y.CATEG EQ BR.POS.CR THEN
+                CALL F.READ(FN.ACCOUNT.CLASS,'U-HOPOSDR',R.ACCOUNT.CLASS,F.ACCOUNT.CLASS,AC.CL.ERR)
+                CATEG.TR = R.ACCOUNT.CLASS<AC.CLS.CATEGORY>
+            END ELSE
+                CALL F.READ(FN.ACCOUNT.CLASS,'U-HOPOSCR',R.ACCOUNT.CLASS,F.ACCOUNT.CLASS,AC.CL.ERR)
+                CATEG.TR = R.ACCOUNT.CLASS<AC.CLS.CATEGORY>
+            END
+            IF Y.BAL.FIR EQ '-' THEN
+                Y.TR.ACCT = Y.POST.CCY:CATEG.TR:'0001':Y.TR.BRANCH[6,4]
+                DR.ACCT = Y.TR.ACCT
+                CR.ACCT = AC.ID
+                Y.BAL = Y.BAL[2,Y.LEN]
+            END ELSE
+                Y.TR.ACCT = Y.POST.CCY:CATEG.TR:'0001':Y.TR.BRANCH[6,4]
+                CR.ACCT = Y.TR.ACCT
+                DR.ACCT = AC.ID
+                Y.BAL = Y.BAL
+            END
+
+            Y.FT.OFS.STR = Y.VERSION.ID:"/I/PROCESS,//,,"
+            Y.FT.OFS.STR := "TRANSACTION.TYPE::=AC,"
+            Y.FT.OFS.STR := "DEBIT.ACCT.NO::=":DR.ACCT:","
+            Y.FT.OFS.STR := "DEBIT.CURRENCY::=":Y.POST.CCY:","
+            Y.FT.OFS.STR := "DEBIT.AMOUNT::=":Y.BAL:","
+            Y.FT.OFS.STR := "CREDIT.ACCT.NO::=":CR.ACCT:","
+            Y.FT.OFS.STR := "ORDERING.BANK::=CAB,"
+            CALL OFS.BULK.MANAGER(Y.FT.OFS.STR,OFS.OUT.MSG,'')
+
+        END
+    END
+    RETURN
+*----------------------------------------------------------------------------------------
+END

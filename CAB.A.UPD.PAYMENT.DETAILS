@@ -1,0 +1,115 @@
+*-----------------------------------------------------------------------------
+* <Rating>-60</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.A.UPD.PAYMENT.DETAILS
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.A.UPD.PAYMENT.DETAILS
+*---------------------------------------------------------------
+*Description       : Version Auth routine updates the status back to unpaid once the reveresed
+*                    deal is successfully authorized.
+*Linked With       : TELLER,NON.CUST.CASH.PAYMENT.REVE , FUNDS.TRANSFER,NON.CUST.CASH.PAYMENT.REVE
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0064
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.TELLER
+    $INSERT I_F.FUNDS.TRANSFER
+    $INCLUDE CAB.BP I_F.PAYMENT.DETAILS
+    $INCLUDE CAB.BP I_F.PAYMENT.BATCHES
+    $INCLUDE CAB.BP I_F.CAB.FILE.PARAMETER
+
+    IF V$FUNCTION EQ "A" THEN
+        GOSUB INIT.FILES
+        GOSUB OPEN.FILES
+        GOSUB PROCESS
+    END
+
+    RETURN
+
+***********
+INIT.FILES:
+***********
+
+    FN.PAY.DET = "F.PAYMENT.DETAILS"
+    F.PAY.DET = ""
+    FN.PAY.BAT = "F.PAYMENT.BATCHES"
+    F.PAY.BAT = ""
+    FN.CAB.FILE = "F.CAB.FILE.PARAMETER"
+    F.CAB.FILE = ""
+
+    RETURN
+
+***********
+OPEN.FILES:
+***********
+
+    CALL OPF(FN.PAY.DET,F.PAY.DET)
+    CALL OPF(FN.PAY.BAT,F.PAY.BAT)
+    CALL OPF(FN.CAB.FILE,F.CAB.FILE)
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    LOC.FIELD = "PAY.DET.ID":FM:"PAY.DET.ID"
+    LOCAL.APPLICATION = 'FUNDS.TRANSFER':FM:'TELLER'
+    LOCAL.POS = '' ; PAY1.POS = "" ; PAY2.POS = ""
+    CALL MULTI.GET.LOC.REF(LOCAL.APPLICATION,LOC.FIELD,LOCAL.POS)
+    PAY1.POS = LOCAL.POS<1,1>
+    PAY2.POS = LOCAL.POS<2,1>
+    IF ID.NEW[1,2] EQ "FT" AND R.NEW(FT.RECORD.STATUS) EQ "RNAU" THEN
+        PAY.DET.ID = R.NEW(FT.LOCAL.REF)<1,PAY1.POS>
+        GOSUB UPD.PAY.DET
+    END
+    IF ID.NEW[1,2] EQ "TT" AND R.NEW(TT.TE.RECORD.STATUS) EQ "RNAU" THEN
+        PAY.DET.ID = R.NEW(TT.TE.LOCAL.REF)<1,PAY2.POS>
+        GOSUB UPD.PAY.DET
+    END
+
+    RETURN
+
+************
+UPD.PAY.DET:
+************
+
+    CALL F.READ(FN.PAY.DET,PAY.DET.ID,R.PAY.DET,F.PAY.DET,DET.ERR)
+    IF R.PAY.DET THEN
+        BATCH.CODE = R.PAY.DET<PY.DET.BATCH.CODE>
+        CALL F.READ(FN.PAY.BAT,BATCH.CODE,R.PAY.BAT,F.PAY.BAT,BAT.ERR)
+        IF R.PAY.BAT THEN
+            BATCH.END.DATE = R.PAY.BAT<PAY.BAT.BATCH.END.DATE>
+        END
+    END
+    IF BATCH.END.DATE GT TODAY THEN
+        R.PAY.DET<PY.DET.PAYMENT.STATUS> = "UNPAID"
+    END ELSE
+        ACTION.ON.END.DATE = R.PAY.BAT<PAY.BAT.ACTION.ON.END.DATE>
+        IF ACTION.ON.END.DATE EQ "" THEN
+            R.PAY.DET<PY.DET.PAYMENT.STATUS> = "DORMANT"
+        END
+    END
+    R.PAY.DET<PY.DET.TXN.REF.NO> = ""
+    IF ID.NEW[1,2] EQ "TT" THEN
+        CUST.CHARGE.REF = R.PAY.DET<PY.DET.CUST.CHARGE.REF>
+        R.PAY.DET<PY.DET.CUST.CHARGE.REF> = ""
+        CALL F.READ(FN.CAB.FILE,"PAYMENTS",R.CAB.FILE,F.CAB.FILE,CAB.ERR)
+        IF R.CAB.FILE THEN
+            Y.OFS.SOURCE.ID = R.CAB.FILE<CAB.FIL.OFS.SOURCE>
+            Y.FT.DATA = 'FUNDS.TRANSFER,RET/R/PROCESS,,':CUST.CHARGE.REF
+            CALL OFS.POST.MESSAGE(Y.FT.DATA,'',Y.OFS.SOURCE.ID,OPERATOR)
+        END
+    END
+    CALL F.WRITE(FN.PAY.DET,PAY.DET.ID,R.PAY.DET)
+
+    RETURN
+
+END

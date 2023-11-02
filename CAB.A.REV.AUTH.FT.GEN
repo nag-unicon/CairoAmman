@@ -1,0 +1,149 @@
+*-----------------------------------------------------------------------------
+* <Rating>-110</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.A.REV.AUTH.FT.GEN
+*---------------------------------------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.A.REV.AUTH.FT.GEN
+*---------------------------------------------------------------------------------------------
+*Description       : Authorization Routine gets triggered when an authorised payment batches is reversed
+*                  : and authorized.It will update the status as returned in payment details for the respective
+*                  : batches and create the same in payment returned file.
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0064
+*---------------------------------------------------------------------------------------------
+*Modification Details:
+*=====================
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_GTS.COMMON
+    $INSERT I_DataTypes
+    $INSERT I_F.FUNDS.TRANSFER
+    $INSERT I_F.FT.COMMISSION.TYPE
+    $INSERT I_F.CURRENCY
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.OFS.SOURCE
+    $INCLUDE CAB.BP I_F.PAYMENT.DETAILS
+    $INCLUDE CAB.BP I_F.PAYMENT.BATCHES
+    $INCLUDE CAB.BP I_F.PAYMENT.COMPANY
+    $INCLUDE CAB.BP I_F.PAYMENT.RETURNED
+    $INCLUDE CAB.BP I_F.CAB.FILE.PARAMETER
+    $INCLUDE CAB.BP I_F.PAYMENT.L.CONCAT.FILE
+
+    GOSUB INIT.FILES
+    GOSUB OPEN.FILES
+    GOSUB PROCESS
+
+    RETURN
+
+***********
+INIT.FILES:
+***********
+
+    FN.ACC = "F.ACCOUNT"
+    F.ACC = ""
+    FN.COM.TYPE = "F.FT.COMMISSION.TYPE"
+    F.COM.TYPE = ""
+    FN.OFS.SOURCE = "F.OFS.SOURCE"
+    F.OFS.SOURCE = ""
+    FN.CAB.FILE = "F.CAB.FILE.PARAMETER"
+    F.CAB.FILE = ""
+    FN.PAY.DET = "F.PAYMENT.DETAILS"
+    F.PAY.DET = ""
+    FN.PAY.CMPY = "F.PAYMENT.COMPANY"
+    F.PAY.CMPY = ""
+    FN.PAY.CONCAT = "F.PAYMENT.L.CONCAT.FILE"
+    F.PAY.CONCAT = ""
+
+    RETURN
+
+***********
+OPEN.FILES:
+***********
+
+    CALL OPF(FN.ACC,F.ACC)
+    CALL OPF(FN.COM.TYPE,F.COM.TYPE)
+    CALL OPF(FN.OFS.SOURCE,F.OFS.SOURCE)
+    CALL OPF(FN.PAY.CMPY,F.PAY.CMPY)
+    CALL OPF(FN.PAY.DET,F.PAY.DET)
+    CALL OPF(FN.CAB.FILE,F.CAB.FILE)
+    CALL OPF(FN.PAY.CONCAT,F.PAY.CONCAT)
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    CALL F.READ(FN.CAB.FILE,"PAYMENTS",R.CAB.FILE,F.CAB.FILE,CAB.FILE.ERR)
+    IF R.CAB.FILE THEN
+        Y.OFS.SOURCE.ID = R.CAB.FILE<CAB.FIL.OFS.SOURCE>
+        CALL F.READ(FN.PAY.CONCAT,ID.NEW,R.PAY.CONCAT,F.PAY.CONCAT,CON.ERR)
+        IF R.PAY.CONCAT THEN
+            SEL.LIST = R.PAY.CONCAT<PLCF.PAY.ID>
+            CHANGE VM TO FM IN SEL.LIST
+        END
+        Y.TOT.CNT = DCOUNT(SEL.LIST,FM)
+        GOSUB POST.FT.RECORD
+        FOR CNT = 1 TO Y.TOT.CNT
+            CALL F.READ(FN.PAY.DET,SEL.LIST<CNT>,R.PAY.DET,F.PAY.DET,PAY.DET.ERR)
+            IF R.PAY.DET THEN
+                R.PAY.DET<PY.DET.PAYMENT.STATUS> = "RETURNED"
+                R.PAY.DET<PY.DET.PAY.RETURN.DATE> = TODAY
+                CALL F.WRITE(FN.PAY.DET,SEL.LIST<CNT>,R.PAY.DET)
+                Y.OFS.DATA = ""
+                Y.OFS.DATA = 'PAYMENT.RETURNED,RET/I/PROCESS,,':SEL.LIST<CNT>:',BATCH.CODE::=':R.PAY.DET<PY.DET.BATCH.CODE>:','
+                Y.OFS.DATA:= 'PAYMENT.AMOUNT::=':R.PAY.DET<PY.DET.PAYMENT.AMOUNT>:',PAYMENT.CURRENCY::=':R.PAY.DET<PY.DET.PAYMENT.CURRENCY>:','
+                Y.OFS.DATA:= 'PAY.BEN.NAME::=':R.PAY.DET<PY.DET.PAY.BEN.NAME>:',PAY.NARRATIVE::=':R.PAY.DET<PY.DET.PAY.NARRATIVE>:',BEN.NATIONAL.NO::=':R.PAY.DET<PY.DET.BEN.NATIONAL.NO>:','
+                Y.OFS.DATA:= 'SHAREHOLDER.NO::=':R.PAY.DET<PY.DET.SHAREHOLDER.NO>:',EMPLOYEE.NO::=':R.PAY.DET<PY.DET.EMPLOYEE.NO>:',LEGAL.ID::=':R.PAY.DET<PY.DET.LEGAL.ID>:','
+                Y.OFS.DATA:= 'EMAIL.ID::=':R.PAY.DET<PY.DET.EMAIL.ID>:',MOBILE.NO::=':R.PAY.DET<PY.DET.MOBILE.NO>:','
+                Y.OFS.DATA:= 'PHONE.NO::=':R.PAY.DET<PY.DET.PHONE.NO>:',OTH.DETAILS1::=':R.PAY.DET<PY.DET.OTH.DETAILS1>:','
+                Y.OFS.DATA:= 'OTH.DETAILS2::=':R.PAY.DET<PY.DET.OTH.DETAILS2>:',OTH.DETAILS3::=':R.PAY.DET<PY.DET.OTH.DETAILS3>:','
+                Y.OFS.DATA:= 'OTH.DETAILS4::=':R.PAY.DET<PY.DET.OTH.DETAILS4>:',OTH.DETAILS5::=':R.PAY.DET<PY.DET.OTH.DETAILS5>:','
+                Y.OFS.DATA:= 'COMP.CHARGE.ID::=':R.PAY.DET<PY.DET.COMP.CHARGE.ID>:',COMP.CHARGE.AMT::=':R.PAY.DET<PY.DET.COMP.CHARGE.AMT>:',PAYMENT.STATUS::=':R.PAY.DET<PY.DET.PAYMENT.STATUS>:','
+                Y.OFS.DATA:= 'COMP.CHARGE.CCY::=':R.PAY.DET<PY.DET.COMP.CHARGE.CCY>:',CUST.CHARGE.ID::=':R.PAY.DET<PY.DET.CUST.CHARGE.ID>:',CUST.CHARGE.AMT::=':R.PAY.DET<PY.DET.CUST.CHARGE.AMT>:','
+                Y.OFS.DATA:= 'CHARGE.CCY::=':R.PAY.DET<PY.DET.CHARGE.CCY>:',FIN.PAY.AMT::=':R.PAY.DET<PY.DET.FIN.PAY.AMT>:',PAY.RETURN.DATE::='TODAY
+                CALL OFS.POST.MESSAGE(Y.OFS.DATA,'',Y.OFS.SOURCE.ID,OPERATOR)
+            END
+        NEXT CNT
+    END
+    RETURN
+
+***************
+POST.FT.RECORD:
+***************
+
+    BATCH.CODE = R.NEW(PAY.BAT.COMPANY.CODE)
+    R.NEW(PAY.BAT.BATCH.STATUS) = "BATCH.REVERSED"
+    CALL F.READ(FN.PAY.CMPY,BATCH.CODE,R.PAY.CMPY,F.PAY.CMPY,PAY.CMPY.ERR)
+    IF R.PAY.CMPY THEN
+        DEB.ACC = R.PAY.CMPY<PAY.COMP.INTERNAL.ACCOUNT>
+        CRE.ACC = R.PAY.CMPY<PAY.COMP.COMP.ACCOUNT.NO>
+        COMP.CHARGE.ID = R.PAY.CMPY<PAY.COMP.COMP.CHARGE.ID>
+        Y.AMT = R.NEW(PAY.BAT.BATCH.TOTAL.AMOUNT)
+        CALL F.READ(FN.ACC,DEB.ACC,R.ACC,F.ACC,ACC.ERR)
+        IF R.ACC THEN
+            DEB.CURR = R.ACC<AC.CURRENCY>
+            Y.FT.DATA = 'FUNDS.TRANSFER,RET/I/PROCESS,,,TRANSACTION.TYPE::=AC,DEBIT.AMOUNT::=':Y.AMT:','
+            Y.FT.DATA:= 'ORDERING.BANK::=CAB,DEBIT.CURRENCY::=':DEB.CURR:',DEBIT.ACCT.NO::=':DEB.ACC:',CREDIT.ACCT.NO::=':CRE.ACC
+            CALL OFS.POST.MESSAGE(Y.FT.DATA,'',Y.OFS.SOURCE.ID,OPERATOR)
+            IF COMP.CHARGE.ID THEN
+                CALL F.READ(FN.COM.TYPE,COMP.CHARGE.ID,R.COM.TYPE,F.COM.TYPE,COM.ERR)
+                IF R.COM.TYPE THEN
+                    COMM.CUR = R.COM.TYPE<FT4.CURRENCY>
+                    COMM.AMT = R.NEW(PAY.BAT.CHARGE.AMOUNT)
+                    DEB.PL = "PL":R.COM.TYPE<FT4.CATEGORY.ACCOUNT>
+                    Y.FT.DATA = 'FUNDS.TRANSFER,RET/I/PROCESS,,,TRANSACTION.TYPE::=AC,DEBIT.AMOUNT::=':COMM.AMT:','
+                    Y.FT.DATA:= 'ORDERING.BANK::=CAB,DEBIT.CURRENCY::=':COMM.CUR:',DEBIT.ACCT.NO::=':DEB.PL:',CREDIT.ACCT.NO::=':CRE.ACC
+                    CALL OFS.POST.MESSAGE(Y.FT.DATA,'',Y.OFS.SOURCE.ID,OPERATOR)
+                END
+            END
+        END
+    END
+
+    RETURN
+END

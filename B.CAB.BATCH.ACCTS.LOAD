@@ -1,0 +1,71 @@
+* Developed by AGryaznov@Temenos.com
+* 15/Feb/2012 - Initial Creation
+
+    SUBROUTINE B.CAB.BATCH.ACCTS.LOAD
+
+************************************************************************
+* The algorithm for this COB routine is the following:
+* - Pick the accounts defined in CAB.EBI.MNSTR.ACCOUNTS
+* - Read the file ACCT.ENT.LWORK.DAY with @ID as the account
+* - Loop in the stmt.entry ids mentioned in the record of acct.ent.lwork.day
+* - Pick the details and create Ministry Finance Transaction Report
+*   as a flat file in the folder EBI/MNSTR.TMP
+* It is designed for the External Batch Interface (project CAB)
+*
+*                  ---- MODIFICATIONS ---------
+*
+************************************************************************
+
+$INSERT I_COMMON
+$INSERT I_EQUATE
+$INSERT I_F.CAB.EBI.MNSTR.ACCOUNTS
+$INSERT I_B.CAB.BATCH.ACCTS
+
+    GOSUB INITIALISE
+
+    RETURN
+
+************************************************************************
+
+INITIALISE:
+
+    LOC.OUT.DIR = "EBI/MNSTR.TMP"
+
+    OPEN LOC.OUT.DIR TO F.OUT.FILE ELSE
+       PRINT "Can not open file ":LOC.OUT.DIR
+       RETURN
+    END
+
+    FN.STMT.ENTRY = 'F.STMT.ENTRY'
+    F.STMT.ENTRY  = ''
+    CALL OPF(FN.STMT.ENTRY,F.STMT.ENTRY)
+
+    FN.ACCT.ENT.LWORK.DAY = 'F.ACCT.ENT.LWORK.DAY'
+    F.ACCT.ENT.LWORK.DAY  = ''
+    CALL OPF(FN.ACCT.ENT.LWORK.DAY,F.ACCT.ENT.LWORK.DAY)
+
+    Y.DELIM = ''
+    Y.ACCT.LIST = ''
+
+    *Read parameters
+    OPEN "F.CAB.EBI.MNSTR.ACCOUNTS" TO F.CAB.EBI.MNSTR.ACCOUNTS ELSE
+       PAR.ERROR = "Can not open a file CAB.EBI.MNSTR.ACCOUNTS"
+       RETURN
+    END
+    READ R.CAB.EBI.MNSTR.ACCOUNTS FROM F.CAB.EBI.MNSTR.ACCOUNTS, 'SYSTEM' ELSE
+       CRT "Can not read a record SYSTEM from CAB.EBI.MNSTR.ACCOUNTS"
+       CLOSE F.CAB.EBI.MNSTR.ACCOUNTS
+       RETURN
+    END 
+    Y.DELIM     = R.CAB.EBI.MNSTR.ACCOUNTS<CEMA.DELIMETER>
+    Y.ACCT.LIST = R.CAB.EBI.MNSTR.ACCOUNTS<CEMA.ACCOUNT>
+    CLOSE F.CAB.EBI.MNSTR.ACCOUNTS
+
+    LOC.DEL.CMD = "CLEAR.FILE ":LOC.OUT.DIR
+    EXECUTE LOC.DEL.CMD
+
+    RETURN
+
+************************************************************************
+
+END

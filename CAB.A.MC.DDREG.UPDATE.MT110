@@ -1,0 +1,242 @@
+*-----------------------------------------------------------------------------
+* <Rating>-104</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.A.MC.DDREG.UPDATE.MT110
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.A.MC.DDREG.UPDATE
+*---------------------------------------------------------------
+*Description       :
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0067
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.TELLER
+    $INSERT I_RC.COMMON
+    $INSERT I_GTS.COMMON
+    $INSERT I_F.FUNDS.TRANSFER
+    $INSERT I_F.DEAL.SLIP.FORMAT
+    $INSERT I_F.MC.DD.REGISTER
+    $INSERT I_F.DD.CHQ.TYPE
+
+    GOSUB INIT.FILES
+    GOSUB OPEN.FILES
+    GOSUB PROCESS
+
+    RETURN
+
+***********
+INIT.FILES:
+***********
+
+    FN.MC.DD.REGISTER = "F.MC.DD.REGISTER"
+    F.MC.DD.REGISTER = ""
+    FN.DD.CHQ = "F.DD.CHQ.TYPE"
+    F.DD.CHQ = ""
+
+    RETURN
+
+***********
+OPEN.FILES:
+***********
+
+    CALL OPF(FN.MC.DD.REGISTER,F.MC.DD.REGISTER)
+    CALL OPF(FN.DD.CHQ,F.DD.CHQ)
+
+    FN.DEAL.SLIP.FORMAT = 'F.DEAL.SLIP.FORMAT'
+    F.DEAL.SLIP.FORMAT = ''
+    R.DEAL.SLIP = ''
+    CALL OPF(FN.DEAL.SLIP.FORMAT,F.DEAL.SLIP.FORMAT)
+
+    FN.DD.CHQ = "F.DD.CHQ.TYPE"
+    F.DD.CHQ = ""
+    CALL OPF(FN.DD.CHQ,F.DD.CHQ)
+    RETURN
+
+********
+PROCESS:
+********
+
+    LOCAL.APPLICATION = 'FUNDS.TRANSFER':FM:'TELLER'
+    LOCAL.FIELD = 'L.DD.TYPE':FM:'L.GEN.MT110':VM:'L.DD.TYPE'
+    LOCAL.POS = ''
+    CALL MULTI.GET.LOC.REF(LOCAL.APPLICATION,LOCAL.FIELD,LOCAL.POS)
+    L.FT.DD.TYPE.POS = LOCAL.POS<1,1>
+    L.GEN.MT110.POS = LOCAL.POS<2,1>
+    L.DD.TYPE.POS = LOCAL.POS<2,2>
+    L.TT.DD.TYPE.POS = LOCAL.POS<2,2>
+    GOSUB UPDATE.REGISTER
+
+    RETURN
+
+****************
+UPDATE.REGISTER:
+****************
+
+    IF ID.NEW[1,2] EQ "TT" THEN
+        LOCAL.AMT.DEBITED = R.NEW(TT.TE.AMOUNT.LOCAL.1)
+        RECORD.STATUS = R.NEW(TT.TE.RECORD.STATUS)
+        IF PGM.VERSION EQ ",MC.ISS.CASH" THEN
+            Y.MDR.ID = 'MC':R.NEW(TT.TE.STOCK.NUMBER)
+        END ELSE
+            Y.MDR.ID = R.NEW(TT.TE.LOCAL.REF)<1,L.TT.DD.TYPE.POS>:R.NEW(TT.TE.STOCK.NUMBER)
+        END
+        GOSUB AUTH.LEVEL.CHECK
+    END ELSE
+        LOCAL.AMT.DEBITED = R.NEW(FT.LOC.AMT.DEBITED)
+        RECORD.STATUS = R.NEW(FT.RECORD.STATUS)
+        IF PGM.VERSION EQ ",MC.ISS.ACCT" THEN
+            Y.MDR.ID = 'MC':R.NEW(FT.CHEQUE.NUMBER)
+        END ELSE
+            Y.MDR.ID = R.NEW(FT.LOCAL.REF)<1,L.FT.DD.TYPE.POS>:R.NEW(FT.CHEQUE.NUMBER)
+        END
+        GOSUB AUTH.LEVEL.CHECK
+    END
+
+    RETURN
+
+*****************
+AUTH.LEVEL.CHECK:
+*****************
+
+    IF LOCAL.AMT.DEBITED GT "1000" THEN
+        IF RECORD.STATUS EQ "INAU" OR RECORD.STATUS EQ "RNAU" THEN
+            RETURN
+        END
+    END
+    CALL F.READ(FN.MC.DD.REGISTER,Y.MDR.ID,R.MC.REG,F.MC.DD.REGISTER,READ.ERR)
+    IF R.MC.REG THEN
+        GOSUB UPDATE.MCDD.REG
+    END ELSE
+        GOSUB UPDATE.MCDD.REG
+    END
+
+    RETURN
+
+****************
+UPDATE.MCDD.REG:
+****************
+
+    IF RECORD.STATUS EQ 'RNAU' OR RECORD.STATUS EQ 'RNA2' THEN
+        R.MC.REG<MC.DD.REG.STATUS.HIST,-1> = 'DESTROYED'
+        R.MC.REG<MC.DD.REG.STATUS.DATE,-1> = TODAY
+        R.MC.REG<MC.DD.REG.STATUS.TRANSID,-1> = ID.NEW
+        R.MC.REG<MC.DD.REG.STATUS>       = 'DESTROYED'
+    END ELSE
+*       CALL CAB.A.MCDD.PRINT.ADVICE
+        GOSUB CAB.A.MCDD.PRINT.ADVICE
+        R.MC.REG<MC.DD.REG.STATUS.HIST,-1> = 'ISSUED'
+        R.MC.REG<MC.DD.REG.STATUS.DATE,-1> = TODAY
+        R.MC.REG<MC.DD.REG.STATUS.TRANSID,-1> = ID.NEW
+        R.MC.REG<MC.DD.REG.STATUS>       = 'ISSUED'
+        R.MC.REG<MC.DD.REG.COMPANY>      = ID.COMPANY
+        IF ID.NEW[1,2] EQ "TT" THEN
+            R.MC.REG<MC.DD.REG.CURRENCY>     = R.NEW(TT.TE.CURRENCY.1)
+            R.MC.REG<MC.DD.REG.PURCHASER>    = R.NEW(TT.TE.NARRATIVE.2)<1,3>
+            IF R.NEW(TT.TE.CURRENCY.1) EQ LCCY THEN
+                R.MC.REG<MC.DD.REG.AMOUNT>       = R.NEW(TT.TE.AMOUNT.LOCAL.1)
+            END ELSE
+                R.MC.REG<MC.DD.REG.AMOUNT>       = R.NEW(TT.TE.AMOUNT.FCY.1)
+            END
+            R.MC.REG<MC.DD.REG.ACCOUNT>      = R.NEW(TT.TE.ACCOUNT.2)
+            GOSUB MGR.CHQ.ACCT
+            Y.NARR = R.NEW(TT.TE.NARRATIVE.1)
+            CHANGE SM TO "" IN Y.NARR
+            R.MC.REG<MC.DD.REG.PAYEE.NAME>  = Y.NARR
+        END ELSE
+            R.MC.REG<MC.DD.REG.CURRENCY> = R.NEW(FT.CREDIT.CURRENCY)
+            ORDERING.CUST = R.NEW(FT.ORDERING.CUST)
+            CHANGE VM TO " " IN ORDERING.CUST
+            R.MC.REG<MC.DD.REG.PURCHASER>    = ORDERING.CUST
+            R.MC.REG<MC.DD.REG.AMOUNT>       = R.NEW(FT.AMOUNT.CREDITED)[4,18]
+            R.MC.REG<MC.DD.REG.ACCOUNT>      = R.NEW(FT.DEBIT.ACCT.NO)
+            R.MC.REG<MC.DD.REG.MGR.CHQ.ACCT> = R.NEW(FT.CREDIT.ACCT.NO)
+            IF PGM.VERSION EQ ",MC.ISS.ACCT" THEN
+                PAYEE.NAME  =  R.NEW(FT.CREDIT.THEIR.REF)
+            END ELSE
+                PAYEE.NAME = R.NEW(FT.BEN.CUSTOMER)
+                CHANGE VM TO " " IN PAYEE.NAME
+            END
+            R.MC.REG<MC.DD.REG.PAYEE.NAME> = PAYEE.NAME
+        END
+    END
+
+    R.MC.REG<MC.DD.REG.CURR.NO> +=1
+    R.MC.REG<MC.DD.REG.INPUTTER> = TNO:"_":OPERATOR
+    TIME.STAMP = TIMEDATE()
+    X = OCONV(DATE(),"D-")
+    X = X[9,2]:X[1,2]:X[4,2]:TIME.STAMP[1,2]:TIME.STAMP[4,2]
+    R.MC.REG<MC.DD.REG.DATE.TIME> = X
+    R.MC.REG<MC.DD.REG.AUTHORISER> = TNO:"_":OPERATOR
+    R.MC.REG<MC.DD.REG.CO.CODE> = ID.COMPANY
+    CALL F.WRITE(FN.MC.DD.REGISTER,Y.MDR.ID,R.MC.REG)
+
+*    IF (V$FUNCTION NE 'R' AND R.NEW(FT.RECORD.STATUS) NE 'RNAU') THEN
+*        TEXT = "Cheque Number is ":Y.MDR.ID
+*        CALL REM
+*    END
+
+    RETURN
+
+*************
+MGR.CHQ.ACCT:
+*************
+
+    IF PGM.VERSION EQ ",DD.ISS.CASH" THEN
+        IF R.NEW(TT.TE.LOCAL.REF)<1,L.GEN.MT110.POS> EQ "YES" THEN
+            CALL F.READ(FN.DD.CHQ,R.NEW(TT.TE.LOCAL.REF)<1,L.DD.TYPE.POS>,R.DD.CHQ,F.DD.CHQ,CHQ.ERR)
+            IF R.DD.CHQ THEN
+                R.MC.REG<MC.DD.REG.MGR.CHQ.ACCT> = R.DD.CHQ<DD.CHQ.NOSTRO.ACCOUNT>
+            END
+        END ELSE
+            R.MC.REG<MC.DD.REG.MGR.CHQ.ACCT> = R.NEW(TT.TE.ACCOUNT.1)
+        END
+    END ELSE
+        R.MC.REG<MC.DD.REG.MGR.CHQ.ACCT> = R.NEW(TT.TE.ACCOUNT.1)
+    END
+
+    RETURN
+
+*------------------------------------------------------------------------------
+CAB.A.MCDD.PRINT.ADVICE:
+*----------------------
+    SAVE.APPLICATION=APPLICATION
+    SAVE.ID.NEW=ID.NEW
+    OFS$DEAL.SLIP.PRINTING = 1
+    V$FUNCTION = 'A'
+    IF ID.NEW[1,2] EQ "TT" THEN
+        DD.TYPE.ID = R.NEW(TT.TE.LOCAL.REF)<1,L.TT.DD.TYPE.POS>
+    END ELSE
+        DD.TYPE.ID = R.NEW(FT.LOCAL.REF)<1,L.FT.DD.TYPE.POS>
+    END
+
+    CALL F.READ(FN.DD.CHQ,DD.TYPE.ID,R.DD.CHQ,F.DD.CHQ,DD.CHQ.ERR)
+    IF R.DD.CHQ THEN
+        DEAL.SLIP.FORMAT = R.DD.CHQ<DD.CHQ.DD.FORMAT>
+        IF ID.NEW[1,2] EQ "TT" THEN
+            DEAL.FORMAT = FIELD(DEAL.SLIP.FORMAT,'.',1,2):".TT.":FIELD(DEAL.SLIP.FORMAT,'.',3)
+        END ELSE
+            DEAL.FORMAT = FIELD(DEAL.SLIP.FORMAT,'.',1,2):".FT.":FIELD(DEAL.SLIP.FORMAT,'.',3)
+        END
+        CALL F.READ(FN.DEAL.SLIP.FORMAT,DEAL.FORMAT,R.DEAL.SLIP,F.DEAL.SLIP.FORMAT,ERR.DEAL)
+        IF R.DEAL.SLIP THEN
+            REP.CONTROL.VAL = R.DEAL.SLIP<EB.DSF.REPORT.CONTROL.ID>
+            ZER.VAL = '0'
+            CALL PRINTER.ON(REP.CONTROL.VAL,'')
+            CALL REBUILD.SCREEN
+            CALL PRODUCE.DEAL.SLIP(DEAL.FORMAT)
+            CALL PRINTER.OFF
+        END
+    END
+    ID.NEW=SAVE.ID.NEW
+    APPLICATION = SAVE.APPLICATION
+    RETURN
+*------------------------------------------------------------------------------
+END

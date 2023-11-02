@@ -1,0 +1,219 @@
+    SUBROUTINE CAB.AA.ARR.UNAUTH.TO.LIVE(ArrangementID)
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_BATCH.FILES
+    $INSERT I_F.AA.PROPERTY
+    $INSERT I_CAB.AA.ARR.UNAUTH.TO.LIVE.COMMON
+
+    GOSUB READ.LOG.FILE
+    GOSUB PROCESS
+    GOSUB DO.WRITE
+
+    RETURN
+
+READ.LOG.FILE:
+
+    recIDName = "AA_PropertyRecord__":SESSION.NO :"_":TODAY:'.csv'
+    READ rActivityChargesRecord FROM TMP.SAVED.LISTS, recIDName ELSE NULL
+
+    RETURN
+
+PROCESS:
+
+    rAaArrangementDateXref = ""
+    eRrAaArrangementDateXref = ""
+
+    CALL F.READ(FN.AA.ARRANGEMENT.DATED.XREF, ArrangementID, rAaArrangementDateXref, F.AA.ARRANGEMENT.DATED.XREF, eRrAaArrangementDateXref)
+
+    PropertyList = rAaArrangementDateXref<1>
+
+    UnAuthorisedPropertyRec = rAaArrangementDateXref<3>
+
+    TotalRec = DCOUNT(UnAuthorisedPropertyRec, VM)
+
+    FOR RecCount = 1 TO TotalRec
+
+        PropertyRec = UnAuthorisedPropertyRec<1, RecCount>
+        CHANGE SM TO VM IN PropertyRec
+
+        LOOP
+            REMOVE recID FROM PropertyRec SETTING recIDpos
+        WHILE recID : recIDpos
+
+            IF FIELD(recID, '.', 1) GT '20180101' THEN      ;* Process only for last 2 months.
+
+                PropertyName = PropertyList<1, RecCount>
+                GOSUB GET.PROPERTY.CLASS.NAME
+
+                ArrRecID = ArrangementID :'-': PropertyName :'-': recID
+
+                GOSUB GET.UNAUTH.RECORD
+                GOSUB MOVE.TO.LIVE.FROM.UNAUTH
+
+            END
+
+        REPEAT
+
+    NEXT RecCount
+
+    RETURN
+
+GET.PROPERTY.CLASS.NAME:
+
+    PROP.ERR = "" ;
+    R.PROPERTY = ""
+    CALL AA.LOAD.STATIC.DATA("F.AA.PROPERTY", PropertyName, R.PROPERTY, PROP.ERR)
+
+    PropertyClassName = ""
+    PropertyClassName = R.PROPERTY<AA.PROP.PROPERTY.CLASS>
+
+    RETURN
+
+GET.UNAUTH.RECORD:
+
+    FN.FILE.NAME.NAU = "F.AA.ARR.":PropertyClassName:"$NAU"
+    F.FILE.NAME.NAU = ''
+    CALL OPF(FN.FILE.NAME.NAU, F.FILE.NAME.NAU)
+
+    FN.FILE.NAME = "F.AA.ARR.":PropertyClassName
+    F.FILE.NAME = ''
+    CALL OPF(FN.FILE.NAME, F.FILE.NAME)
+
+    rAaPropertyrecord = ""
+    eRrAaPropertyrecord = ""
+
+    CALL F.READ(FN.FILE.NAME.NAU, ArrRecID, rAaPropertyrecord, F.FILE.NAME.NAU, eRrAaPropertyrecord)          ;* Read Unauthorised AA.ARR.<ActiityCharges> record
+
+
+    RETURN
+
+MOVE.TO.LIVE.FROM.UNAUTH:
+
+    IF rAaPropertyrecord THEN
+
+        STANDARD.SEL.ID = "AA.ARR.":PropertyClassName
+        CALL GET.STANDARD.SELECTION.DETS(STANDARD.SEL.ID, R.STANDARD.SELECTION)
+
+        IN.FIELD.NAME = "RECORD.STATUS"
+        CALL FIELD.NAMES.TO.NUMBERS(IN.FIELD.NAME,R.STANDARD.SELECTION,RECORD.STATUS.FIELD.NO,YAF,YAV,YAS,DATA.TYPE,ERR.MSG)
+
+        IN.FIELD.NAME = "INPUTTER"
+        CALL FIELD.NAMES.TO.NUMBERS(IN.FIELD.NAME,R.STANDARD.SELECTION,INPUTTER.FIELD.NO,YAF,YAV,YAS,DATA.TYPE,ERR.MSG)
+
+        IN.FIELD.NAME = "AUTHORISER"
+        CALL FIELD.NAMES.TO.NUMBERS(IN.FIELD.NAME,R.STANDARD.SELECTION,AUTHORISER.FIELD.NO,YAF,YAV,YAS,DATA.TYPE,ERR.MSG)
+
+        ActiD = DCOUNT(rAaPropertyrecord<INPUTTER.FIELD.NO>, "_")
+
+        MasterActivityID = FIELD(rAaPropertyrecord<INPUTTER.FIELD.NO>, "_", ActiD)
+
+        ProcessFlag = ''
+
+        BEGIN CASE
+
+        CASE MasterActivityID[1,2] EQ "FT"
+            rFundsTransfer = ""
+            eRrFundsTransfer = ""
+
+            CALL F.READ(FN.FUNDS.TRANSFER, MasterActivityID, rFundsTransfer, F.FUNDS.TRANSFER, eRrFundsTransfer)        ;* Read the Unauth file
+
+            IF NOT(rFundsTransfer) THEN
+                ProcessFlag = 1
+            END
+
+        CASE MasterActivityID[1,3] EQ "AAA"
+            rAaArrangementActivity = ""
+            eRrAaArrangementActivity = ""
+            CALL F.READ(FN.AA.ARRANGEMENT.ACTIVITY, MasterActivityID, rAaArrangementActivity, F.AA.ARRANGEMENT.ACTIVITY, eRrAaArrangementActivity)
+
+            IF NOT(rAaArrangementActivity) THEN
+                ProcessFlag = 1
+            END
+
+        END CASE
+
+        IF ProcessFlag THEN
+
+            rAaPropertyrecord<RECORD.STATUS.FIELD.NO> = ""
+            rAaPropertyrecord<AUTHORISER.FIELD.NO>    = rAaPropertyrecord<INPUTTER.FIELD.NO>
+
+            CALL F.WRITE(FN.FILE.NAME, ArrRecID, rAaPropertyrecord)   ;* Move the Unauth record to Live file
+
+            CALL F.DELETE(FN.FILE.NAME.NAU, ArrRecID)       ;* Delete the Unauth record once moved to Live
+
+            rAaArrangementDateXref<3, RecCount> = ''
+
+            GOSUB UPDATE.AUTHORISED.PROPERTY.DATE
+            GOSUB UPDATE.AUTH.HIGHEST.PROPERTY.DATE
+
+            rActivityChargesRecord<-1> = ArrRecID :',': MasterActivityID
+        END
+
+    END
+
+    RETURN
+
+UPDATE.AUTHORISED.PROPERTY.DATE:
+
+    AuthActDates = ""
+    AuthActDates = rAaArrangementDateXref<2, RecCount>
+
+    INS recID BEFORE AuthActDates<1,1,1>
+
+    AuthActDates = SORT(AuthActDates)
+    CHANGE SM TO FM IN AuthActDates
+    TotalDates = DCOUNT(AuthActDates, FM)
+
+    rAaArrangementDateXref<2, RecCount> = ""      ;* Nullify the property pos to reassign the new array
+    HIGHEST.DATE.EXIST = ""
+
+    FOR Datecount = 1 TO TotalDates
+
+        LOCATE AuthActDates<Datecount> IN HIGHEST.DATE.EXIST SETTING DatePos ELSE
+            INS AuthActDates<Datecount> BEFORE HIGHEST.DATE.EXIST<1>
+        END
+
+    NEXT Datecount
+
+    CHANGE FM TO SM IN HIGHEST.DATE.EXIST
+    rAaArrangementDateXref<2, RecCount> = HIGHEST.DATE.EXIST
+
+    RETURN
+
+UPDATE.AUTH.HIGHEST.PROPERTY.DATE:
+
+    AuthActDates = ""
+    AuthActDates = rAaArrangementDateXref<5, RecCount>
+
+    INS recID BEFORE AuthActDates<1,1,1>
+
+    AuthActDates = SORT(AuthActDates)
+    CHANGE SM TO FM IN AuthActDates
+    TotalDates = DCOUNT(AuthActDates, FM)
+
+    rAaArrangementDateXref<5, RecCount> = ""      ;* Nullify the property pos to reassign the new array
+    HIGHEST.DATE.EXIST = ""
+
+    FOR Datecount = 1 TO TotalDates
+
+        LOCATE AuthActDates<Datecount> IN HIGHEST.DATE.EXIST SETTING DatePos ELSE
+            INS AuthActDates<Datecount> BEFORE HIGHEST.DATE.EXIST<1>
+        END
+
+    NEXT Datecount
+
+    CHANGE FM TO SM IN HIGHEST.DATE.EXIST
+    rAaArrangementDateXref<5, RecCount> = HIGHEST.DATE.EXIST
+
+    RETURN
+
+DO.WRITE:
+
+    CALL F.WRITE(FN.AA.ARRANGEMENT.DATED.XREF, ArrangementID, rAaArrangementDateXref)
+
+    WRITE rActivityChargesRecord TO TMP.SAVED.LISTS, recIDName        ;* Write it out. Job well done!
+
+    RETURN
+
+END

@@ -1,0 +1,239 @@
+*-----------------------------------------------------------------------------
+* <Rating>-3</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.A.PAY.BATCH.CHK
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.A.PAY.BATCH.CHK
+*---------------------------------------------------------------
+*Description       : Authorization routine attahced to payment batches file performs action based on delete and authorization.
+*Linked With       : PAYMENT.BATCHES,AUTH
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0064
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.FT.COMMISSION.TYPE
+    $INCLUDE CAB.BP I_F.PAYMENT.COMPANY
+    $INCLUDE CAB.BP I_F.PAYMENT.LOG
+    $INCLUDE CAB.BP I_F.PAYMENT.DETAILS
+    $INCLUDE CAB.BP I_F.PAYMENT.BATCHES
+    $INCLUDE CAB.BP I_F.CAB.FILE.PARAMETER
+    $INCLUDE CAB.BP I_F.PAYMENT.L.CONCAT.FILE
+
+    GOSUB INIT.FILES
+    GOSUB OPEN.FILES
+    GOSUB PROCESS
+
+    RETURN
+
+***********
+INIT.FILES:
+***********
+
+    FN.ACC = "F.ACCOUNT"
+    F.ACC = ""
+
+    FN.COM.TYPE = "F.FT.COMMISSION.TYPE"
+    F.COM.TYPE = ""
+
+    FN.PAY.CMPY = "F.PAYMENT.COMPANY"
+    F.PAY.CMPY = ""
+
+    FN.PAY.LOG = "F.PAYMENT.LOG"
+    F.PAY.LOG = ""
+
+    FN.CAB.FILE = "F.CAB.FILE.PARAMETER"
+    F.CAB.FILE = ""
+
+    FN.PAY.DET$NAU = "F.PAYMENT.DETAILS$NAU"
+    F.PAY.DET$NAU = ""
+    FN.PAY.CONCAT = "F.PAYMENT.L.CONCAT.FILE"
+    F.PAY.CONCAT = ""
+
+    RETURN
+
+***********
+OPEN.FILES:
+***********
+
+    CALL OPF(FN.ACC,F.ACC)
+    CALL OPF(FN.COM.TYPE,F.COM.TYPE)
+    CALL OPF(FN.PAY.CMPY,F.PAY.CMPY)
+    CALL OPF(FN.PAY.LOG,F.PAY.LOG)
+    CALL OPF(FN.CAB.FILE,F.CAB.FILE)
+    CALL OPF(FN.PAY.DET$NAU,F.PAY.DET$NAU)
+    CALL OPF(FN.PAY.CONCAT,F.PAY.CONCAT)
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    IF V$FUNCTION EQ "D" THEN
+        GOSUB DELETE.CHECKS
+    END
+    IF V$FUNCTION EQ "A" THEN
+        GOSUB AUTHORISE.CHECKS
+    END
+
+    RETURN
+
+**************
+DELETE.CHECKS:
+**************
+
+
+    CALL F.READ(FN.PAY.CONCAT,ID.NEW,R.PAY.CONCAT,F.PAY.CONCAT,CON.ERR)
+    IF R.PAY.CONCAT THEN
+        SEL.DET.LIST = R.PAY.CONCAT<PLCF.PAY.ID>
+        CHANGE VM TO FM IN SEL.DET.LIST
+    END
+    DEL.CNT = DCOUNT(SEL.DET.LIST,FM)
+    CALL F.READ(FN.PAY.CMPY,R.NEW(PAY.BAT.COMPANY.CODE),R.PAY.CMPY,F.PAY.CMPY,PAY.CMPY.ERR)
+    IF R.PAY.CMPY THEN
+        PAYMENT.LOG.ID  =  R.PAY.CMPY<PAY.COMP.PAYMENT.LOG.ID>
+        COMPANY.ID = R.NEW(PAY.BAT.COMPANY.CODE)
+        GOSUB COLLECT.LOG.DETAILS
+        R.PAY.CMPY<PAY.COMP.PAYMENT.LOG.ID> = PAYMENT.LOG.ID
+        CALL F.WRITE(FN.PAY.CMPY,COMPANY.ID,R.PAY.CMPY)
+        CALL F.WRITE(FN.PAY.LOG,PAYMENT.LOG.ID,R.PAYMENT.LOG)
+    END
+    FOR CNT = 1 TO DEL.CNT
+        CALL F.DELETE(FN.PAY.DET$NAU,SEL.DET.LIST<CNT>)
+    NEXT CNT
+
+    RETURN
+
+*****************
+AUTHORISE.CHECKS:
+*****************
+
+    COMPANY.CODE = R.NEW(PAY.BAT.COMPANY.CODE)
+    CALL F.READ(FN.PAY.CMPY,COMPANY.CODE,R.PAY.CMPY,F.PAY.CMPY,CMPY.ERR1)
+    IF R.PAY.CMPY THEN
+        CREDIT.ACCT = R.PAY.CMPY<PAY.COMP.INTERNAL.ACCOUNT>
+        DEBIT.ACCT = R.PAY.CMPY<PAY.COMP.COMP.ACCOUNT.NO>
+        COMP.CHARGE.ID = R.PAY.CMPY<PAY.COMP.COMP.CHARGE.ID>
+        CALL F.READ(FN.CAB.FILE,"PAYMENTS",R.CAB.FILE,F.CAB.FILE,CAB.ERR)
+        IF R.CAB.FILE THEN
+            Y.OFS.SOURCE.ID = R.CAB.FILE<CAB.FIL.OFS.SOURCE>
+            FILE.PATH = R.CAB.FILE<CAB.FIL.GEN.FILE.PATH>
+            CALL F.READ(FN.ACC,DEBIT.ACCT,R.ACC,F.ACC,ACC.ERR)
+            IF R.ACC THEN
+                DEB.CURR = R.ACC<AC.CURRENCY>
+                IF COMP.CHARGE.ID THEN
+                    CALL F.READ(FN.COM.TYPE,COMP.CHARGE.ID,R.COM.TYPE,F.COM.TYPE,COM.ERR)
+                    IF R.COM.TYPE THEN
+                        COMM.CUR = R.COM.TYPE<FT4.CURRENCY>
+                        COMM.AMT = R.NEW(PAY.BAT.CHARGE.AMOUNT)
+                    END
+                END
+                DEBT.AMT = R.NEW(PAY.BAT.BATCH.TOTAL.AMOUNT)
+                Y.FT.DATA = 'FUNDS.TRANSFER,RET/I/PROCESS,,,TRANSACTION.TYPE::=AC,DEBIT.AMOUNT::=':DEBT.AMT:','
+                Y.FT.DATA:= 'DEBIT.CURRENCY::=':DEB.CURR:',DEBIT.ACCT.NO::=':DEBIT.ACCT:',CREDIT.ACCT.NO::=':CREDIT.ACCT:',COMMISSION.TYPE::=':COMP.CHARGE.ID:',COMMISSION.AMT::=':COMM.CUR:COMM.AMT
+                Y.FT.DATA.TEMP = EREPLACE(Y.FT.DATA,'PROCESS','VALIDATE',1,1)
+                CALL OFS.GLOBUS.MANAGER(Y.OFS.SOURCE.ID,Y.FT.DATA.TEMP)
+                Y.FT.STATUS = FIELD(Y.FT.DATA.TEMP,'/',3)[1,1]
+            END
+        END
+    END
+    IF Y.FT.STATUS EQ '1' THEN
+        Y.FT.ID = FIELD(Y.FT.DATA.TEMP,'/',1,1)
+        CHANGE ',' TO FM IN Y.FT.DATA
+        INS Y.FT.ID BEFORE Y.FT.DATA<4>
+        DEL Y.FT.DATA<5>
+        CHANGE FM TO ',' IN Y.FT.DATA
+        R.NEW(PAY.BAT.FT.REF) = Y.FT.ID
+        R.NEW(PAY.BAT.BATCH.STATUS) = "BATCH.AUTHORISED"
+        CALL OFS.POST.MESSAGE(Y.FT.DATA,'',Y.OFS.SOURCE.ID,OPERATOR)
+    END ELSE
+        FN.FP = FILE.PATH
+        F.FP = ""
+        CALL OPF(FN.FP,F.FP)
+        CALL F.READ(FN.FP,'CAB.ERR.FILE.':TODAY,R.FP,F.FP,FP.ERR)
+        IF R.FP THEN
+            R.FP<-1> = Y.FT.DATA.TEMP
+        END ELSE
+            R.FP = Y.FT.DATA.TEMP
+        END
+        WRITE R.FP TO F.FP,'CAB.ERR.FILE.':TODAY
+    END
+    RETURN
+
+********************
+COLLECT.LOG.DETAILS:
+********************
+
+    JULL.VAL = ''
+    CALL JULDATE(TODAY,JULL.VAL)
+    COMP.CODE = FIELD(ID.NEW,'.',1)
+*    IF PAYMENT.LOG.ID EQ "" THEN
+    CALL F.READ(FN.PAY.CONCAT,COMP.CODE,R.PAY.CONCAT1,F.PAY.CONCAT,CON.ERR)
+    IF R.PAY.CONCAT THEN
+        SEL.LIST = R.PAY.CONCAT1<PLCF.PAY.ID>
+        CHANGE VM TO FM IN SEL.LIST
+        NO.OF.REC = DCOUNT(SEL.LIST,FM)
+    END
+    IF SEL.LIST THEN
+        FOR LG.CNT = 1 TO NO.OF.REC
+            CALL F.READ(FN.PAY.CMPY,SEL.LIST<LG.CNT>,R.PAY.CMPY,F.PAY.CMPY,CMPY.ERR)
+            IF R.PAY.CMPY<PAY.COMP.PAYMENT.LOG.ID> THEN
+                PAY.ID.ARR<-1> = R.PAY.CMPY<PAY.COMP.PAYMENT.LOG.ID>
+            END
+        NEXT LG.CNT
+        IF PAY.ID.ARR THEN
+            PAY.ID.ARR = SORT(PAY.ID.ARR)
+            Y.PAYCNT = DCOUNT(PAY.ID.ARR,FM)
+            PAYMENT.LOG.ID = PAY.ID.ARR<Y.PAYCNT>
+            GOSUB FORM.PAYLOG.ID
+        END ELSE
+            PAYMENT.LOG.ID = COMP.CODE:".":JULL.VAL[3,LEN(JULL.VAL)]:".01.001"
+        END
+    END ELSE
+        PAYMENT.LOG.ID = COMP.CODE:".":JULL.VAL[3,LEN(JULL.VAL)]:".01.001"
+    END
+*    END ELSE
+*        GOSUB FORM.PAYLOG.ID
+*    END
+    R.PAYMENT.LOG<PAY.LOG.COMPANY.CODE> = COMP.CODE
+    R.PAYMENT.LOG<PAY.LOG.BATCH.CURRENCY> = R.NEW(PAY.BAT.BATCH.CURRENCY)
+    R.PAYMENT.LOG<PAY.LOG.BATCH.TOTAL.AMOUNT> = R.NEW(PAY.BAT.BATCH.TOTAL.AMOUNT)
+    R.PAYMENT.LOG<PAY.LOG.BATCH.NO.RECORDS> = R.NEW(PAY.BAT.BATCH.NO.OF.REC)
+    R.PAYMENT.LOG<PAY.LOG.BATCH.UPLOAD.DATE> = TODAY
+    Y.TIME = TIME()
+    Y.TIME = OCONV(Y.TIME, "MTS")
+    R.PAYMENT.LOG<PAY.LOG.BATCH.UPLOAD.TIME> = Y.TIME
+    R.PAYMENT.LOG<PAY.LOG.RECORD.DETAILS,1> = ID.NEW
+    R.PAYMENT.LOG<PAY.LOG.ERROR.DESCRIPTION,1> = "PAYMENT BATCHES DELETED BY USER"
+
+    RETURN
+
+***************
+FORM.PAYLOG.ID:
+***************
+
+    Y.SERIAL.NO = FIELD(PAYMENT.LOG.ID,'.',3)
+    Y.SEQ.NO = FIELD(PAYMENT.LOG.ID,'.',4)
+    IF Y.SEQ.NO EQ "100" THEN
+        Y.SERIAL.NO = FIELD(PAYMENT.LOG.ID,'.',3) + 1
+        Y.SEQ.NO = "1"
+    END ELSE
+        Y.SERIAL.NO = FIELD(PAYMENT.LOG.ID,'.',3)
+        Y.SEQ.NO = FIELD(PAYMENT.LOG.ID,'.',4) + 1
+    END
+    Y.SERIAL.NO = FMT(Y.SERIAL.NO,"R%2")
+    Y.SEQ.NO = FMT(Y.SEQ.NO,"R%3")
+    PAYMENT.LOG.ID = COMP.CODE:".":JULL.VAL[3,LEN(JULL.VAL)]:".":Y.SERIAL.NO:".":Y.SEQ.NO
+
+    RETURN
+
+END

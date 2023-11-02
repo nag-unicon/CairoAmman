@@ -1,0 +1,72 @@
+*-----------------------------------------------------------------------------
+* <Rating>-50</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.A.UPD.PAYMENT.STATUS
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.A.UPD.PAYMENT.STATUS
+*---------------------------------------------------------------
+*Description       : Authorization routine used to update the status as paid once the record is authorized.
+*Linked With       : TELLER,NON.CUST.CASH.PAYMENT , TELLER,NON.CUST.CASH.PAYMENT.FCY , FUNDS.TRANSFER,NON.CUST.CASH.PAYMENT
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0064
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.TELLER
+    $INSERT I_F.FUNDS.TRANSFER
+    $INCLUDE CAB.BP I_F.PAYMENT.DETAILS
+
+    GOSUB INIT.FILES
+    GOSUB OPEN.FILES
+    GOSUB PROCESS
+
+    RETURN
+
+***********
+INIT.FILES:
+***********
+
+    FN.PAY.DET = "F.PAYMENT.DETAILS"
+    F.PAY.DET = ""
+
+    RETURN
+
+***********
+OPEN.FILES:
+***********
+
+    CALL OPF(FN.PAY.DET,F.PAY.DET)
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    LOC.FIELD = "PAY.DET.ID":FM:"PAY.DET.ID"
+    LOCAL.APPLICATION = 'FUNDS.TRANSFER':FM:'TELLER'
+    LOCAL.POS = '' ; PAY1.POS = "" ; PAY2.POS = ""
+    CALL MULTI.GET.LOC.REF(LOCAL.APPLICATION,LOC.FIELD,LOCAL.POS)
+    PAY1.POS = LOCAL.POS<1,1>
+    PAY2.POS = LOCAL.POS<2,1>
+    IF ID.NEW[1,2] EQ "FT" THEN
+        PAY.DET.ID = R.NEW(FT.LOCAL.REF)<1,PAY1.POS>
+    END ELSE
+        PAY.DET.ID = R.NEW(TT.TE.LOCAL.REF)<1,PAY2.POS>
+    END
+    CALL F.READ(FN.PAY.DET,PAY.DET.ID,R.PAY.DET,F.PAY.DET,PAY.ERR)
+    IF R.PAY.DET THEN
+        R.PAY.DET<PY.DET.PAYMENT.STATUS> = "PAID"
+        CALL F.WRITE(FN.PAY.DET,PAY.DET.ID,R.PAY.DET)
+    END
+
+    RETURN
+
+END

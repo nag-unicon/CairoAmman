@@ -1,0 +1,37 @@
+*-----------------------------------------------------------------------------
+* <Rating>0</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE BRANCH.STOCK.REQ.ID
+*---------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : BRANCH.STOCK.REQ.ID
+*---------------------------------------------------------------
+*Description       : This is the ID generation routine for the file BRANCH.STOCK.REQ
+*Linked With       :
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0067
+*---------------------------------------------------------------
+*Modification Details:
+*=====================
+*-----------------------------------------------------------------------------
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_DataTypes
+
+    IF V$FUNCTION EQ 'I' THEN
+        IF NUM(COMI) EQ "1" THEN
+            DT.VAL = TODAY
+            JULL.VAL = ''
+            CALL JULDATE(DT.VAL,JULL.VAL)
+            Y.SERIAL.NO = FMT(COMI,"R%5")
+            ID.NEW = ID.COMPANY[LEN(ID.COMPANY)-3,LEN(ID.COMPANY)]:".":JULL.VAL:".STREQ":Y.SERIAL.NO
+        END ELSE
+            ID.NEW = COMI
+        END
+    END
+
+    RETURN
+END

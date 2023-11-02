@@ -1,0 +1,199 @@
+    SUBROUTINE CAB.AA.CHG.INT.REFUND
+
+*************************************************************************
+*** Discounted and Flat Interest Refund Amount collected amount
+*** This Api is a part of auto payoff. It will refund the charges and
+*** Interest already collected from customer account and made it as amort has been moving
+*** to P&L from EB.ACCRUAL during
+*** Prepayment of Loan amount or Preclosure or Legal movement
+*** Customer Need to refund of excess interest paid for remaing period
+*************************************************************************
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_AA.LOCAL.COMMON
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT.ACTIVITY
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT
+    $INCLUDE T24.BP I_F.AA.TERM.AMOUNT
+    $INCLUDE T24.BP I_F.AA.CHARGE
+    $INCLUDE T24.BP I_F.AA.ACCOUNT
+    $INCLUDE T24.BP I_AA.APP.COMMON
+    $INCLUDE T24.BP I_AA.ACTION.CONTEXT
+    $INCLUDE T24.BP I_AA.CONTRACT.DETAILS
+    $INCLUDE T24.BP I_F.FUNDS.TRANSFER
+    $INCLUDE T24.BP I_F.AC.BALANCE.TYPE
+    $INCLUDE T24.BP I_F.ACCT.ACTIVITY
+    $INCLUDE T24.BP I_F.AA.INTEREST
+
+    GOSUB INIT
+
+    RETURN
+
+*****
+INIT:
+*****
+
+    PRO.STATUS = c_arrActivityStatus["-",1,1]
+    ARRANGEMENT.ID = AA$ARR.ID          ;* Arrangement contract Id
+    ACTIVITY.ID = AA$CURR.ACTIVITY
+    EFFECTIVE.DATE = AA$ACTIVITY.EFF.DATE
+
+    IF PRO.STATUS EQ "AUTH" AND ACTIVITY.ID EQ "LENDING-AUTO-PAYOFF" THEN
+        GOSUB INPUT.PROCESS
+    END
+
+    RETURN
+
+**************
+INPUT.PROCESS:
+**************
+
+    GOSUB GET.BASE.INFO
+    GOSUB GET.AMORT.AMT
+    GOSUB AA.GET.SETT
+    GOSUB GET.PL.CATEGORY
+    GOSUB BUILD.OFS
+
+
+    RETURN
+****************
+GET.PL.CATEGORY:
+****************
+***Based on the initial developement we are conisider only one PL
+***Incase loan contains different PL category he need to manually transfer
+***Transfer from PL
+
+    PLACC ='PL51001'
+
+    RETURN
+
+************
+AA.GET.SETT:
+************
+
+    CALL AA.GET.PROPERTY.RECORD('', ARRANGEMENT.ID, 'ACCOUNT', EFFECTIVE.DATE, 'ACCOUNT', '', R.ARR.ACCOUNT, R.AC.ERR)
+
+    CALL AA.GET.PROPERTY.RECORD('', ARRANGEMENT.ID, 'PAYOFFFEE', EFFECTIVE.DATE, 'CHARGE', '', R.ARR.CHG.AMOUNT, R.CG.ERR)
+
+    CALL AA.GET.PROPERTY.RECORD('', ARRANGEMENT.ID, 'ACCOUNTING', EFFECTIVE.DATE, 'ACCOUNTING', '', R.ARR.ACCOUNTING, R.ACC.ERR)
+
+    APP.NAME = 'AA.ARR.ACCOUNT' : @FM : 'AA.ARR.CHARGE'
+    FIELD.NAME = 'SETTLE.ACCOUNT' : @FM : 'PAYOFF.SETT.AC': @VM : 'CHG.REFUND.RATE':VM:'L.BLUE.RING'
+    FIELD.POS = '';
+    CALL MULTI.GET.LOC.REF(APP.NAME,FIELD.NAME,FIELD.POS)
+    SETT.ACC = ''
+    SETT.ACC = R.ARR.CHG.AMOUNT<AA.CHG.LOCAL.REF,FIELD.POS<2,1>>
+
+    CUST.CHG.RATE = R.ARR.CHG.AMOUNT<AA.CHG.LOCAL.REF,FIELD.POS<2,2>>
+    YR.BR.POS = R.ARR.CHG.AMOUNT<AA.CHG.LOCAL.REF,FIELD.POS<2,3>>
+
+***Settlement Account would be take from payoff property otherwise Account Property
+
+    IF SETT.ACC EQ '' THEN
+        SETT.ACC = R.ARR.ACCOUNT<AA.AC.LOCAL.REF,FIELD.POS<1,1,1>>
+    END
+
+    RETURN
+
+**************
+GET.BASE.INFO:
+**************
+
+    ARR.ID = ARRANGEMENT.ID
+    CALL AA.GET.ARRANGEMENT(ARR.ID,R.ARRANGEMENT,ERR.ARR)
+    ACC.ID = R.ARRANGEMENT<AA.ARR.LINKED.APPL.ID,1>
+    ACC.CCY = R.ARRANGEMENT<AA.ARR.CURRENCY>
+
+    RETURN
+
+**************
+GET.AMORT.AMT:
+**************
+
+    BASE.BALANCE ='EREPTOT'
+    BALANCE.TYPE.AMT ='0'
+    GOSUB CHECK.AC.BALANCE.TYPE
+    FT.AMT = BALANCE.TYPE.AMT
+
+    RETURN
+*******************
+GET.BALANCE.AMOUNT:
+*******************
+
+    BAL.DATE = TODAY
+    BAL.DETS = ''
+    BAL.DATE = EFFECTIVE.DATE
+
+    CALL AC.GET.PERIOD.BALANCES(ACC.ID, BASE.BALANCE, '', BAL.DATE,'', '', BAL.DETS, ERR.PROCESS)
+    BALANCE.TYPE.AMT += BAL.DETS<IC.ACT.BALANCE>
+
+    RETURN
+
+**********************
+CHECK.AC.BALANCE.TYPE:
+**********************
+    R.BALANCE.TYPE = ''
+    BALANCE.TYPE.AMT = ''
+    CALL CACHE.READ("F.AC.BALANCE.TYPE", BASE.BALANCE, R.BALANCE.TYPE, VAL.ERR)
+
+    BASE.BALANCES = R.BALANCE.TYPE<AC.BT.VIRTUAL.BAL>
+    BASE.BAL.COUNT = DCOUNT(BASE.BALANCES, VM)
+    FOR BAL.COUNTER = 1 TO BASE.BAL.COUNT
+        BASE.BALANCE = BASE.BALANCES<1, BAL.COUNTER>
+        GOSUB GET.BALANCE.AMOUNT
+    NEXT BAL.COUNTER
+
+    RETURN
+
+**********
+BUILD.OFS:
+**********
+
+* Default rate would be 100%
+
+    IF CUST.CHG.RATE EQ '' THEN
+        CUST.CHG.RATE = '100'
+    END
+
+    CAL<1>='2'
+    CAL<2>='U'
+    CAL<3>='NATURAL'
+
+    FT.REFUND.AMT = (CUST.CHG.RATE * ABS(FT.AMT)  / 100)
+    CALL EB.ROUND.AMOUNT('JOD',FT.REFUND.AMT,CAL,'')
+
+    IF FT.REFUND.AMT > '0' THEN
+        FT.RECORD =''
+        FT.RECORD<FT.DEBIT.CURRENCY> = ACC.CCY
+        FT.RECORD<FT.DEBIT.AMOUNT> = FT.REFUND.AMT
+        FT.RECORD<FT.DEBIT.ACCT.NO> = PLACC
+        FT.RECORD<FT.TRANSACTION.TYPE> = 'ACCH'
+        FT.RECORD<FT.CREDIT.ACCT.NO> = SETT.ACC
+        FT.RECORD<FT.CREDIT.VALUE.DATE> = EFFECTIVE.DATE
+        FT.RECORD<FT.DEBIT.VALUE.DATE> = EFFECTIVE.DATE
+        FT.RECORD<FT.ORDERING.CUST,1> = ARR.ID
+        FT.RECORD<FT.DEBIT.THEIR.REF> = 'Returned Int'
+        FT.RECORD<FT.CREDIT.THEIR.REF> = 'Returned Int'
+        APP.NAME = "FUNDS.TRANSFER"
+        OFS.RECORD = ''
+        OFSVERSION = APP.NAME:","
+        NO.OF.AUTH = "1"
+        ARR.ACTIVITY.ID =''
+        FUNCT ='I'
+        theResponse = ""
+        txnCommitted = ""
+        options = ''
+        options<1> = "AA.COB"
+        options<4> = "HLD"
+        IF YR.BR.POS EQ 'REGULAR' OR YR.BR.POS EQ 'SPECIAL' THEN
+            NO.OF.AUTH = '0'
+            CALL OFS.BUILD.RECORD(APP.NAME, FUNCT, "PROCESS", OFSVERSION, "", NO.OF.AUTH, ARR.ACTIVITY.ID, FT.RECORD, OFS.RECORD)
+        END ELSE
+            CALL OFS.BUILD.RECORD(APP.NAME, FUNCT, "PROCESS", OFSVERSION, "", NO.OF.AUTH, ARR.ACTIVITY.ID, FT.RECORD, OFS.RECORD)
+        END
+
+        OFS.SOURCE = 'AA.COB'
+
+        CALL OFS.POST.MESSAGE(OFS.RECORD,'',OFS.SOURCE,'')
+    END
+    RETURN

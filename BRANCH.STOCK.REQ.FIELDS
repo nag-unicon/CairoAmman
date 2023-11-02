@@ -1,0 +1,96 @@
+*-----------------------------------------------------------------------------
+* <Rating>-23</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE BRANCH.STOCK.REQ.FIELDS
+*-----------------------------------------------------------------------------
+*<doc>
+* Template for field definitions routine YOURAPPLICATION.FIELDS
+*
+* @author tcoleman@temenos.com
+* @stereotype fields template
+* @uses Table
+* @public Table Creation
+* @package infra.eb
+* </doc>
+*-----------------------------------------------------------------------------
+* Modification History :
+*
+* 19/10/07 - EN_10003543
+*            New Template changes
+*
+* 14/11/07 - BG_100015736
+*            Exclude routines that are not released
+*-----------------------------------------------------------------------------
+*** <region name= Header>
+*** <desc>Inserts and control logic</desc>
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_DataTypes
+*** </region>
+*-----------------------------------------------------------------------------
+    CALL Table.defineId("ID", T24_String)         ;* Define Table id
+    ID.N = '30' ; ID.T = "A"
+*-----------------------------------------------------------------------------
+*
+    fieldName = 'TYPE'
+    fieldLength = '5'
+    fieldType = '':FM:'DRAFT_BCHQ'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'COUNTERPARTY'
+    fieldLength = '16'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("ACCOUNT")
+
+    fieldName = 'CURRENCY'
+    fieldLength = '3'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+    CALL Field.setCheckFile("CURRENCY")
+
+    fieldName = 'NO.OF.DRAFT'
+    fieldLength = '12'
+    fieldType = ''
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'REFERENCE'
+    fieldLength = '16'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'STATUS'
+    fieldLength = '25'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'REJ.REASON'
+    fieldLength = '50'
+    fieldType = 'A'
+    neighbour = ''
+    CALL Table.addFieldDefinition(fieldName, fieldLength, fieldType, neighbour)
+
+    fieldName = 'RESERVED.05'  ;  fieldType = T24_String ; args = Field_NoInput ;  GOSUB ADD.RESERVED.FIELDS
+    fieldName = 'RESERVED.04'  ;  fieldType = T24_String ; args = Field_NoInput ;  GOSUB ADD.RESERVED.FIELDS
+    fieldName = 'RESERVED.03'  ;  fieldType = T24_String ; args = Field_NoInput ;  GOSUB ADD.RESERVED.FIELDS
+    fieldName = 'RESERVED.02'  ;  fieldType = T24_String ; args = Field_NoInput ;  GOSUB ADD.RESERVED.FIELDS
+    fieldName = 'RESERVED.01'  ;  fieldType = T24_String ; args = Field_NoInput ;  GOSUB ADD.RESERVED.FIELDS
+
+    CALL Table.setAuditPosition         ;* Poputale audit information
+
+    RETURN
+*-----------------------------------------------------------------------------
+ADD.RESERVED.FIELDS:
+*------------------
+
+    CALL Table.addField(fieldName, fieldType, args, neighbour)        ;* Add a new fields
+
+    RETURN
+*-----------------------------------------------------------------------------------------------------------------
+END

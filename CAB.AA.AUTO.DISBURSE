@@ -1,0 +1,577 @@
+    SUBROUTINE CAB.AA.AUTO.DISBURSE
+***************************************************************************
+***  CAB AA Auto Disbursement API's will trigger Funds Transfer to Customer Drawdown
+***  Account available in Account property
+***
+***
+***  22-06-2015 : Increase Commitment activity enable user to do auto disbursement
+***                     Functionality has been extended to cover the increase commitment
+***
+***  29-06-2015 : Workflow of auto disbursement has been changed. No more concept of
+***                    post message, it will be handled by OFS.BULK.MANAGER
+***
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     :
+* Development Id   : ITSS
+* Date             :
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Post routine
+* Attached to      : BNK/CAB.AA.AUTO.DISBURSE
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : This Routine to process the Auto Disbursement/Repayment
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref : Disbursement credit account should be taken from ITEM.SUPPLIER for RENEWAL.ENERGY products
+* Modification Date: 21st Nov 2106
+* Modified by      : Muthukaruppan (ITSS)
+* Modifi. Descript : Modified the routine as easy readable/understand. Removed the unnecessary codes from this routine.
+* ----------------------------------------------------------------------------------------------
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.FUNDS.TRANSFER
+    $INSERT I_F.AA.ACCOUNT
+    $INSERT I_F.AA.ARRANGEMENT
+    $INSERT I_F.AA.ARRANGEMENT.ACTIVITY
+    $INSERT I_F.AA.PAYMENT.SCHEDULE
+    $INSERT I_F.AA.CHARGE
+    $INSERT I_AA.APP.COMMON
+    $INSERT I_F.ACCT.ACTIVITY
+    $INSERT I_F.AA.BILL.DETAILS
+    $INSERT I_F.AA.PROPERTY
+    $INSERT TT.BP I_F.AA.AUTO.DISBURSE
+    $INSERT TT.BP I_F.CAB.RENEWABLE.SUPPLIER
+    $INSERT T24.BP I_F.AA.TERM.AMOUNT
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB INIT
+    GOSUB GET.LOCAL.REFERENCE.POS
+    GOSUB PROCESS
+
+    RETURN
+
+*** </region>
+*** <region name= Initialise and Open the Variables>
+
+INIT:
+
+    FN.SAVED.LISTS ='&SAVEDLISTS&'
+    F.SAVEDLISTS = ''
+
+    FN.AA.AUTO.DISBURSE = 'F.AA.AUTO.DISBURSE'
+    F.AA.AUTO.DISBURSE = ''
+    CALL OPF(FN.AA.AUTO.DISBURSE,F.AA.AUTO.DISBURSE)
+
+    OPEN '','&SAVEDLISTS&' TO F.SAVEDLISTS ELSE
+        ERR.OPEN ='EB.RTN.CANT.OPEN.&SAVEDLISTS'
+    END
+
+    KEY.ID = "AUTO.DISBURSEMENT":ID.COMPANY :'_': TODAY:".csv"
+
+    READ R.LOG.LIST FROM F.SAVEDLISTS, KEY.ID ELSE          ;* File does not exist. Strange!
+    END
+
+    RETURN
+
+*** </region>
+*** <region name= Get the Local Reference Positions>
+
+GET.LOCAL.REFERENCE.POS:
+
+    APPLS   = 'AA.PRD.DES.ACCOUNT' :FM: 'AA.PRD.DES.PAYMENT.SCHEDULE' :FM: 'AA.PRD.DES.CHARGE':FM:'AA.PRD.DES.TERM.AMOUNT'
+    FLD.VALS = 'DRAWACCOUNT' :VM: 'ITEM.SUPPLIER' :VM: 'SETTLE.ACCOUNT' :FM: 'DAYS' :VM: 'BILL.INT.AMT' :VM: 'BILL.COMM.AMT' :VM: 'TOTAL.INTEREST' :VM: 'TOTAL.COMM' :FM: 'ANNUALCOMM.PER':FM:'PARTIAL.AMT'
+    FLD.POS  = ''
+
+    CALL MULTI.GET.LOC.REF(APPLS,FLD.VALS,FLD.POS)
+
+    DRAWACCOUNT.POS   = FLD.POS<1,1>
+    ITEM.SUPPLIER.POS = FLD.POS<1,2>
+    SETTLE.ACCOUNT.POS= FLD.POS<1,3>
+
+    DAYS.POS           = FLD.POS<2,1>
+    BILL.INT.AMT.POS   = FLD.POS<2,2>
+    BILL.COMM.AMT.POS  = FLD.POS<2,3>
+    TOTAL.INTEREST.POS = FLD.POS<2,4>
+    TOTAL.COMM.POS     = FLD.POS<2,5>
+
+    ANNUALCOMM.PER.POS = FLD.POS<3,1>
+
+    Y.PAR.AMT.POS  = FLD.POS<4,1>
+    RETURN
+
+*** </region>
+*** <region name= Select all the records from FBNK.AA.AUTO.DISBURSE and process>
+
+PROCESS:
+
+    SEL.CMD= 'SELECT ' : FN.AA.AUTO.DISBURSE
+    CALL EB.READLIST(SEL.CMD, KEY.LIST, '', SELECT.NO, RET.CODE)
+
+    KEY.CNT = DCOUNT(KEY.LIST,FM)
+
+    FOR I=1 TO KEY.CNT
+
+        GOSUB GET.ARRANGEMENT
+        GOSUB GET.AUTO.DISBURSE.DETAILS
+        GOSUB GET.CREDIT.ACCOUNT
+        GOSUB GET.TERM.AMOUNT.DETAIL
+
+        IF CREDIT.ACCT THEN
+            GOSUB CHECK.AUTO.DISBURSE
+        END
+
+    NEXT I
+
+    RETURN
+
+*** </region>
+*** <region name= Get the Arrangement Record>
+
+GET.ARRANGEMENT:
+
+    ARRANGEMENT.ID = KEY.LIST<I>
+
+    R.ARRANGEMENT = ""
+    CALL AA.GET.ARRANGEMENT(ARRANGEMENT.ID, R.ARRANGEMENT, "")
+
+    ACCOUNT.ID           = R.ARRANGEMENT<AA.ARR.LINKED.APPL.ID,1>
+    ARRANGEMENT.CURRENCY = R.ARRANGEMENT<AA.ARR.CURRENCY>
+    PRODUCT.GROUP        = R.ARRANGEMENT<AA.ARR.PRODUCT.GROUP>
+    ARRANGEMENT.DATE     = R.ARRANGEMENT<AA.ARR.START.DATE>
+
+    RETURN
+
+*** </region>
+*** <region name= Read the AA.AUTO.DISBURSE file for the arrangement id>
+
+GET.AUTO.DISBURSE.DETAILS:
+
+    CALL LOAD.COMPANY(R.ARRANGEMENT<AA.ARR.CO.CODE>)
+
+    CALL F.READ(FN.AA.AUTO.DISBURSE,ARRANGEMENT.ID,R.AA.AUTO.DISBURSE,F.AA.AUTO.DISBURSE,ER.AUTO)
+
+    ST.DATE = R.AA.AUTO.DISBURSE<CAB.ST.DATE.ACT>
+
+    RETURN
+
+*** </region>
+*** <region name= Get Credit Account from AA.ARR.ACCOUNT application for the arrangement>
+***<desc = Credit Account should be taken from ITEM.SUPPLIED if arrangement belongs to Renewal Energy product else DRAWACCOUNT.>
+
+GET.CREDIT.ACCOUNT:
+
+    EFFECTIVE.DATE = ST.DATE
+    CALL AA.GET.PROPERTY.RECORD('', ARRANGEMENT.ID, 'ACCOUNT', EFFECTIVE.DATE, 'ACCOUNT', '', PROPERTY.RECORD, RET.ERR)
+
+    SupplierAccount = 0
+    BEGIN CASE
+
+    CASE R.ARRANGEMENT<AA.ARR.PRODUCT.GROUP> EQ "RENEWABLE.ENERGY"    ;* Credit Account for Renewal Energy product
+        ITEM.SUPPLIER = PROPERTY.RECORD<AA.AC.LOCAL.REF, ITEM.SUPPLIER.POS>
+        CREDIT.ACCT   = PROPERTY.RECORD<AA.AC.LOCAL.REF, SETTLE.ACCOUNT.POS>
+
+        FN.CAB.RENEWABLE.SUPPLIER = "F.CAB.RENEWABLE.SUPPLIER"
+        F.CAB.RENEWABLE.SUPPLIER = ""
+        CALL OPF(FN.CAB.RENEWABLE.SUPPLIER, F.CAB.RENEWABLE.SUPPLIER)
+
+        R.CAB.RENEWABLE.SUPPLIER = ""
+        ERR.CAB.RENEWABLE.SUPPLIER = ""
+        CALL F.READ(FN.CAB.RENEWABLE.SUPPLIER, ITEM.SUPPLIER, R.CAB.RENEWABLE.SUPPLIER, F.CAB.RENEWABLE.SUPPLIER, ERR.CAB.RENEWABLE.SUPPLIER)
+
+        IF R.CAB.RENEWABLE.SUPPLIER<CAB.CUS.ACCOUNT> THEN
+            SUPPLIER.ACCT = R.CAB.RENEWABLE.SUPPLIER<CAB.CUS.ACCOUNT>
+            SupplierAccount = 1
+        END
+
+    CASE 1
+        CREDIT.ACCT = PROPERTY.RECORD<AA.AC.LOCAL.REF, DRAWACCOUNT.POS>
+
+    END CASE
+
+    REPAY.ACCT    = PROPERTY.RECORD<AA.AC.LOCAL.REF, SETTLE.ACCOUNT.POS>
+
+    RETURN
+
+GET.TERM.AMOUNT.DETAIL:
+    PROPERTY.CLASS = "TERM.AMOUNT"
+
+    GOSUB GET.ARRANGEMENT.CONDITIONS
+    R.TERM.AMOUNT = R.AA.RECORD
+    Y.PARTIAL.AMT = R.TERM.AMOUNT<AA.AMT.LOCAL.REF,Y.PAR.AMT.POS>
+
+    RETURN
+*** </region>
+*** <region name= Check Auto Disburse>
+***<desc = Process the Required Activity (Disbursement/Repayment/Calc Charge) based on the action defined in NEXT.ACTION field>
+
+CHECK.AUTO.DISBURSE:
+
+    PR.CNT = DCOUNT(R.AA.AUTO.DISBURSE<CAB.NEXT.ACTION>, VM)
+
+    BEGIN CASE
+
+    CASE R.AA.AUTO.DISBURSE<CAB.NEXT.ACTION,1> EQ 'DISBURSE'
+        GOSUB TRIG.FUND.TRANS
+
+        IF SupplierAccount AND AVAIL.AMT GT 0 THEN
+            GOSUB PROCESS.SUPPLIER.ACCOUNT.TXN
+        END
+
+        PROCESS.ARR.ID = ARRANGEMENT.ID : '-DISBURSE'
+        DEL R.AA.AUTO.DISBURSE<CAB.NEXT.ACTION,1>
+
+    CASE R.AA.AUTO.DISBURSE<CAB.NEXT.ACTION,1> EQ 'CALCULATE'
+
+        IF PRODUCT.GROUP EQ 'COMM.DISC.BILLS' THEN
+            GOSUB GET.CONDITIONS
+        END
+
+        GOSUB POST.RENEGO
+        R.RECORD.ARRAY = AA.RECORD
+        GOSUB PROCESS.OFS.RECORD
+        PROCESS.ARR.ID = ARRANGEMENT.ID : '-CALCULATE'
+        DEL R.AA.AUTO.DISBURSE<CAB.NEXT.ACTION,1>
+
+    CASE R.AA.AUTO.DISBURSE<CAB.NEXT.ACTION,1> EQ 'REMOVE'
+
+        PROCESS.ARR.ID = ARRANGEMENT.ID : '-REMOVE'
+        DEL R.AA.AUTO.DISBURSE<CAB.NEXT.ACTION,1>
+
+    CASE R.AA.AUTO.DISBURSE<CAB.NEXT.ACTION,1> EQ 'SET.DUES'
+        GOSUB SET.DUE.AMOUNT
+        PROCESS.ARR.ID = ARRANGEMENT.ID : '-SET.DUES'
+        DEL R.AA.AUTO.DISBURSE<CAB.NEXT.ACTION,1>
+
+    CASE R.AA.AUTO.DISBURSE<CAB.NEXT.ACTION,1> EQ 'INTEREST'
+        GOSUB POST.PRI.INTEREST
+        R.RECORD.ARRAY = AA.RECORD
+        GOSUB PROCESS.OFS.RECORD
+
+        GOSUB POST.PEN.INTEREST
+        R.RECORD.ARRAY = AA.RECORD
+        GOSUB PROCESS.OFS.RECORD
+
+        PROCESS.ARR.ID = ARRANGEMENT.ID : '-INTEREST'
+        DEL R.AA.AUTO.DISBURSE<CAB.NEXT.ACTION,1>
+
+    END CASE
+
+    GOSUB PROCESS.LOG
+    GOSUB WRITE.PROCESS
+
+    RETURN
+
+*** </region>
+*** <region name= Process Disbursement Activity>
+
+TRIG.FUND.TRANS:
+
+    IF Y.PARTIAL.AMT NE '' THEN
+        AVAIL.AMT = Y.PARTIAL.AMT
+
+    END ELSE
+        BAL.LIST        = "CURCOMMITMENT"
+        VALUE.TRADE<3>  = "ALL"
+        VALUE.TRADE<4>  = "ECB"
+        PERIOD.ST.DATE  = TODAY
+        PERIOD.END.DATE = TODAY
+        SYSTEM.DATE     = TODAY
+
+        CALL AA.GET.PERIOD.BALANCES(ACCOUNT.ID, BAL.LIST, VALUE.TRADE, PERIOD.ST.DATE, PERIOD.END.DATE, SYSTEM.DATE, BAL.DETS, ERR.PROCESS)
+
+        AVAIL.AMT = ABS(BAL.DETS<IC.ACT.BALANCE>)
+    END
+
+    IF AVAIL.AMT GT 0 THEN    ;*** Do Auto disbursement only CURCOMMITMENT has value
+        FT.RECORD =''
+        FT.RECORD<FT.DEBIT.CURRENCY>    = ARRANGEMENT.CURRENCY
+        FT.RECORD<FT.DEBIT.AMOUNT>      = AVAIL.AMT
+        FT.RECORD<FT.DEBIT.ACCT.NO>     = ARRANGEMENT.ID
+        FT.RECORD<FT.TRANSACTION.TYPE>  = 'ACDI'
+        FT.RECORD<FT.CREDIT.ACCT.NO>    = CREDIT.ACCT
+        FT.RECORD<FT.CREDIT.VALUE.DATE> = ST.DATE
+        FT.RECORD<FT.DEBIT.VALUE.DATE>  = ST.DATE
+
+        APP.NAME   = "FUNDS.TRANSFER"
+        R.RECORD.ARRAY = FT.RECORD
+
+        GOSUB PROCESS.OFS.RECORD
+    END
+
+    RETURN
+
+PROCESS.SUPPLIER.ACCOUNT.TXN:
+
+    FT.RECORD =''
+    FT.RECORD<FT.DEBIT.CURRENCY>    = ARRANGEMENT.CURRENCY
+    FT.RECORD<FT.DEBIT.AMOUNT>      = AVAIL.AMT
+    FT.RECORD<FT.DEBIT.ACCT.NO>     = CREDIT.ACCT ;* Debit the Settlement Account to move it to Supplier Account
+    FT.RECORD<FT.TRANSACTION.TYPE>  = 'AC'
+    FT.RECORD<FT.CREDIT.ACCT.NO>    = SUPPLIER.ACCT         ;* Credit the Disbursement Amount into Supplier Account
+    FT.RECORD<FT.CREDIT.THEIR.REF>  = ACCOUNT.ID
+    FT.RECORD<FT.CREDIT.VALUE.DATE> = ST.DATE
+    FT.RECORD<FT.DEBIT.VALUE.DATE>  = ST.DATE
+    FT.RECORD<FT.DEBIT.THEIR.REF>   = "Trans-SupplierAc"
+
+    APP.NAME   = "FUNDS.TRANSFER"
+    R.RECORD.ARRAY = FT.RECORD
+
+    GOSUB PROCESS.OFS.RECORD
+
+    RETURN
+
+*** </region>
+***<desc = Process Periodic Reset Activity for Principal Interest property>
+
+POST.PRI.INTEREST:
+
+    APP.NAME = "AA.ARRANGEMENT.ACTIVITY"
+    AA.RECORD<AA.ARR.ACT.EFFECTIVE.DATE> = ST.DATE
+    AA.RECORD<AA.ARR.ACT.ACTIVITY>       = "LENDING-PERIODIC.RESET-PRINCIPALINT"
+    AA.RECORD<AA.ARR.ACT.ARRANGEMENT>    = ARRANGEMENT.ID
+
+    RETURN
+
+*** </region>
+***<desc = Process Periodic Reset Activity for Penalty Interest property>
+
+POST.PEN.INTEREST:
+
+    APP.NAME = "AA.ARRANGEMENT.ACTIVITY"
+    AA.RECORD<AA.ARR.ACT.EFFECTIVE.DATE> = ST.DATE
+    AA.RECORD<AA.ARR.ACT.ACTIVITY>       = "LENDING-PERIODIC.RESET-PENALTYINT"
+    AA.RECORD<AA.ARR.ACT.ARRANGEMENT>    = ARRANGEMENT.ID
+
+    RETURN
+
+*** </region>
+***<desc = Process Calc Charge Activity to collect New arrangement Fee>
+
+POST.RENEGO:
+
+    APP.NAME                             = "AA.ARRANGEMENT.ACTIVITY"
+    AA.RECORD<AA.ARR.ACT.EFFECTIVE.DATE> = ST.DATE
+    AA.RECORD<AA.ARR.ACT.ACTIVITY>       = "LENDING-CALC-CHARGE"
+    AA.RECORD<AA.ARR.ACT.ARRANGEMENT>    = ARRANGEMENT.ID
+
+    RETURN
+
+*** </region>
+***<desc = Process Repayment Activity to settle the Dues >
+
+SET.DUE.AMOUNT:
+
+    BAL.AMOUNT   = 0
+
+    PROCESS.TYPE = 'INITIALISE'
+    R.AA.ACCOUNT.DETAILS = ''
+
+    CALL AA.PROCESS.ACCOUNT.DETAILS(ARRANGEMENT.ID, PROCESS.TYPE, UPDATE.TYPE, R.AA.ACCOUNT.DETAILS, RET.ERROR)
+
+    BILL.TYPE = "ACT.CHARGE"  ;* Get only ACT.CHARGE related bills
+    PAYMENT.METHOD = "DUE"    ;* Get only payments which needs to be made due and not capitalise
+    BILL.STATUS = "DUE"
+    SETTLE.STATUS = ""
+    BILL.REFERENCE = ""
+
+    CALL AA.GET.BILL(ARRANGEMENT.ID, "", "", "", BILL.TYPE, PAYMENT.METHOD, BILL.STATUS, SETTLE.STATUS, "", "", "", BILL.REFERENCE, RET.ERROR)
+
+    LOOP
+        REMOVE BILL.ID FROM BILL.REFERENCE SETTING BILL.POS
+    WHILE BILL.ID : BILL.POS
+
+        CALL AA.GET.BILL.DETAILS(ARRANGEMENT.ID, BILL.ID, BILL.DETAILS, RET.ERROR)
+        BAL.AMOUNT = BILL.DETAILS<AA.BD.OS.TOTAL.AMOUNT>
+
+        IF ABS(BAL.AMOUNT) GT 0 THEN
+
+            FT.RECORD =''
+            BILL.PROPERTY = BILL.DETAILS<AA.BD.PAY.PROPERTY,1>
+
+            CALL CACHE.READ("F.AA.PROPERTY", BILL.PROPERTY, R.AA.PROPERTY, ERR.AA.PROPERTY)
+
+            FT.RECORD<FT.DEBIT.THEIR.REF> = R.AA.PROPERTY<AA.PROP.DESCRIPTION,1>[1,16]
+
+            FT.RECORD<FT.DEBIT.CURRENCY>   = ARRANGEMENT.CURRENCY
+            FT.RECORD<FT.DEBIT.AMOUNT>     = ABS(BAL.AMOUNT)
+            FT.RECORD<FT.DEBIT.ACCT.NO>    = REPAY.ACCT
+            FT.RECORD<FT.TRANSACTION.TYPE> = 'ACRP'
+            FT.RECORD<FT.CREDIT.ACCT.NO>   = ARRANGEMENT.ID
+            FT.RECORD<FT.CREDIT.VALUE.DATE>= ST.DATE
+            FT.RECORD<FT.DEBIT.VALUE.DATE> = ST.DATE
+
+            APP.NAME = "FUNDS.TRANSFER"
+            R.RECORD.ARRAY = FT.RECORD
+            GOSUB PROCESS.OFS.RECORD
+        END
+
+    REPEAT
+
+    RETURN
+
+*** </region>
+***<desc = Process OFS Record (AA.ARRANGEMENT.ACTIVITY/FUNDS.TRANSFER)>
+
+PROCESS.OFS.RECORD:
+
+    OFS.RECORD = ''
+    OFSVERSION = APP.NAME:","
+    NO.OF.AUTH = "0"
+    ARR.ACTIVITY.ID = ""
+    FUNCT = "I"
+    TRANSACTION.ID = ""
+    GTS.MODE = 1
+
+    CALL OFS.BUILD.RECORD(APP.NAME, FUNCT, "PROCESS", OFSVERSION, GTS.MODE, NO.OF.AUTH, TRANSACTION.ID, R.RECORD.ARRAY, OFS.RECORD)
+
+    R.LOG.LIST<-1> = OFS.RECORD
+    theResponse    = ""
+    txnCommitted   = ""
+    options        = ""
+    options<1>     = "AA.AUTO.DISB"
+    options<4>     = "HLD"
+
+    R.LOG.LIST<-1> = OFS.RECORD
+    CALL OFS.CALL.BULK.MANAGER(options,OFS.RECORD,theResponse,txnCommitted)
+
+    RETURN
+
+*** </region>
+
+PROCESS.OFS.MESSAGE:
+
+    APP.NAME = "AA.ARRANGEMENT.ACTIVITY"
+    OFS.RECORD = ''
+    OFSVERSION = APP.NAME:","
+    NO.OF.AUTH = "0"
+    ARR.ACTIVITY.ID = ""
+    FUNCT = "I"
+    TRANSACTION.ID = ""
+    GTS.MODE = 1
+
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ARRANGEMENT>    = ARRANGEMENT.ID
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.EFFECTIVE.DATE> = ARRANGEMENT.DATE
+
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,3> = "CURRENCY:1:1"
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,3>= "JOD"
+
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,4> = "CHARGE.TYPE:1:1"
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,4>= "FIXED"
+
+    CALL OFS.BUILD.RECORD(APP.NAME, FUNCT, "PROCESS", OFSVERSION, GTS.MODE, NO.OF.AUTH, TRANSACTION.ID, R.AA.ARRANGEMENT.ACTIVITY, OFS.RECORD)
+
+    theResponse    = ""
+    txnCommitted   = ""
+    options        = ""
+    options<1>     = "AA.CHARGE"
+    options<4>     = "HLD"
+
+    CALL OFS.CALL.BULK.MANAGER(options,OFS.RECORD,theResponse,txnCommitted)
+
+    RETURN
+
+*** </region>
+*** <region name= GET.CONDITIONS>
+
+GET.CONDITIONS:
+
+    returnConditions = ''
+    PROPERTY.CLASS = "PAYMENT.SCHEDULE"
+    property = ""
+    GOSUB GET.ARRANGEMENT.CONDITIONS
+    R.AA.PAYMENT.SCHEDULE = R.AA.RECORD
+
+    PROPERTY.CLASS = "CHARGE"
+    property = 'DISCOUNTINT'
+    GOSUB GET.ARRANGEMENT.CONDITIONS
+    R.AA.CHARGE = R.AA.RECORD
+    DISCOUNTINT.AMOUNT = R.AA.CHARGE<AA.CHG.FIXED.AMOUNT>
+
+    IF R.AA.PAYMENT.SCHEDULE<AA.PS.LOCAL.REF, TOTAL.INTEREST.POS> AND DISCOUNTINT.AMOUNT NE R.AA.PAYMENT.SCHEDULE<AA.PS.LOCAL.REF, TOTAL.INTEREST.POS> THEN
+
+        R.AA.ARRANGEMENT.ACTIVITY = ""
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ACTIVITY>       = "LENDING-CHANGE-DISCOUNTINT"
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.PROPERTY,1>     = "DISCOUNTINT"
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,1> = 'FIXED.AMOUNT:1:1'
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,1>= SUM(R.AA.PAYMENT.SCHEDULE<AA.PS.LOCAL.REF, BILL.INT.AMT.POS>)
+
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,2> = 'ANNUALCOMM.PER:1:1'
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,2>= R.AA.CHARGE<AA.CHG.LOCAL.REF, ANNUALCOMM.PER.POS>
+
+        GOSUB PROCESS.OFS.MESSAGE
+    END
+
+    property = 'ANNUALCOMM'
+    GOSUB GET.ARRANGEMENT.CONDITIONS
+    R.AA.CHARGE = R.AA.RECORD
+    COMMISSION.AMOUNT = R.AA.CHARGE<AA.CHG.FIXED.AMOUNT>
+
+    IF R.AA.PAYMENT.SCHEDULE<AA.PS.LOCAL.REF, TOTAL.COMM.POS> AND COMMISSION.AMOUNT NE R.AA.PAYMENT.SCHEDULE<AA.PS.LOCAL.REF, TOTAL.COMM.POS> THEN
+
+        R.AA.ARRANGEMENT.ACTIVITY = ""
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ACTIVITY>       = "LENDING-CHANGE-ANNUALCOMM"
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.PROPERTY,1>     = "ANNUALCOMM"
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,1> = 'FIXED.AMOUNT:1:1'
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,1>=  SUM(R.AA.PAYMENT.SCHEDULE<AA.PS.LOCAL.REF, BILL.COMM.AMT.POS>)
+
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.NAME,1,2> = 'ANNUALCOMM.PER:1:1'
+        R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.FIELD.VALUE,1,2>= R.AA.CHARGE<AA.CHG.LOCAL.REF, ANNUALCOMM.PER.POS>
+
+        GOSUB PROCESS.OFS.MESSAGE
+    END
+
+    RETURN
+
+*** </region>
+
+*** <region name= GET.ARRANGEMENT.CONDITIONS>
+
+GET.ARRANGEMENT.CONDITIONS:
+
+    returnConditions = ''
+    CALL AA.GET.ARRANGEMENT.CONDITIONS(ARRANGEMENT.ID, PROPERTY.CLASS, property, ARRANGEMENT.DATE, '', returnConditions, '')
+    R.AA.RECORD = RAISE(returnConditions)
+
+    RETURN
+
+*** </region>
+
+***<desc = Process to update LOG File for the processed arrangements>
+
+PROCESS.LOG:
+
+    R.LOG.LIST<-1> = PROCESS.ARR.ID
+    IF R.LOG.LIST THEN
+        WRITELIST R.LOG.LIST TO KEY.ID
+    END
+    RETURN
+
+*** </region>
+
+***<desc = Process to update the AA.AUTO.DISBURSE file>
+
+WRITE.PROCESS:
+
+    REM.PROC  ='0'
+    REM.PROC = DCOUNT(R.AA.AUTO.DISBURSE<CAB.NEXT.ACTION>,@VM)
+    IF REM.PROC GT 0  THEN
+        CALL F.WRITE(FN.AA.AUTO.DISBURSE,ARRANGEMENT.ID,R.AA.AUTO.DISBURSE)
+    END ELSE
+        CALL F.DELETE(FN.AA.AUTO.DISBURSE,ARRANGEMENT.ID)
+    END
+
+    RETURN
+
+PROGRAM.END:
+
+    RETURN TO PROGRAM.END
+END

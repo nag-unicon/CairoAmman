@@ -1,0 +1,135 @@
+    SUBROUTINE CAB.AA.A.CREATE.CASH.POOL
+*--------------------------------------------------------------------------------------------------------------*
+* Date   - 23/06/2014
+* Author - Gokul
+* Desc   - This routine is attached as Auth Routine to the AA.ARR.ACCOUNT Versions.
+*          Upon authorising any record in AA.ARR.ACCOUNT record AC.CASH.POOL record
+*          will be created for the Settlement Account
+* Attached Versions - AA.ARR.ACCOUNT,AA.EASY , AA.ARR.ACCOUNT,AA.SIMPLE,AA.ARR.ACCOUNT,CONTROL,AA.PRD.DES
+*--------------------------------------------------------------------------------------------------------------*
+
+    $INCLUDE T24.BP I_COMMON
+    $INCLUDE T24.BP I_EQUATE
+    $INCLUDE T24.BP I_F.AA.ACCOUNT
+    $INCLUDE T24.BP I_F.AA.ARRANGEMENT.ACTIVITY
+    $INCLUDE T24.BP I_F.ACCOUNT
+    $INCLUDE T24.BP I_F.AC.CASH.POOL
+    $INSERT I_AA.ACTION.CONTEXT
+    $INSERT I_AA.APP.COMMON
+
+    GOSUB INIT
+    GOSUB PROCESS.INIT
+
+    RETURN
+*****
+INIT:
+*****
+    PRO.STATUS = c_arrActivityStatus["-",1,1]
+    ARRANGEMENT.ID = AA$ARR.ID          ;* Arrangement contract Id
+    ACTIVITY.ID = AA$CURR.ACTIVITY
+
+    RETURN
+
+*************
+PROCESS.INIT:
+*************
+
+    IF (PRO.STATUS EQ "AUTH" AND ACTIVITY.ID EQ "LENDING-NEW-ARRANGEMENT") THEN
+        GOSUB INITIALISE
+        IF AC.CASH.ID NE '' THEN
+            GOSUB CREATE.CASH.POOL
+        END
+    END
+    RETURN
+
+***********
+INITIALISE:
+***********
+
+    FN.AA.DUE.BP = "AA.DUE.BP"
+    F.AA.DUE.BP = ""
+    OPEN FN.AA.DUE.BP TO F.AA.DUE.BP ELSE
+        EXECUTE "CREATE FN.AA.DUE.BP TYPE=UD"
+    END
+*
+    APPL ="AA.PRD.DES.ACCOUNT"
+    APPL.FLD = "SETTLE.ACCOUNT"
+    APPL.POS = ""
+    CALL MULTI.GET.LOC.REF(APPL,APPL.FLD,APPL.POS)
+*
+    FN.AA.ARR.ACCOUNT = "F.AA.ARR.ACCOUNT"
+    F.AA.ARR.ACCOUNT = ""
+    CALL OPF(FN.AA.ARR.ACCOUNT,F.AA.ARR.ACCOUNT)
+    R.AC.CASH.POOL  = ""
+    ACC.RECORD = ""
+
+    ARRANGEMENT.ID = AA$ARR.ID
+    EFFECTIVE.DATE = AA$ACTIVITY.EFF.DATE
+    ACC.RECORD = ""
+    CALL AA.GET.PROPERTY.RECORD('', ARRANGEMENT.ID, 'ACCOUNT', EFFECTIVE.DATE, 'ACCOUNT', '', ACC.RECORD, R.ERR)
+
+    SETTLE.ID = ACC.RECORD<AA.AC.LOCAL.REF,APPL.POS>
+
+    AC.CASH.ID = ACC.RECORD<AA.AC.ACCOUNT.REFERENCE>
+
+    RETURN
+*
+*****************
+CREATE.CASH.POOL:
+*****************
+    R.AC.CASH.POOL<AC.CP.RULE,1> ="AAMAIN"
+    R.AC.CASH.POOL<AC.CP.MINIMUM.AMT,1> = "0"
+    R.AC.CASH.POOL<AC.CP.SEQUENCE> = "1"
+    R.AC.CASH.POOL<AC.CP.ID.BAL.TYPE,1> = "TOTALDUE"
+    R.AC.CASH.POOL<AC.CP.FREQUENCY,1> = "BSNSS"
+    R.AC.CASH.POOL<AC.CP.LINK.ACCT,1> =  SETTLE.ID
+    Y.OFS.SRC  = "AA.COB"
+    APP.NAME = "AC.CASH.POOL"
+    VERSION.NAME = "AC.CASH.POOL,SETTLE"
+    FUNCT = "I"
+    GTS.CONTROL = '1'
+    NO.OF.AUTH ='0'
+    RESPONSE = ''
+    GTS.CONTROL = '1'         ;* Put errors in HLD
+    NO.OF.AUTH = '0'
+    TXN.ID = AC.CASH.ID
+    IN.REC = ''
+    OFS.RECORD = ''
+    OFS.SRC = "AA.COB"
+
+    CALL OFS.BUILD.RECORD(APP.NAME, FUNCT, "PROCESS", VERSION.NAME, GTS.CONTROL, NO.OF.AUTH, TXN.ID, R.AC.CASH.POOL, OFS.RECORD)
+*
+
+    CALL.INFO = ""
+    CALL.INFO<1> = OFS.SRC
+    CALL.INFO<4> = "HLD"      ;* Processing should put errors in HLD
+*    CALL OFS.CALL.BULK.MANAGER(CALL.INFO, OFS.RECORD, OFS.RESPONSE, '')
+    OFS.SOURCE = 'AA.COB'
+
+    CALL OFS.POST.MESSAGE(OFS.RECORD,'',OFS.SOURCE,'')
+
+    GOSUB LOG.MESSAGE
+*
+    RETURN
+*
+************
+LOG.MESSAGE:
+*************
+* Status of FT processed for past due bills and penalty accounts are logged here
+    OFS.RESPONSE =''
+    STATUS.MSG = FIELD(OFS.RESPONSE,',',1)
+    STATUS.MSG = FIELD(STATUS.MSG,'/',3)
+    T24.RESP.MSG=FIELD(OFS.RESPONSE,',',2)
+    T24.REF.ID = FIELD(OFS.RESPONSE,'/',1)
+
+    IF STATUS.MSG EQ 1 THEN
+        LOG.VAL = TXN.ID:',':ARRANGEMENT.ID:',':'SUCCESS'
+    END ELSE
+        LOG.VAL = TXN.ID:',':ARRANGEMENT.ID:',':'FAILURE'
+    END
+
+    WRITE LOG.VAL  TO F.AA.DUE.BP,"cashpool.log"
+
+*
+    RETURN
+END

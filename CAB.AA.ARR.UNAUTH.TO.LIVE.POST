@@ -1,0 +1,28 @@
+    SUBROUTINE CAB.AA.ARR.UNAUTH.TO.LIVE.POST
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+
+
+    OPEN '&SAVEDLISTS&' TO TMP.SAVE ELSE NULL
+
+    SEL.CMD = "SELECT &SAVEDLISTS& WITH @ID LIKE AA_PropertyRecord...":TODAY:".csv"
+    CALL EB.READLIST(SEL.CMD, KEY.LIST, '', SELECT.NO, RET.CODE)
+
+    FOR SCNT = 1 TO SELECT.NO
+
+        R.CLOSEDACCOUNTS = ''
+        READ R.CLOSEDACCOUNTS FROM TMP.SAVE, KEY.LIST<SCNT> ELSE      ;* File does not exist. Strange!
+            CONTINUE
+        END
+
+        FULL.ARRAY<-1> = R.CLOSEDACCOUNTS
+
+        DELETE  TMP.SAVE, KEY.LIST<SCNT>
+
+    NEXT SCNT
+
+    IF FULL.ARRAY THEN
+        KEY.FORMAT = "AA_PropertyRecord_":TODAY:".csv"       ;* This file without session number consolidates all data
+        WRITE FULL.ARRAY TO TMP.SAVE, KEY.FORMAT  ;* Write it out. Job well done!
+    END

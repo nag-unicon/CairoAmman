@@ -1,0 +1,71 @@
+* Developed by - ksrini@temenos.com
+
+    SUBROUTINE B.CAB.STO.COE.EXTRACT.LOAD
+
+************************************************************************
+* This Service routine will
+* - Select the FT WITH INWARD.PAY.TYPE LIKE STO... AND CREDIT.ACCT.NO LIKE ...12432...
+* - With the returned FT list, read & format the STO related details
+* - Produce flat files in a folder
+* It is designed for the STO-COE interface.
+*
+*                  ---- MODIFICATIONS ---------
+*
+* 21-Oct-2012 - Initial Creation
+************************************************************************
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_B.CAB.STO.COE.EXTRACT
+
+    GOSUB INITIALISE
+
+    RETURN
+
+************************************************************************
+
+INITIALISE:
+
+    LOC.OUT.DIR = "STO.BATCH/OUT/STO.COE.TMP"
+
+    OPEN LOC.OUT.DIR TO F.OUT.FILE ELSE
+        PRINT "Can not open file ":LOC.OUT.DIR
+        RETURN
+    END
+
+    FN.FUNDS.TRANSFER= 'F.FUNDS.TRANSFER'
+    F.FUNDS.TRANSFER  = ''
+    CALL OPF(FN.FUNDS.TRANSFER,F.FUNDS.TRANSFER)
+
+    FN.STO = 'F.STANDING.ORDER'
+    F.STO  = ''
+    CALL OPF(FN.STO,F.STO)
+
+    FN.FTTC = 'F.FT.TXN.TYPE.CONDITION'
+    F.FTTC  = ''
+    CALL OPF(FN.FTTC,F.FTTC)
+
+    FN.TXN = 'F.TRANSACTION'
+    F.TXN  = ''
+    CALL OPF(FN.TXN,F.TXN)
+
+    FN.CCY = 'F.CURRENCY'
+    F.CCY  = ''
+    CALL OPF(FN.CCY,F.CCY)
+
+    FN.CUSTOMER = 'F.CUSTOMER'
+    F.CUSTOMER = ''
+    CALL OPF(FN.CUSTOMER,F.CUSTOMER)
+
+    CALL MULTI.GET.LOC.REF('STANDING.ORDER','KIN.ACCT.NO',LRF.POS)
+    KIN.ACCT.NO.POS = LRF.POS<1,1>
+
+
+    LOC.DEL.CMD = "CLEAR.FILE ":LOC.OUT.DIR
+    EXECUTE LOC.DEL.CMD
+
+    RETURN
+
+************************************************************************
+
+END

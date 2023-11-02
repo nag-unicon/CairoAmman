@@ -1,0 +1,54 @@
+    SUBROUTINE CAB.AA.CLOSE.PENDING.CLOSURE.LOAD
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 20th Dec 2016
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Load routine
+* Attached to      : BNK/CAB.AA.CLOSE.PENDING.CLOSURE
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : Load Routine to initialise and Open the variables to Trigger the Close arrangement Activity
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT TT.BP I_CAB.AA.CLOSE.PENDING.CLOSURE.COMMON
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB OPEN.FILES
+
+    RETURN
+
+*** </region>
+*** <region name= Main Body>
+
+OPEN.FILES:
+
+    FN.AA.ARRANGEMENT = "F.AA.ARRANGEMENT"
+    F.AA.ARRANGEMENT = ""
+    CALL OPF(FN.AA.ARRANGEMENT, F.AA.ARRANGEMENT)
+
+    FN.ACCOUNT = "F.ACCOUNT"
+    F.ACCOUNT = ""
+    CALL OPF(FN.ACCOUNT, F.ACCOUNT)
+    RETURN
+
+END

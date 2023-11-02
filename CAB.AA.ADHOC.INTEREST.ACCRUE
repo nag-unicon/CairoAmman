@@ -1,0 +1,132 @@
+    SUBROUTINE CAB.AA.ADHOC.INTEREST.ACCRUE(ARR.ID)
+
+**********************************************************************************
+***  This is adhoc service, If bank required to accure interest on online they can
+***  run this service and accure interest uptodate
+***
+*** Author : Arundharun
+***
+*** Now, Through this routine i am going to check the current dated product and its interest
+*** Property
+
+*** Modified by : Muthukaruppan
+ 
+*** Purpose     : This Routine is used to trigger the LENDING-ACCRUE-INTEREST(PRINCIPALINT & PENALTYINT) acitivty for all the migrated arrangements
+***              which is more than 12 characters.
+***
+**********************************************************************************
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_BATCH.FILES
+    $INSERT I_F.AA.ARRANGEMENT
+    $INSERT I_F.AA.ARRANGEMENT.ACTIVITY
+    $INCLUDE TT.BP I_CAB.AA.ACC.COMMON
+
+    GOSUB CHECK.REQUIRED.INFO
+    GOSUB GET.ARRANGEMENT
+    GOSUB PROCESS.INPUT.ACTION
+
+    RETURN
+
+CHECK.REQUIRED.INFO:
+
+    IF LEN(ARR.ID) GT 12 THEN
+    END ELSE        ;* Stop the local accrual process. Core will take the necessary action to do the accrual process for all the valid arrangement's
+        GOSUB PROGRAM.END
+    END
+
+    RETURN
+
+GET.ARRANGEMENT:
+
+    R.AA.ARRANGEMENT = ""
+    ERR.AA.ARRANGEMENT = ""
+    CALL AA.GET.ARRANGEMENT(ARR.ID, R.AA.ARRANGEMENT, ERR.AA.ARRANGEMENT)
+
+    COMP.ID = R.AA.ARRANGEMENT<AA.ARR.CO.CODE>
+    CALL LOAD.COMPANY(COMP.ID)
+
+    ARRANGEMENT.PROPERTIES = R.AA.ARRANGEMENT<AA.ARR.PROPERTY>
+    CHANGE SM TO VM IN ARRANGEMENT.PROPERTIES
+
+    RETURN
+
+PROCESS.INPUT.ACTION:
+
+    INTEREST.PROPERTIES = 'PRINCIPALINT' :FM: 'PENALTYINT'
+
+    TXN.CNT = DCOUNT(INTEREST.PROPERTIES, FM)
+
+    PROPERTY.CNT = 1
+    LOOP
+    WHILE PROPERTY.CNT LE TXN.CNT
+
+        LOCATE INTEREST.PROPERTIES<PROPERTY.CNT> IN ARRANGEMENT.PROPERTIES<1,1> SETTING PROPERTY.POS THEN
+            GOSUB BUILD.OFS.MESSAGE
+            GOSUB PROCESS.OFS.MESSAGE
+        END
+
+        PROPERTY.CNT + =1
+
+    REPEAT
+
+    GOSUB LOG.WRITE
+
+    RETURN
+
+BUILD.OFS.MESSAGE:
+
+    ACT.ID      = "LENDING-ACCRUE-":INTEREST.PROPERTIES<PROPERTY.CNT>
+
+    AAA.REQUEST = ""
+    AAA.REQUEST<AA.ARR.ACT.ARRANGEMENT>       = ARR.ID
+    AAA.REQUEST<AA.ARR.ACT.ACTIVITY>          = ACT.ID
+    AAA.REQUEST<AA.ARR.ACT.EFFECTIVE.DATE>    = TODAY
+    AAA.REQUEST<AA.ARR.ACT.INITIATION.TYPE,1> = "USER"
+
+    APP.NAME = "AA.ARRANGEMENT.ACTIVITY"
+    OFSVERSION = APP.NAME:","
+    NO.OF.AUTH = "0"
+    OFS.RECORD = ''
+
+    ARR.ACTIVITY.ID = ""
+    ARR.ACTIVITY.ID = ARR.ID[1,12] :'-': INTEREST.PROPERTIES<PROPERTY.CNT> :'-': "ACCRUAL"          ;* Arrangement id should be 10 digits in AAA id
+
+    CALL OFS.BUILD.RECORD(APP.NAME, FUNCT, "PROCESS", OFSVERSION, "", NO.OF.AUTH, ARR.ACTIVITY.ID, AAA.REQUEST, OFS.RECORD)
+
+    RETURN
+
+PROCESS.OFS.MESSAGE:
+
+    theResponse = ""
+    txnCommitted = ""
+    options = ''
+    options<1> = "AA.ACCRUAL"
+    options<4> = "HLD"
+
+    CALL OFS.CALL.BULK.MANAGER(options,OFS.RECORD,theResponse,txnCommitted)
+
+    RETURN
+
+LOG.WRITE:
+
+    KEY.NAME = "AA.INT_" :COMO.NAME : "_" : TODAY :".csv"
+
+    READLIST LOG.LIST FROM KEY.NAME SETTING POS ELSE
+        CRT "CANNOT OPEN THE LIST"
+    END
+
+    LOG.LIST<-1> = ARR.ID :',': INTEREST.PROPERTIES<PROPERTY.CNT> :',': R.AA.ARRANGEMENT<AA.ARR.PRODUCT,1> :',': TODAY
+
+    CRT "Processed Arrangement ID :::::::::::::::::::::::::" : ARR.ID
+
+    WRITELIST LOG.LIST TO KEY.NAME
+
+    RETURN
+
+PROGRAM.END:
+
+    RETURN TO PROGRAM.END
+
+END

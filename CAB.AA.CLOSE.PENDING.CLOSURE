@@ -1,0 +1,110 @@
+    SUBROUTINE CAB.AA.CLOSE.PENDING.CLOSURE(ARR.ID)
+* ----------------------------------------------------------------------------------------------
+* Company Name     : Cairo Amman Bank
+* Developed By     : Muthukaruppan S
+* Development Id   : ITSS
+* Date             : 07th Nov 2016
+*----------------------------------------------------------------------------------------------
+* Subroutine Type  : Select routine
+* Attached to      : BNK/CAB.AA.CLOSE.PENDING.CLOSURE
+*
+* Attached As      : Batch Routine
+* ----------------------------------------------------------------------------------------------
+* Primary Purpose  : Routine to select all the arrangement with arrangement status equal to PENDING.CLOSURE
+* ----------------------------------------------------------------------------------------------
+* ARGS -(Input)    : NA
+* ARGS -(Output)   : NA
+* ----------------------------------------------------------------------------------------------
+* Modification History:
+* ---------------------
+* Modification Ref :
+* Modification Date:
+* Modified by      :
+* Modifi. Descript :
+* ----------------------------------------------------------------------------------------------
+
+*** <region name= Inserts>
+***
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.ACCOUNT
+    $INSERT I_F.AA.ARRANGEMENT
+    $INSERT I_F.AA.ARRANGEMENT.ACTIVITY
+    $INSERT TT.BP I_CAB.AA.CLOSE.PENDING.CLOSURE.COMMON
+
+*** </region>
+*** <region name= Main Body>
+
+    GOSUB PROCESS
+
+    RETURN
+
+*** </region>
+*** <region name= Select Statment>
+
+PROCESS:
+
+    CALL AA.GET.ARRANGEMENT(ARR.ID, R.ARRANGEMENT, RET.ERROR)
+    SAVE.ID.COMPANY = ID.COMPANY
+    ID.COMPANY = R.ARRANGEMENT<AA.ARR.CO.CODE>
+    ACCOUNT.ID = R.ARRANGEMENT<AA.ARR.LINKED.APPL.ID,1>
+
+    GOSUB CHECK.CASH.POOL.RECORD
+    GOSUB PROCESS.CLOSE.ARRANGEMENT
+    GOSUB BUILD.OFS.RECORD
+
+    ID.COMPANY = SAVE.ID.COMPANY
+
+    RETURN
+
+CHECK.CASH.POOL.RECORD:
+
+    R.ACCOUNT = ""
+    ERR.ACCOUNT = ""
+    CALL F.READ(FN.ACCOUNT, ACCOUNT.ID, R.ACCOUNT, F.ACCOUNT, ERR.ACCOUNT)
+
+    IF R.ACCOUNT<AC.CASH.POOL.GROUP,1> NE "" THEN
+        TRANSACTION.ID = FIELD(R.ACCOUNT<AC.CASH.POOL.GROUP,1>, "_", 1)
+        APP.NAME = "AC.CASH.POOL"
+        FUNCT = "R"
+        GOSUB BUILD.OFS.RECORD
+    END
+
+
+    RETURN
+
+BUILD.OFS.RECORD:
+
+    OFS.RECORD = ''
+    OFSVERSION = APP.NAME:","
+    NO.OF.AUTH = "0"
+    GTS.MODE = 1
+
+    CALL OFS.BUILD.RECORD(APP.NAME, FUNCT, "PROCESS", OFSVERSION, GTS.MODE, NO.OF.AUTH, TRANSACTION.ID, R.PROCESS.RECORD, OFS.RECORD)
+
+    theResponse    = ""
+    txnCommitted   = ""
+    options        = ""
+    options<1>     = "AA.CLOSE"
+    options<4>     = "HLD"
+
+    CALL OFS.CALL.BULK.MANAGER(options,OFS.RECORD,theResponse,txnCommitted)
+
+    RETURN
+
+*** </region>
+
+PROCESS.CLOSE.ARRANGEMENT:
+
+    R.AA.ARRANGEMENT.ACTIVITY = ""
+    APP.NAME = "AA.ARRANGEMENT.ACTIVITY"
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ACTIVITY>    = "LENDING-CLOSE-ARRANGEMENT"
+    R.AA.ARRANGEMENT.ACTIVITY<AA.ARR.ACT.ARRANGEMENT> = ARR.ID
+
+    TRANSACTION.ID = ""
+    R.PROCESS.RECORD = R.AA.ARRANGEMENT.ACTIVITY
+
+    FUNCT = "I"
+    RETURN
+
+END

@@ -1,0 +1,170 @@
+*-----------------------------------------------------------------------------
+* <Rating>-100</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.A.UPD.PAY.DET
+*---------------------------------------------------------------------------------------------
+*Company   Name    : Cairo Amman Bank
+*Developed By      : Temenos Application Management
+*Program   Name    : CAB.A.UPD.PAY.DET
+*---------------------------------------------------------------------------------------------
+*Description       : Auth Routine to update the status as returned in payment details file and
+*                    a new record will be created with same datas in payment.returned file.
+*Linked With       : FUNDS.TRANSFER,NON.CUST.CASH.PAYMENT.RETURN
+*In  Parameter     : N/A
+*Out Parameter     : N/A
+*ODR number used   : ODR-2011-10-0064
+*---------------------------------------------------------------------------------------------
+*Modification Details:
+*=====================
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_GTS.COMMON
+    $INSERT I_DataTypes
+    $INSERT I_System
+    $INSERT I_F.OFS.SOURCE
+    $INSERT I_F.FUNDS.TRANSFER
+    $INSERT I_F.FT.COMMISSION.TYPE
+    $INCLUDE CAB.BP I_F.PAYMENT.BATCHES
+    $INCLUDE CAB.BP I_F.PAYMENT.COMPANY
+    $INCLUDE CAB.BP I_F.PAYMENT.DETAILS
+    $INCLUDE CAB.BP I_F.PAYMENT.RETURNED
+    $INCLUDE CAB.BP I_F.CAB.FILE.PARAMETER
+
+    IF V$FUNCTION EQ "A" THEN
+        GOSUB INIT.FILES
+        GOSUB OPEN.FILES
+        GOSUB PROCESS
+    END ELSE
+        ETEXT = "EB-PAY.BAT.AUTH"
+        CALL STORE.END.ERROR
+    END
+
+    RETURN
+
+***********
+INIT.FILES:
+***********
+
+    FN.OFS.SOURCE = "F.OFS.SOURCE"
+    F.OFS.SOURCE = ""
+    FN.COM.TYPE = "F.FT.COMMISSION.TYPE"
+    F.COM.TYPE = ""
+    FN.CAB.FILE = "F.CAB.FILE.PARAMETER"
+    F.CAB.FILE = ""
+    FN.PAY.DET = "F.PAYMENT.DETAILS"
+    F.PAY.DET = ""
+    FN.PAY.RET = "F.PAYMENT.RETURNED"
+    F.PAY.RET = ""
+    FN.PAY.BAT = "F.PAYMENT.BATCHES"
+    F.PAY.BAT = ""
+    FN.PAY.CMPY = "F.PAYMENT.COMPANY"
+    F.PAY.CMPY = ""
+
+    RETURN
+
+***********
+OPEN.FILES:
+***********
+
+    CALL OPF(FN.OFS.SOURCE,F.OFS.SOURCE)
+    CALL OPF(FN.COM.TYPE,F.COM.TYPE)
+    CALL OPF(FN.PAY.DET,F.PAY.DET)
+    CALL OPF(FN.PAY.RET,F.PAY.RET)
+    CALL OPF(FN.PAY.BAT,F.PAY.BAT)
+    CALL OPF(FN.PAY.CMPY,F.PAY.CMPY)
+    CALL OPF(FN.CAB.FILE,F.CAB.FILE)
+
+    RETURN
+
+********
+PROCESS:
+********
+
+    LOC.FIELD = "PAY.DET.ID"
+    LOCAL.APPLICATION = 'FUNDS.TRANSFER'
+    LOCAL.POS = ''
+    CALL MULTI.GET.LOC.REF(LOCAL.APPLICATION,LOC.FIELD,LOCAL.POS)
+    PAY.FT.POS = LOCAL.POS<1,1>
+    Y.PAY.DET.ID = R.NEW(FT.LOCAL.REF)<1,PAY.FT.POS>
+    CALL F.READ(FN.CAB.FILE,"PAYMENTS",R.CAB.FILE,F.CAB.FILE,CAB.FILE.ERR)
+    IF R.CAB.FILE THEN
+        Y.OFS.SOURCE.ID = R.CAB.FILE<CAB.FIL.OFS.SOURCE>
+        FILE.PATH = R.CAB.FILE<CAB.FIL.GEN.FILE.PATH>
+        CALL F.READ(FN.PAY.DET,Y.PAY.DET.ID,R.PAY.DET,F.PAY.DET,PAY.DET.ERR)
+        IF R.PAY.DET THEN
+            R.PAY.DET<PY.DET.PAYMENT.STATUS> = "RETURNED"
+            R.PAY.DET<PY.DET.PAY.RETURN.DATE> = TODAY
+            R.PAY.DET<PY.DET.TXN.REF.NO> = ID.NEW
+            BATCH.CODE = R.PAY.DET<PY.DET.BATCH.CODE>
+            COMP.CHARGE.AMT = R.PAY.DET<PY.DET.COMP.CHARGE.AMT>
+            COMP.CHARGE.ID = R.PAY.DET<PY.DET.COMP.CHARGE.ID>
+        END
+    END
+    IF COMP.CHARGE.ID THEN
+        CALL F.READ(FN.PAY.BAT,BATCH.CODE,R.PAY.BAT,F.PAY.BAT,BAT.ERR)
+        IF R.PAY.BAT THEN
+            COMPANY.CODE = R.PAY.BAT<PAY.BAT.COMPANY.CODE>
+            CALL F.READ(FN.PAY.CMPY,COMPANY.CODE,R.PAY.CMPY,F.PAY.CMPY,CMPY.ERR)
+            IF R.PAY.CMPY THEN
+                COMP.ACCOUNT.NO = R.PAY.CMPY<PAY.COMP.COMP.ACCOUNT.NO>
+                CALL F.READ(FN.COM.TYPE,COMP.CHARGE.ID,R.COM.TYPE,F.COM.TYPE,COM.ERR)
+                IF R.COM.TYPE THEN
+                    DEB.PL = "PL":R.COM.TYPE<FT4.CATEGORY.ACCOUNT>
+                    DEB.CUR = R.COM.TYPE<FT4.CURRENCY>
+                    Y.FT.DATA = 'FUNDS.TRANSFER,RET/I/PROCESS,,,TRANSACTION.TYPE::=AC,DEBIT.AMOUNT::=':COMP.CHARGE.AMT:','
+                    Y.FT.DATA:= 'ORDERING.BANK::=CAB,DEBIT.CURRENCY::=':DEB.CUR:',DEBIT.ACCT.NO::=':DEB.PL:',CREDIT.ACCT.NO::=':COMP.ACCOUNT.NO
+                    GOSUB FT.CHARGE.VALIDATE
+                END
+            END
+        END
+    END
+    CALL F.WRITE(FN.PAY.DET,Y.PAY.DET.ID,R.PAY.DET)
+
+    Y.OFS.DATA = ""
+    Y.OFS.DATA = 'PAYMENT.RETURNED,RET/I/PROCESS,,':Y.PAY.DET.ID:',BATCH.CODE::=':R.PAY.DET<PY.DET.BATCH.CODE>:','
+    Y.OFS.DATA:= 'PAYMENT.AMOUNT::=':R.PAY.DET<PY.DET.PAYMENT.AMOUNT>:',PAYMENT.CURRENCY::=':R.PAY.DET<PY.DET.PAYMENT.CURRENCY>:','
+    Y.OFS.DATA:= 'PAY.BEN.NAME::=':R.PAY.DET<PY.DET.PAY.BEN.NAME>:',PAY.NARRATIVE::=':R.PAY.DET<PY.DET.PAY.NARRATIVE>:',BEN.NATIONAL.NO::=':R.PAY.DET<PY.DET.BEN.NATIONAL.NO>:','
+    Y.OFS.DATA:= 'SHAREHOLDER.NO::=':R.PAY.DET<PY.DET.SHAREHOLDER.NO>:',EMPLOYEE.NO::=':R.PAY.DET<PY.DET.EMPLOYEE.NO>:',LEGAL.ID::=':R.PAY.DET<PY.DET.LEGAL.ID>:','
+    Y.OFS.DATA:= 'EMAIL.ID::=':R.PAY.DET<PY.DET.EMAIL.ID>:',MOBILE.NO::=':R.PAY.DET<PY.DET.MOBILE.NO>:','
+    Y.OFS.DATA:= 'PHONE.NO::=':R.PAY.DET<PY.DET.PHONE.NO>:',OTH.DETAILS1::=':R.PAY.DET<PY.DET.OTH.DETAILS1>:','
+    Y.OFS.DATA:= 'OTH.DETAILS2::=':R.PAY.DET<PY.DET.OTH.DETAILS2>:',OTH.DETAILS3::=':R.PAY.DET<PY.DET.OTH.DETAILS3>:','
+    Y.OFS.DATA:= 'OTH.DETAILS4::=':R.PAY.DET<PY.DET.OTH.DETAILS4>:',OTH.DETAILS5::=':R.PAY.DET<PY.DET.OTH.DETAILS5>:','
+    Y.OFS.DATA:= 'COMP.CHARGE.ID::=':R.PAY.DET<PY.DET.COMP.CHARGE.ID>:',COMP.CHARGE.AMT::=':R.PAY.DET<PY.DET.COMP.CHARGE.AMT>:',PAYMENT.STATUS::=':R.PAY.DET<PY.DET.PAYMENT.STATUS>:','
+    Y.OFS.DATA:= 'COMP.CHARGE.CCY::=':R.PAY.DET<PY.DET.COMP.CHARGE.CCY>:',CUST.CHARGE.ID::=':R.PAY.DET<PY.DET.CUST.CHARGE.ID>:',CUST.CHARGE.AMT::=':R.PAY.DET<PY.DET.CUST.CHARGE.AMT>:','
+    Y.OFS.DATA:= 'TXN.REF.NO::=':ID.NEW:',CHARGE.CCY::=':R.PAY.DET<PY.DET.CHARGE.CCY>:',FIN.PAY.AMT::=':R.PAY.DET<PY.DET.FIN.PAY.AMT>:',PAY.RETURN.DATE::=':TODAY
+    CALL OFS.POST.MESSAGE(Y.OFS.DATA,'',Y.OFS.SOURCE.ID,OPERATOR)
+
+    RETURN
+
+*******************
+FT.CHARGE.VALIDATE:
+*******************
+
+    Y.FT.DATA.TEMP = EREPLACE(Y.FT.DATA,'PROCESS','VALIDATE',1,1)
+    CALL OFS.GLOBUS.MANAGER(Y.OFS.SOURCE.ID,Y.FT.DATA.TEMP)
+    Y.FT.STATUS = FIELD(Y.FT.DATA.TEMP,'/',3)[1,1]
+    IF Y.FT.STATUS EQ '1' THEN
+        Y.FT.ID = FIELD(Y.FT.DATA.TEMP,'/',1,1)
+        CHANGE ',' TO FM IN Y.FT.DATA
+        INS Y.FT.ID BEFORE Y.FT.DATA<4>
+        DEL Y.FT.DATA<5>
+        CHANGE FM TO ',' IN Y.FT.DATA
+        CALL OFS.POST.MESSAGE(Y.FT.DATA,'',Y.OFS.SOURCE.ID,OPERATOR)
+        R.PAY.DET<PY.DET.FT.RETURN.REF> = Y.FT.ID
+    END ELSE
+        FN.FP = FILE.PATH
+        F.FP = ""
+        CALL OPF(FN.FP,F.FP)
+        CALL F.READ(FN.FP,'CAB.ERR.FILE.':TODAY,R.FP,F.FP,FP.ERR)
+        IF R.FP THEN
+            R.FP<-1> = Y.FT.DATA.TEMP
+        END ELSE
+            R.FP = Y.FT.DATA.TEMP
+        END
+        WRITE R.FP TO F.FP,'CAB.ERR.FILE.':TODAY
+    END
+
+    RETURN
+
+END

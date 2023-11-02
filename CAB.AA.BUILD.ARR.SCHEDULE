@@ -1,0 +1,171 @@
+    SUBROUTINE CAB.AA.BUILD.ARR.SCHEDULE(ARR.ID, FILE.VERSION, SIM.REF, R.AA.PAYMENT.SCHEDULE)
+
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT T24.BP I_F.AA.SIMULATION.RUNNER
+    $INSERT T24.BP I_F.AA.ARRANGEMENT
+    $INSERT T24.BP I_F.AA.PAYMENT.SCHEDULE
+
+    GOSUB INITIALISE
+    GOSUB PROCESS
+
+    RETURN
+
+INITIALISE:
+
+
+
+    AA$SEP = "-"
+    FileID = "AA.ARR.PAYMENT.SCHEDULE"
+    FN.AA.ARR = "F.AA.ARRANGEMENT"
+
+    BEGIN CASE
+
+    CASE FILE.VERSION EQ "SIM"
+        FN.AA.ARR ="F.AA.ARRANGEMENT.SIM"
+
+    CASE FILE.VERSION EQ "LIV"
+
+    END CASE
+
+    FV.AA.ARR = ""
+    CALL OPF(FN.AA.ARR,FV.AA.ARR)
+
+    CALL F.READ(FN.AA.ARR, ARR.ID, R.ARR, FV.AA.ARR, RET.ERR)
+
+    IF R.ARR<AA.ARR.START.DATE> GT TODAY THEN
+        CMP.DATE = R.ARR<AA.ARR.START.DATE>
+    END ELSE
+        CMP.DATE = TODAY
+    END
+
+    BEGIN CASE
+
+    CASE FILE.VERSION EQ "SIM"
+
+        SIM.FLG = 1
+        FN.AA.SIM = "F.":FileID:"$SIM"
+        FV.AA.SIM = ''
+        CALL OPF(FN.AA.SIM,FV.AA.SIM)
+        CALL F.READ("F.AA.SIMULATION.RUNNER", SIM.REF, R.SIM, F.AA.SIM, RET.ERR)
+        CMP.DATE = R.SIM<AA.SIM.SIM.END.DATE>     ;*For Simulation compare with End Date
+        FIELD.POS = 2
+
+    CASE FILE.VERSION EQ "NAU"
+        NAU.FLG = 1
+        FN.AA.NAU = "F.":FileID:"$NAU"
+        FV.AA.NAU = ''
+        CALL OPF(FN.AA.NAU,FV.AA.NAU)
+        SIM.REF = ''
+        FIELD.POS = 3
+
+    CASE FILE.VERSION EQ "LIV"
+
+        FN.AA = "F.":FileID
+        FV.AA = ''
+        CALL OPF(FN.AA,FV.AA)
+        LIV.FLG = 1
+        FIELD.POS = 2
+
+    END CASE
+
+    RETURN
+
+PROCESS:
+
+    ARR.INFO = ARR.ID
+
+    BEGIN CASE
+
+    CASE SIM.FLG
+
+        SIM.UPDATED = ''
+        CALL SIM.READ(SIM.REF, 'F.AA.ARRANGEMENT.DATED.XREF', ARR.ID, DATE.RECORD, '', SIM.UPDATED, RET.ERR)
+        ARR.INFO<6> = SIM.UPDATED       ;*If Sim Flag is required or not
+
+    CASE 1
+        CALL F.READ('F.AA.ARRANGEMENT.DATED.XREF', ARR.ID, DATE.RECORD, '', RET.ERR)
+
+    END CASE
+
+    PROPERTY = "REPAYMENT.SCHEDULE"
+    PROPERTY.CLS.LIST = "PAYMENT.SCHEDULE"
+
+    LOCATE PROPERTY IN DATE.RECORD<1, 1> SETTING PROPERTY.POS THEN
+    END
+
+    GOSUB FIND.DATE ;* Get it
+
+    ID.TO.ADD = ARR.ID:AA$SEP:PROPERTY:AA$SEP:LOC.DATE :"%":SIM.REF
+
+    CALL F.READ(FN.AA.SIM, ID.TO.ADD, R.AA.PAYMENT.SCHEDULE, FV.AA.SIM, ERR.AA.SIM)
+
+    BEGIN CASE
+
+    CASE R.AA.PAYMENT.SCHEDULE<AA.PS.ACTUAL.AMT>
+        RETURN.DATA = R.AA.PAYMENT.SCHEDULE<AA.PS.ACTUAL.AMT>
+
+    CASE R.AA.PAYMENT.SCHEDULE<AA.PS.CALC.AMOUNT>
+        RETURN.DATA = R.AA.PAYMENT.SCHEDULE<AA.PS.CALC.AMOUNT>
+
+    END CASE
+
+    RETURN
+
+FIND.DATE:
+
+    ID.DATE = CMP.DATE
+    IF NOT(INDEX(ID.DATE,".",1)) THEN
+        SEARCH.DATE = ID.DATE:".999"
+    END ELSE
+        SEARCH.DATE = ID.DATE
+    END
+
+    LOCATE SEARCH.DATE IN DATE.RECORD<FIELD.POS, PROPERTY.POS, 1> BY 'DR' SETTING POS THEN          ;*  Locate to get the exact / nearest date...
+        CHECK.DELETE = DATE.RECORD<6, PROPERTY.POS, POS>    ;* If that date having delete option then delete that date from dated xref.
+        IF CHECK.DELETE THEN
+            DEL DATE.RECORD<FIELD.POS, PROPERTY.POS, POS>
+        END
+    END
+
+    LOCATE SEARCH.DATE IN DATE.RECORD<FIELD.POS, PROPERTY.POS, 1> BY 'DR' SETTING DATE.POS THEN     ;* Locate to get the exact / nearest date...
+        NULL
+    END
+    LOC.DATE = DATE.RECORD<FIELD.POS, PROPERTY.POS, DATE.POS>         ;* Return the date for the position
+    NO.AUTH.DATES = DCOUNT(DATE.RECORD<FIELD.POS,PROPERTY.POS>,SM)
+
+    IF FIELD.POS = 2 AND (DATE.POS NE NO.AUTH.DATES) THEN   ;* If authorised record date is picked and that is not the last date
+        GOSUB CHECK.RNAU.DATES          ;* Check if the same date has been reversed
+    END
+
+    RETURN
+
+CHECK.RNAU.DATES:
+
+    EXIT.FLAG = ''
+
+    IF DATE.RECORD<4,PROPERTY.POS> THEN ;* First check if there are any reversals at all
+        TEMP.DATE.RECORD = DATE.RECORD
+        LOOP
+        UNTIL EXIT.FLAG
+            LOCATE LOC.DATE IN DATE.RECORD<4,PROPERTY.POS,1> BY 'DR' SETTING REV.POS THEN ;* Is this date found in the reversal line
+                DEL TEMP.DATE.RECORD<FIELD.POS, PROPERTY.POS, DATE.POS>         ;* Delete the date from AUTH record so that it is not picked
+                LOCATE SEARCH.DATE IN TEMP.DATE.RECORD<FIELD.POS, PROPERTY.POS, 1> BY 'DR' SETTING DATE.POS THEN        ;* Locate to get the exact / nearest date...
+                    NULL
+                END
+                LOC.DATE = TEMP.DATE.RECORD<FIELD.POS, PROPERTY.POS, DATE.POS>  ;* This is the date prior to the reversed date. Take that.
+                IF LOC.DATE = '' THEN   ;* Incase of NULL, dont try to locate. It might go on a indefinite loop. Dont ever allow that!
+                    EXIT.FLAG = 1       ;* Escape chute!!
+                END
+            END ELSE
+                EXIT.FLAG = 1 ;* Normal exit. We have found the last authorized date
+            END
+        REPEAT
+
+    END
+
+    RETURN
+
+*** </region>
+
+END

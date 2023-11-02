@@ -1,0 +1,94 @@
+* Developed by AGryaznov@Temenos.com
+* 15/Feb/2012 - Initial Creation
+
+    SUBROUTINE B.CAB.BATCH.ACCTS(SEL.ID)
+
+************************************************************************
+* The algorithm for this COB routine is the following:
+* - Pick the accounts defined in CAB.EBI.MNSTR.ACCOUNTS
+* - Read the file ACCT.ENT.LWORK.DAY with @ID as the account
+* - Loop in the stmt.entry ids mentioned in the record of acct.ent.lwork.day
+* - Pick the details and create Ministry Finance Transaction Report
+*   as a flat file in the folder EBI/MNSTR.TMP
+* It is designed for the External Batch Interface (project CAB)
+*
+*                  ---- MODIFICATIONS ---------
+*
+************************************************************************
+
+$INSERT I_COMMON
+$INSERT I_EQUATE
+$INSERT I_F.STMT.ENTRY
+$INSERT I_F.TRANSACTION
+$INSERT I_B.CAB.BATCH.ACCTS
+
+    GOSUB INITIALIZE
+    GOSUB PROCESS
+
+    RETURN
+
+************************************************************************
+
+PROCESS:
+
+    LOC.MSG  = ''
+
+    R.STMT.ENTRY = ''
+    CALL F.READ(FN.STMT.ENTRY,SEL.ID,R.STMT.ENTRY,F.STMT.ENTRY,STMT.ENTRY.ERR)
+
+    LOC.ACCT = R.STMT.ENTRY<AC.STE.ACCOUNT.NUMBER>
+    IF NOT(LOC.ACCT) THEN LOC.ACCT = R.STMT.ENTRY<AC.STE.PL.CATEGORY>
+
+    LOC.MSG  =           LOC.ACCT
+    LOC.MSG := Y.DELIM : SEL.ID
+    LOC.MSG := Y.DELIM : R.STMT.ENTRY<AC.STE.VALUE.DATE>
+    LOC.MSG := Y.DELIM : R.STMT.ENTRY<AC.STE.BOOKING.DATE>
+
+    LOC.TRNX = R.STMT.ENTRY<AC.STE.TRANSACTION.CODE>
+
+    LOC.MSG := Y.DELIM : LOC.TRNX
+
+    LOC.NRRT = R.STMT.ENTRY<AC.STE.NARRATIVE>
+    IF NOT(LOC.NRRT) THEN
+       CALL DBR("TRANSACTION":FM:AC.TRA.NARRATIVE,LOC.TRNX,LOC.NRRT)
+    END
+    CONVERT VM TO ' ' IN LOC.NRRT
+
+    LOC.MSG := Y.DELIM : LOC.NRRT
+    LOC.MSG := Y.DELIM : R.STMT.ENTRY<AC.STE.TRANS.REFERENCE>
+
+    LOC.AMT   = R.STMT.ENTRY<AC.STE.AMOUNT.FCY>
+    LOC.RATE  = R.STMT.ENTRY<AC.STE.EXCHANGE.RATE>
+    LOC.RDATE = R.STMT.ENTRY<AC.STE.VALUE.DATE>
+    IF NOT(LOC.AMT) THEN
+       LOC.AMT   = R.STMT.ENTRY<AC.STE.AMOUNT.LCY>
+       LOC.RATE  = ''
+       LOC.RDATE = ''
+    END
+
+    LOC.MSG := Y.DELIM : LOC.AMT
+
+    LOC.AGNT = R.STMT.ENTRY<AC.STE.CUSTOMER.ID>
+    IF NOT(LOC.AGNT) THEN LOC.AGNT = R.STMT.ENTRY<AC.STE.ACCOUNT.OFFICER>
+
+    LOC.MSG := Y.DELIM : LOC.AGNT
+
+    LOC.MSG := Y.DELIM : R.STMT.ENTRY<AC.STE.CURRENCY>
+    LOC.MSG := Y.DELIM : LOC.RATE
+    LOC.MSG := Y.DELIM : LOC.RDATE
+
+    *Save to file
+    FILE.NAME = TODAY:'.':SEL.ID
+    WRITE LOC.MSG TO F.OUT.FILE,FILE.NAME
+
+    RETURN
+ 
+************************************************************************
+
+INITIALIZE:
+
+    RETURN
+
+************************************************************************
+
+END

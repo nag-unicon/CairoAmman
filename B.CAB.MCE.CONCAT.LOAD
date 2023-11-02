@@ -1,0 +1,66 @@
+* Version 1.0
+* Started on 18.06.2012 by AGryaznov@Temenos.com
+
+*********************************************************************
+* This COB routine will 
+* - Select the CAB.MCE.STOCK.ID file in SELECT part.
+* - With the returned IDs list, read & format the STOCK.ENTRY related details.
+* - Produce flat files in the folder MCE\TMP.
+* It is designed for the MCE Interface (project CAB).
+*
+*                       ---- MODIFICATIONS ---------
+*********************************************************************
+
+   SUBROUTINE B.CAB.MCE.CONCAT.LOAD
+   
+$INSERT I_COMMON
+$INSERT I_EQUATE
+$INSERT I_B.CAB.MCE.CONCAT
+$INSERT I_F.CAB.MCE.PARAM
+
+    GOSUB INITIALISE
+
+    RETURN
+
+************************************************************************
+
+INITIALISE:
+
+    FN.CAB.MCE.PARAM = 'F.CAB.MCE.PARAM'
+    F.CAB.MCE.PARAM  = ''
+    CALL OPF(FN.CAB.MCE.PARAM,F.CAB.MCE.PARAM)
+
+    R.CAB.MCE.PARAM = ''
+    CALL F.READ(FN.CAB.MCE.PARAM,"TMP.DIR",R.CAB.MCE.PARAM,F.CAB.MCE.PARAM,CAB.MCE.PARAM.ERR)
+    LOC.OUT.DIR = R.CAB.MCE.PARAM<CMP.VALUE,1> : R.CAB.MCE.PARAM<CMP.VALUE,2>
+
+    OPEN LOC.OUT.DIR TO F.OUT.FILE ELSE
+       PRINT "Can not open file ":LOC.OUT.DIR
+       RETURN
+    END
+
+    FN.ACCOUNT = 'F.ACCOUNT'
+    F.ACCOUNT  = ''
+    CALL OPF(FN.ACCOUNT,F.ACCOUNT)
+
+    FN.COMPANY = 'F.COMPANY'
+    F.COMPANY  = ''
+    CALL OPF(FN.COMPANY,F.COMPANY)
+
+    FN.STOCK.ENTRY = 'F.STOCK.ENTRY'
+    F.STOCK.ENTRY  = ''
+    CALL OPF(FN.STOCK.ENTRY,F.STOCK.ENTRY)
+
+    FN.CAB.MCE.STOCK.ID = 'F.CAB.MCE.STOCK.ID'
+    F.CAB.MCE.STOCK.ID  = ''
+    CALL OPF(FN.CAB.MCE.STOCK.ID,F.CAB.MCE.STOCK.ID)
+
+    FN.CAB.MCE.STOCK.ID.HIS = 'F.CAB.MCE.STOCK.ID.HIS'
+    F.CAB.MCE.STOCK.ID.HIS  = ''
+    CALL OPF(FN.CAB.MCE.STOCK.ID.HIS,F.CAB.MCE.STOCK.ID.HIS)
+
+    RETURN
+
+************************************************************************
+
+END

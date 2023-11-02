@@ -1,0 +1,71 @@
+* Version 1.0
+* Started on 18.06.2012 by AGryaznov@Temenos.com
+
+*********************************************************************
+* This COB routine will 
+* - Select the files in the folder MCE\TMP.
+* - Concatenate all the flat files and produce a single file in the folder MCE\OUT
+* This rtn must be run after job B.CAB.MCE.CONCAT.
+* It is designed for the MCE Interface (project CAB).
+*
+*                       ---- MODIFICATIONS ---------
+*********************************************************************
+
+   SUBROUTINE B.CAB.MCE.CONCAT.POST
+
+$INSERT I_COMMON
+$INSERT I_EQUATE
+$INSERT I_F.CAB.MCE.PARAM
+
+
+    GOSUB INITIALIZE
+    IF NOT(LOC.OUT.DIR) THEN RETURN
+    IF NOT(LOC.TMP.DIR) THEN RETURN
+    GOSUB PROCESS
+
+    RETURN
+
+
+************************************************************************
+
+PROCESS:
+
+    LOC.TIME = TIMEDATE()
+    LOC.TIME = LOC.TIME[1,8]
+    CONVERT ":" TO "" IN LOC.TIME
+
+    Y.FNAME = "chqrqstmng":LOC.TIME:".txt"
+
+    LOC.CAT.CMD = 'SH "cat ./':LOC.TMP.DIR:'/* > ./':LOC.OUT.DIR:'/':Y.FNAME:'"'
+    EXECUTE LOC.CAT.CMD
+    CRT LOC.CAT.CMD
+
+    LOC.DEL.CMD = "CLEAR.FILE ":LOC.TMP.DIR
+    EXECUTE LOC.DEL.CMD
+    CRT LOC.DEL.CMD
+
+    RETURN
+ 
+*************************************************************************
+
+INITIALIZE:
+
+    FN.CAB.MCE.PARAM = 'F.CAB.MCE.PARAM'
+    F.CAB.MCE.PARAM  = ''
+    CALL OPF(FN.CAB.MCE.PARAM,F.CAB.MCE.PARAM)
+
+    LOC.OUT.DIR = ''
+    R.CAB.MCE.PARAM = ''
+    CALL F.READ(FN.CAB.MCE.PARAM,"OUT.DIR",R.CAB.MCE.PARAM,F.CAB.MCE.PARAM,CAB.MCE.PARAM.ERR)
+    LOC.OUT.DIR = R.CAB.MCE.PARAM<CMP.VALUE,1> : R.CAB.MCE.PARAM<CMP.VALUE,2>
+
+    LOC.TMP.DIR = ''
+    R.CAB.MCE.PARAM = ''
+    CALL F.READ(FN.CAB.MCE.PARAM,"TMP.DIR",R.CAB.MCE.PARAM,F.CAB.MCE.PARAM,CAB.MCE.PARAM.ERR)
+    LOC.TMP.DIR = R.CAB.MCE.PARAM<CMP.VALUE,1> : R.CAB.MCE.PARAM<CMP.VALUE,2>
+
+    RETURN
+
+*************************************************************************
+
+END

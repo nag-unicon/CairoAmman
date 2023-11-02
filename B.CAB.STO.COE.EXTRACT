@@ -1,0 +1,165 @@
+* Developed by - ksrini@temenos.com
+
+    SUBROUTINE B.CAB.STO.COE.EXTRACT(SEL.ID)
+
+************************************************************************
+* This Service routine will
+* - Select the FT WITH INWARD.PAY.TYPE LIKE STO... AND CREDIT.ACCT.NO LIKE ...12432...
+* - With the returned FT list, read & format the STO related details
+* - Produce flat files in a folder
+* It is designed for the STO-COE interface.
+*
+*                  ---- MODIFICATIONS ---------
+*
+* 21-Oct-2012 - Initial Creation
+************************************************************************
+
+    $INSERT I_COMMON
+    $INSERT I_EQUATE
+    $INSERT I_F.FUNDS.TRANSFER
+    $INSERT I_F.STANDING.ORDER
+    $INSERT I_B.CAB.STO.COE.EXTRACT
+    $INSERT I_F.FT.TXN.TYPE.CONDITION
+    $INSERT I_F.TRANSACTION
+    $INSERT I_F.CURRENCY
+    $INSERT I_F.CUSTOMER
+
+    GOSUB INITIALIZE
+    GOSUB PROCESS
+
+    RETURN
+
+
+************************************************************************
+
+PROCESS:
+
+    EQU CRLF TO CHARX(013):CHARX(010)
+    LOC.MSG  = ''
+
+    R.FT = ''
+    FT.ERR = ''
+    CALL F.READ(FN.FUNDS.TRANSFER,SEL.ID,R.FT,F.FUNDS.TRANSFER,FT.ERR)
+    STO.ID = FIELD(R.FT<FT.INWARD.PAY.TYPE>,'-',3):'.':FIELD(R.FT<FT.INWARD.PAY.TYPE>,'-',4)
+    R.STO = ''
+    STO.ERR = ''
+    CALL F.READ(FN.STO,STO.ID,R.STO,F.STO,STO.ERR)
+**Changes for selecting transactions which has kin.acct.no,cpty.act.no with inter-sys categ.
+    YR.INT = 0
+    IF NOT(NUM(R.STO<STO.CPTY.ACCT.NO>)) AND R.STO<STO.CPTY.ACCT.NO>[4,5] EQ '12432' THEN
+        YR.INT = 1
+    END
+    IF R.STO<STO.LOCAL.REF,KIN.ACCT.NO.POS> EQ '' AND YR.INT EQ 0 AND R.STO<STO.DEBIT.THEIR.REF> EQ '' THEN
+        RETURN
+    END
+**End of Change
+
+    IF R.STO<STO.TYPE> EQ 'BO' OR R.STO<STO.TYPE> EQ 'FI' THEN
+        IF R.STO<STO.CREDIT.CUSTOMER> THEN
+            YR.NARRATIVE.1 = '9050 STANDING ORDER DR'
+            YR.CUSTOMER.ID = R.STO<STO.CREDIT.CUSTOMER>
+        END ELSE
+            YR.NARRATIVE.1 = '9051 STANDING ORDER CR'
+            YR.CUSTOMER.ID = R.STO<STO.DEBIT.CUSTOMER>
+        END
+        IF YR.CUSTOMER.ID NE '' THEN
+            CALL F.READ(FN.CUSTOMER,YR.CUSTOMER.ID,R.CUST.REC,F.CUSTOMER,CUST.ERR)
+            YR.CUSTOMER.NAME = R.CUST.REC<EB.CUS.SHORT.NAME,1>[1,25]
+        END
+        LOC.MSG = R.STO<STO.DEBIT.THEIR.REF>'13" "L'
+        IF R.FT<FT.DEBIT.AMOUNT> THEN
+            AMOUNT = R.FT<FT.DEBIT.AMOUNT>
+            AC.CCY = R.FT<FT.DEBIT.CURRENCY>
+        END ELSE
+            AMOUNT = R.FT<FT.CREDIT.AMOUNT>
+            AC.CCY = R.FT<FT.CREDIT.CURRENCY>
+        END
+        R.CCY = ''
+        CCY.ERR = ''
+        CALL F.READ(FN.CCY,AC.CCY,R.CCY,F.CCY,CCY.ERR)
+        IF R.CCY THEN
+            CCY.DEC = R.CCY<EB.CUR.NO.OF.DECIMALS>
+            AMT.DEC = 14 - CCY.DEC
+        END
+        BALANCE.FMT1 = FIELD(AMOUNT,'.',1)
+        BALANCE.FMT2 = FIELD(AMOUNT,'.',2)
+        BALANCE.FMT1 = FMT(BALANCE.FMT1,'R%':AMT.DEC)
+        BALANCE.FMT2 = FMT(BALANCE.FMT2,'R%':CCY.DEC)
+        AMOUNT = BALANCE.FMT1:BALANCE.FMT2
+        LOC.MSG:= AMOUNT
+        LOC.MSG:= '+'
+        LOC.MSG:= '46'
+        LOC.MSG:= R.FT<FT.CREDIT.VALUE.DATE>[3,6]
+        FTTC.ID = R.FT<FT.TRANSACTION.TYPE>
+        R.FTTC = ''
+        FTTC.ERR = ''
+        CALL F.READ(FN.FTTC,FTTC.ID,R.FTTC,F.FTTC,FTTC.ERR)
+        TXN.ID = R.FTTC<FT6.STO.TXN.CODE.CR>
+        R.TXN = ''
+        TXN.ERR = ''
+        CALL F.READ(FN.TXN,TXN.ID,R.TXN,F.TXN,TXN.ERR)
+**        LOC.MSG:=R.TXN<AC.TRA.NARRATIVE,1>[25]'25" "R'
+        LOC.MSG:=YR.NARRATIVE.1'25" "L'
+**        LOC.MSG:=R.FT<FT.CREDIT.THEIR.REF>[25]'25" "R'
+        LOC.MSG:=YR.CUSTOMER.NAME'25" "L'
+**        LOC.MSG:='''25" "R'
+        LOC.MSG:=STO.ID'25" "L'
+
+        LOC.MSG:=CRLF
+
+        LOC.MSG := R.STO<STO.LOCAL.REF,KIN.ACCT.NO.POS>'13" "L'
+        IF R.FT<FT.DEBIT.AMOUNT> THEN
+            AMOUNT = R.FT<FT.DEBIT.AMOUNT>
+            AC.CCY = R.FT<FT.DEBIT.CURRENCY>
+        END ELSE
+            AMOUNT = R.FT<FT.CREDIT.AMOUNT>
+            AC.CCY = R.FT<FT.CREDIT.CURRENCY>
+        END
+        R.CCY = ''
+        CCY.ERR = ''
+        CALL F.READ(FN.CCY,AC.CCY,R.CCY,F.CCY,CCY.ERR)
+        IF R.CCY THEN
+            CCY.DEC = R.CCY<EB.CUR.NO.OF.DECIMALS>
+            AMT.DEC = 14 - CCY.DEC
+        END
+        BALANCE.FMT1 = FIELD(AMOUNT,'.',1)
+        BALANCE.FMT2 = FIELD(AMOUNT,'.',2)
+        BALANCE.FMT1 = FMT(BALANCE.FMT1,'R%':AMT.DEC)
+        BALANCE.FMT2 = FMT(BALANCE.FMT2,'R%':CCY.DEC)
+        AMOUNT = BALANCE.FMT1:BALANCE.FMT2
+        LOC.MSG:= AMOUNT
+        LOC.MSG:= '-'
+        LOC.MSG:= '46'
+        LOC.MSG:= R.FT<FT.DEBIT.VALUE.DATE>[3,6]
+        FTTC.ID = R.FT<FT.TRANSACTION.TYPE>
+        R.FTTC = ''
+        FTTC.ERR = ''
+        CALL F.READ(FN.FTTC,FTTC.ID,R.FTTC,F.FTTC,FTTC.ERR)
+        TXN.ID = R.FTTC<FT6.STO.TXN.CODE.DR>
+        R.TXN = ''
+        TXN.ERR = ''
+        CALL F.READ(FN.TXN,TXN.ID,R.TXN,F.TXN,TXN.ERR)
+**        LOC.MSG:=R.TXN<AC.TRA.NARRATIVE,1>[25]'25" "R'
+**        LOC.MSG:=R.FT<FT.CREDIT.THEIR.REF>[25]'25" "R'
+        LOC.MSG:=YR.NARRATIVE.1'25" "L'
+        LOC.MSG:=YR.CUSTOMER.NAME'25" "L'
+**        LOC.MSG:='''25" "R'
+        LOC.MSG:=STO.ID'25" "L'
+
+*Save to file
+        FILE.NAME = TODAY:'.':SEL.ID
+        WRITE LOC.MSG TO F.OUT.FILE,FILE.NAME
+    END
+
+
+    RETURN
+
+*************************************************************************
+
+INITIALIZE:
+
+    RETURN
+
+*************************************************************************
+
+END

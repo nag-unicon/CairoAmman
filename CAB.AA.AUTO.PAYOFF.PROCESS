@@ -1,0 +1,301 @@
+*-----------------------------------------------------------------------------
+* <Rating>-85</Rating>
+*-----------------------------------------------------------------------------
+    SUBROUTINE CAB.AA.AUTO.PAYOFF.PROCESS
+* ==========================================================
+* Company Name  : ITSS
+* ==========================================================
+* Modify by :Mudassir
+*15-03-2018 Remove UNC CALL routine CAB.CLEAR.UNC.Since system is calculate and update the remaining balance
+* While using AA.CAB.PAYOFF concate file LENDING-ISSUE-PAYOFF Reverse happened.So we remove this concate file.
+* ----------------------------------------------------------------
+    $INSERT T24.BP I_COMMON
+    $INSERT T24.BP I_EQUATE
+    $INSERT T24.BP I_AA.LOCAL.COMMON
+    $INSERT T24.BP I_F.AA.ARRANGEMENT.ACTIVITY
+    $INSERT T24.BP I_F.AA.ARRANGEMENT
+    $INSERT T24.BP I_F.AA.ACCOUNT
+    $INSERT T24.BP I_F.AA.CHARGE
+    $INSERT T24.BP I_F.ACCOUNT
+    $INSERT T24.BP I_F.AA.ACCOUNT.DETAILS
+    $INSERT T24.BP I_AA.ACTION.CONTEXT
+    $INSERT T24.BP I_AA.APP.COMMON
+    $INSERT T24.BP I_AA.CONTRACT.DETAILS
+    $INSERT T24.BP I_F.AA.ACTIVITY.HISTORY
+    $INSERT CAB.BP I_F.AA.PAYOFF.PARAM
+
+    ARR.ID = AA$ARR.ID        ;* Arrangement contract Id
+
+    GOSUB GET.LOC.REF.POS
+    GOSUB VALIDATE.SETTLEMENT.ACCOUNT
+
+    BEGIN CASE
+
+    CASE c_arrActivityStatus["-",1,1] EQ 'UNAUTH'
+
+        IF NOT(R.NEW(AA.CHG.LOCAL.REF)<1, REASON.POS>) THEN
+            AF = AA.CHG.LOCAL.REF
+            AV = REASON.POS
+            AS = ''
+            ETEXT = 'AA-PAYOFF.REASON.MANDATE'
+            CALL STORE.END.ERROR
+            RETURN
+        END
+
+        GOSUB UPDATE.CHARGE.RATE        ;* updating charge rate based on user/param input
+
+        IF NOT(UPD.RATE) THEN
+            IF LEFT(UPD.RATE, 1) NE 0 THEN        ;* System should accept the user rate 0.
+                GOSUB DEFAULT.RATE.FROM.PARAM     ;* updating rate from param
+            END
+        END
+    CASE c_arrActivityStatus EQ 'AUTH'
+*       CALL CAB.CLEAR.UNC(ARR.ID)      ;*** Post the UNC amount back to settlement account for payoff.
+        GOSUB PROCESS.AUTO.PAYOFF.SIMULATION      ;* raise OFS for payoff
+*       GOSUB CANCEL.BILL
+
+    CASE c_arrActivityStatus EQ 'AUTH-REV'
+
+*      GOSUB POST.CANCEL.BILL
+*      GOSUB CANCEL.BILL
+
+    END CASE
+
+    RETURN
+
+GET.LOC.REF.POS:
+
+    APPL.ARR      = 'AA.PRD.DES.CHARGE' :FM: 'AA.PRD.DES.ACCOUNT'
+    FIELDNAME.ARR = 'PAYOFF.REASON':VM:'PAYOFF.SETT.AC':VM:'PAYOFF.CHG.RATE':VM:'L.BLUE.RING':FM:'SETTLE.ACCOUNT'
+    POS.ARR       = ''
+
+    CALL MULTI.GET.LOC.REF(APPL.ARR,FIELDNAME.ARR,POS.ARR)
+
+    REASON.POS         = POS.ARR<1,1>
+    SET.ACCT.POS       = POS.ARR<1,2>
+    RATE.POS           = POS.ARR<1,3>
+    Y.BR.POS           = POS.ARR<1,4>
+    SETTLE.ACCOUNT.POS = POS.ARR<2,1>
+
+    MATURITY.DATE  = c_aalocAccountDetails<AA.AD.MATURITY.DATE>
+    EFFECTIVE.DATE = c_aalocActivityEffDate
+    CURRENT.DATE   = c_aalocActivityEffDate
+
+    IF LEN(MATURITY.DATE) EQ '8' AND LEN(CURRENT.DATE) EQ '8' THEN    ;* to avoid fatal out
+        NO.OF.DAYS = 'C'
+        CALL CDD('',CURRENT.DATE,MATURITY.DATE,NO.OF.DAYS)
+    END
+
+    RETURN
+
+VALIDATE.SETTLEMENT.ACCOUNT:
+
+    SETTLEMENT.ACCT = ''
+    EFFECTIVE.DATE  = TODAY
+
+    CALL AA.GET.PROPERTY.RECORD('', ARR.ID, 'PAYOFFFEE', EFFECTIVE.DATE, 'CHARGE', '', AA.CHARGE.RECORD, RET.ERR)
+
+    SETTLEMENT.ACCT = R.NEW(AA.CHG.LOCAL.REF)<1, SET.ACCT.POS>
+    Y.BR.VALUE      = R.NEW(AA.CHG.LOCAL.REF)<1,Y.BR.POS>
+
+    IF SETTLEMENT.ACCT EQ '' THEN
+        CALL AA.GET.PROPERTY.RECORD('', ARR.ID, 'ACCOUNT', EFFECTIVE.DATE, 'ACCOUNT', '', AA.RECORD, RET.ERR)
+        SETTLEMENT.ACCT = AA.RECORD<AA.AC.LOCAL.REF, SETTLE.ACCOUNT.POS>
+    END
+
+    IF SETTLEMENT.ACCT EQ '' THEN
+        ETEXT ="Settlement Account Mandatory for Payoff"
+        CALL STORE.END.ERROR
+        RETURN
+    END
+
+*** New validation has been introduced to stop the PAYOFF twice on same date
+
+*    FN.ACT.HIS = 'F.AA.ACTIVITY.HISTORY'
+*    F.ACT.HIS  = ''
+*    CALL OPF(FN.ACT.HIS, F.ACT.HIS)
+
+*    R.ACT.HIS  = ""
+*    ER.ACT.HIS = ""
+*    CALL F.READ(FN.ACT.HIS,ARR.ID,R.ACT.HIS,F.ACT.HIS,ER.ACT.HIS)
+
+*    FINDSTR 'LENDING-AUTO-PAYOFF' IN R.ACT.HIS<AA.AH.ACTIVITY> SETTING FM.POS, VM.POS, SM.POS THEN
+*        IF R.ACT.HIS<AA.AH.ACT.STATUS,VM.POS,SM.POS> EQ 'AUTH' THEN
+*            IF R.ACT.HIS<AA.AH.EFFECTIVE.DATE,VM.POS> EQ TODAY THEN
+*                ETEXT ='Auto payoff Already Exists'
+*                CALL STORE.END.ERROR
+*                RETURN
+*            END
+*        END
+*    END
+
+    FN.CAB.CUST = 'F.ACCOUNT'
+    F.CAB.CUST  = ''
+    CALL OPF(FN.CAB.CUST,F.CAB.CUST)
+
+    R.CAB.CUST = ""
+    CALL F.READ(FN.CAB.CUST, SETTLEMENT.ACCT, R.CAB.CUST, F.CAB.CUST, ER.CAB)
+
+    IF R.CAB.CUST<AC.CUSTOMER> NE c_aalocArrangementRec<AA.ARR.CUSTOMER> THEN
+        TEXT = 'Settlement Account is not belong to Customer'
+        CURR.NO = DCOUNT(R.NEW(V-9),@VM)
+        CURR.NO = CURR.NO+1
+        CALL STORE.OVERRIDE(CURR.NO)
+    END
+
+    RETURN
+
+DEFAULT.RATE.FROM.PARAM:
+
+    UPD.RATE      = '0'
+    PAYOFF.REASON = R.NEW(AA.CHG.LOCAL.REF)<1, REASON.POS>
+    PRODUCT.GROUP = c_aalocArrangementRec<AA.ARR.PRODUCT.GROUP>
+
+    FN.AA.PAYOFF.PARAM = 'F.AA.PAYOFF.PARAM'
+    F.AA.PAYOFF.PARAM = ''
+    CALL OPF(FN.AA.PAYOFF.PARAM,F.AA.PAYOFF.PARAM)
+
+    IF R.NEW(AA.CHG.LOCAL.REF)<1, RATE.POS> EQ '' THEN      ;*** Only need to update during charge rate is not present
+
+        R.AA.PAYOFF.PARAM = ""
+        PARAM.ERR = ""
+        CALL F.READ(FN.AA.PAYOFF.PARAM, PRODUCT.GROUP, R.AA.PAYOFF.PARAM, F.AA.PAYOFF.PARAM, PARAM.ERR)
+        REASON.DETAILS = R.AA.PAYOFF.PARAM<POFF.PAYOFF.REASON>
+
+        LOCATE PAYOFF.REASON IN REASON.DETAILS<1,1> SETTING FND.POS THEN
+            UPD.RATE = R.AA.PAYOFF.PARAM<POFF.PAYOFF.CHARGE.RATE,FND.POS>
+            GOSUB DEFAULT.RATE
+        END
+    END
+
+    RETURN
+
+UPDATE.CHARGE.RATE:
+
+    UPD.RATE = ""
+    IF R.NEW(AA.CHG.LOCAL.REF)<1,RATE.POS> OR LEFT(R.NEW(AA.CHG.LOCAL.REF)<1,RATE.POS>,1) EQ 0 THEN
+        UPD.RATE = R.NEW(AA.CHG.LOCAL.REF)<1,RATE.POS>
+        GOSUB DEFAULT.RATE
+    END
+
+
+    RETURN
+
+DEFAULT.RATE:
+
+    IF NO.OF.DAYS LE '365' THEN         ;***By default less than 365 days no need to calculate payoff charge
+        UPD.RATE = '0'
+    END
+
+    START.CNT = 1
+    TOTAL.CNT = DCOUNT(R.NEW(AA.CHG.CHARGE.RATE), VM)
+
+    IF NOT(TOTAL.CNT) THEN
+        TOTAL.CNT = 1
+    END
+
+    R.NEW(AA.CHG.FIXED.AMOUNT) = ''
+    R.NEW(AA.CHG.CHARGE.TYPE)  = 'CALCULATED'
+    R.NEW(AA.CHG.TIER.GROUPS)  = 'LEVEL'
+
+    LOOP
+    WHILE START.CNT LE TOTAL.CNT
+
+        R.NEW(AA.CHG.CHARGE.RATE)<1,START.CNT>    = UPD.RATE
+        R.NEW(AA.CHG.CALC.TIER.TYPE)<1,START.CNT> = 'LEVEL'
+        R.NEW(AA.CHG.CALC.TYPE)<1,START.CNT>      = 'PERCENTAGE'
+
+        START.CNT ++
+    REPEAT
+
+    RETURN
+
+PROCESS.AUTO.PAYOFF.SIMULATION:
+
+    FN.CAB.PAY = 'F.CAB.PAYOFF'
+    F.CAB.PAY  = ''
+    CALL OPF(FN.CAB.PAY,F.CAB.PAY)
+
+    Y.EFFECTIVE.DATE = ''
+    Y.BR.DATE        = ''
+    EFFECTIVE.DATE   = c_aalocActivityEffDate
+    Y.BR.DATE        = EFFECTIVE.DATE
+
+    IF  Y.BR.VALUE NE 'SPECIAL' THEN
+        Y.EFFECTIVE.DATE = Y.BR.DATE
+    END ELSE
+        YDAYS.ORIG = '+1W'
+        CALL CDT('',Y.BR.DATE,YDAYS.ORIG)
+        Y.EFFECTIVE.DATE = Y.BR.DATE
+    END
+
+    PROP.CLASS     = 'PAYOFF'
+    PROP.NAME      = ''
+    PRODUCT.RECORD = c_aalocProductRecord
+
+    CALL AA.GET.PROPERTY.NAME(PRODUCT.RECORD,PROP.CLASS,PROP.NAME)
+
+    R.SIMULATION.CAPTURE = ''
+    R.SIMULATION.CAPTURE<AA.ARR.ACT.ACTIVITY>       = 'LENDING-CALCULATE-':PROP.NAME
+    R.SIMULATION.CAPTURE<AA.ARR.ACT.AUTO.RUN>       = 'DIRECT.EXECUTE'
+
+    GOSUB FORM.OFS.MESSAGE
+
+    R.CAB.AY  = ''
+    RECORD.ID = c_aalocArrId : "-" :Y.EFFECTIVE.DATE
+
+    CALL F.WRITE(FN.CAB.PAY, RECORD.ID, R.CAB.PAY)
+
+    RETURN
+
+FORM.OFS.MESSAGE:
+
+    APP.NAME     = 'AA.SIMULATION.CAPTURE'
+    PROCESS      = 'PROCESS'
+    OFS.VERSION  = 'AA.SIMULATION.CAPTURE,OFS.CA.AA'
+    OFS.FUNCTION = 'I'
+    GTS.MODE     = ''
+    NO.OF.AUTH   = '0'
+    TRANSACTION.ID = ''
+    OFS.MESSAGE    = ''
+    MESSAGE.ID     = ''
+    OFS.SOURCE.ID  = 'AA.COB'
+
+    R.SIMULATION.CAPTURE<AA.ARR.ACT.ARRANGEMENT>    = ARR.ID
+    R.SIMULATION.CAPTURE<AA.ARR.ACT.EFFECTIVE.DATE> = Y.EFFECTIVE.DATE
+
+    REQ.MODE = "USER"
+    CALL CAB.GET.SIM.CAPTURE.ID(REQ.MODE, TRANSACTION.ID)
+
+    CALL OFS.BUILD.RECORD(APP.NAME,OFS.FUNCTION,PROCESS, OFS.VERSION, GTS.MODE, NO.OF.AUTH, TRANSACTION.ID, R.SIMULATION.CAPTURE, OFS.MESSAGE)
+    CALL OFS.POST.MESSAGE(OFS.MESSAGE,MESSAGE.ID, OFS.SOURCE.ID, '')
+
+    RETURN
+
+POST.CANCEL.BILL:
+
+    R.SIMULATION.CAPTURE = ''
+    R.SIMULATION.CAPTURE<AA.ARR.ACT.ACTIVITY>       = 'LENDING-CANCEL-PAYOFF'
+    R.SIMULATION.CAPTURE<AA.ARR.ACT.AUTO.RUN>       = 'DIRECT.EXECUTE'
+
+    GOSUB FORM.OFS.MESSAGE
+
+    RETURN
+
+CANCEL.BILL:
+
+    FN.AA.CAB.PAY ='F.AA.CAB.PAYOFF'
+    F.AA.CAB.PAY =''
+    CALL OPF(FN.AA.CAB.PAY,F.AA.CAB.PAY)
+
+    R.CAB.PAY = ''
+    REC.ID    = c_aalocArrId
+    CALL F.WRITE(FN.AA.CAB.PAY,REC.ID,R.CAB.PAY)
+
+    RETURN
+
+PROGRAM.END:
+
+    RETURN TO PROGRAM.END
+
+END
